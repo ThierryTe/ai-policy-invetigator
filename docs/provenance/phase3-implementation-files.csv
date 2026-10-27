@@ -1,0 +1,34 @@
+path,change,origin
+README.md,MODIFIED,Adaptation of this new project; prior provenance retained
+compose.yaml,MODIFIED,Adaptation of this new project; prior provenance retained
+docs/PHASE3.md,MODIFIED,Adaptation of this new project; prior provenance retained
+docs/api/phase3.md,NEW,Newly authored for Phase 3; no new reference imports
+docs/provenance/HACKATHON_CONTRIBUTIONS.md,MODIFIED,Adaptation of this new project; prior provenance retained
+docs/provenance/phase3-files.csv,MODIFIED,Adaptation of this new project; prior provenance retained
+docs/provenance/phase3-implementation-files.csv,NEW,Newly authored for Phase 3; no new reference imports
+docs/verification/phase3-attempts/1793062908527294000.json,NEW,Newly authored for Phase 3; no new reference imports
+docs/verification/phase3-attempts/1793077945644131000.json,NEW,Newly authored for Phase 3; no new reference imports
+docs/verification/phase3-demo.json,NEW,Newly authored for Phase 3; no new reference imports
+docs/verification/phase3-results.json,NEW,Newly authored for Phase 3; no new reference imports
+evaluation/phase3-golden.json,NEW,Newly authored for Phase 3; no new reference imports
+scripts/smoke_investigation.py,NEW,Newly authored for Phase 3; no new reference imports
+scripts/smoke_workflow.py,MODIFIED,Adaptation of this new project; prior provenance retained
+src/main/java/com/tewendelabs/investigator/investigation/EvidenceValidator.java,NEW,Newly authored for Phase 3; no new reference imports
+src/main/java/com/tewendelabs/investigator/investigation/InvestigationController.java,NEW,Newly authored for Phase 3; no new reference imports
+src/main/java/com/tewendelabs/investigator/investigation/InvestigationSchemas.java,NEW,Newly authored for Phase 3; no new reference imports
+src/main/java/com/tewendelabs/investigator/investigation/InvestigationService.java,NEW,Newly authored for Phase 3; no new reference imports
+src/main/java/com/tewendelabs/investigator/investigation/InvestigationWorker.java,NEW,Newly authored for Phase 3; no new reference imports
+src/main/java/com/tewendelabs/investigator/investigation/JsonContract.java,NEW,Newly authored for Phase 3; no new reference imports
+src/main/java/com/tewendelabs/investigator/provider/MetaHttpTransport.java,NEW,Newly authored for Phase 3; no new reference imports
+src/main/java/com/tewendelabs/investigator/provider/MetaPolicyReasoningProvider.java,NEW,Newly authored for Phase 3; no new reference imports
+src/main/java/com/tewendelabs/investigator/provider/MetaTransport.java,NEW,Newly authored for Phase 3; no new reference imports
+src/main/java/com/tewendelabs/investigator/provider/PolicyReasoningProvider.java,MODIFIED,Adaptation of this new project; prior provenance retained
+src/main/java/com/tewendelabs/investigator/provider/ProviderGate.java,NEW,Newly authored for Phase 3; no new reference imports
+src/main/java/com/tewendelabs/investigator/security/DatabaseSafetyCheck.java,MODIFIED,Adaptation of this new project; prior provenance retained
+src/main/resources/application.properties,MODIFIED,Adaptation of this new project; prior provenance retained
+src/main/resources/db/migration/V3__investigations.sql,NEW,Newly authored for Phase 3; no new reference imports
+src/main/resources/db/migration/V4__external_processing_authority.sql,NEW,Newly authored for Phase 3; no new reference imports
+src/main/resources/db/migration/V5__configurable_investigation_deadline.sql,NEW,Newly authored for Phase 3; no new reference imports
+src/test/java/com/tewendelabs/investigator/SecurityDatabaseTest.java,MODIFIED,Adaptation of this new project; prior provenance retained
+src/test/java/com/tewendelabs/investigator/investigation/StructuredValidationTest.java,NEW,Newly authored for Phase 3; no new reference imports
+src/test/java/com/tewendelabs/investigator/provider/MetaHttpTransportTest.java,NEW,Newly authored for Phase 3; no new reference imports

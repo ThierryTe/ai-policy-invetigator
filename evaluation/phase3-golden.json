@@ -1,0 +1,22 @@
+{
+  "version": "phase3-training-access-v1",
+  "syntheticOnly": true,
+  "analysisDate": "2026-10-27",
+  "baseline": "Security policy baseline. Scope: all employees using sensitive production systems. Employees must complete security training within 30 days after first sensitive production-system access. No exceptions apply.",
+  "replacement": "Security policy replacement. Scope: all employees using sensitive production systems. Employees must complete security training before any sensitive production-system access is granted. No exceptions apply.",
+  "cases": [
+    {
+      "id": "hr-access-before-training",
+      "procedure": "HR procedure A. Scope: all employees using sensitive production systems. HR must grant employees sensitive production-system access on their first day of employment. Employees may complete security training within 30 days after their first day. No exceptions apply.",
+      "expected": "CONTRADICTION",
+      "reason": "Access is granted before mandatory training, for the same employees and systems with no applicable exception."
+    },
+    {
+      "id": "hr-sensitive-access-gated",
+      "procedure": "HR procedure B. Scope: all employees using sensitive production systems. HR must withhold sensitive production-system access until the employee has completed security training. Day-one onboarding accounts have no sensitive production-system permissions. No exceptions apply.",
+      "expected": "NO_CONFLICT",
+      "reason": "Sensitive-system access is blocked until training; day-one accounts have a different permission scope."
+    }
+  ],
+  "limitation": "Small workflow smoke dataset. Broader ambiguity, exception and missing-requirement evaluation requires Phase 4 approval."
+}

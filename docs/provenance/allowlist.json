@@ -1,0 +1,42 @@
+[
+  {
+    "repository": "https://github.com/ThierryTe/spring-ai-rag",
+    "commit": "c22f3b1e0f690aa195e85e0ea37c98d8ffe43cb1",
+    "source_path": "mvnw",
+    "source_sha256": "cae96cef89ebea3531221f4ae17c23cf8edf67d00eae8306d4186ae1bbed4d02",
+    "destination": "mvnw",
+    "classification": "REUSE",
+    "adaptations": "Unchanged",
+    "import_sha256": "cae96cef89ebea3531221f4ae17c23cf8edf67d00eae8306d4186ae1bbed4d02"
+  },
+  {
+    "repository": "https://github.com/ThierryTe/spring-ai-rag",
+    "commit": "c22f3b1e0f690aa195e85e0ea37c98d8ffe43cb1",
+    "source_path": "mvnw.cmd",
+    "source_sha256": "4a361e1374a3e5ad6d03e18e9adc0cf181ac5058ac6203b76f0ba3b456b56481",
+    "destination": "mvnw.cmd",
+    "classification": "REUSE",
+    "adaptations": "Unchanged",
+    "import_sha256": "4a361e1374a3e5ad6d03e18e9adc0cf181ac5058ac6203b76f0ba3b456b56481"
+  },
+  {
+    "repository": "https://github.com/ThierryTe/spring-ai-rag",
+    "commit": "c22f3b1e0f690aa195e85e0ea37c98d8ffe43cb1",
+    "source_path": ".mvn/wrapper/maven-wrapper.properties",
+    "source_sha256": "488e1b3f2e641779d4636abf9390845f901e64607261bc3c0b0bfe4fe96e6706",
+    "destination": ".mvn/wrapper/maven-wrapper.properties",
+    "classification": "REUSE",
+    "adaptations": "Unchanged",
+    "import_sha256": "488e1b3f2e641779d4636abf9390845f901e64607261bc3c0b0bfe4fe96e6706"
+  },
+  {
+    "repository": "https://github.com/ThierryTe/spring-ai-rag",
+    "commit": "c22f3b1e0f690aa195e85e0ea37c98d8ffe43cb1",
+    "source_path": "src/main/java/com/tewendelabs/airag/ingestion/TextCleaningService.java",
+    "source_sha256": "6b6113767819013c131d3a4c79b42d89cf7eea58d27de567d24c1fede12087c3",
+    "destination": "src/main/java/com/tewendelabs/investigator/ingestion/TextCleaningService.java",
+    "classification": "ADAPT",
+    "adaptations": "Package renamed; used only for search text, never canonical evidence.",
+    "import_sha256": "95862bdbf9ef29d4dcb80a093ef22f0a2bace64d479e7caf99d117c937eb7f1e"
+  }
+]

@@ -1,0 +1,382 @@
+{
+  "scope": "Self-contained hackathon Docker build and pinned embedding initialization",
+  "checkedAt": "2026-10-27T19:18:15.740911+00:00",
+  "result": "PASS",
+  "gitCommandsExecuted": false,
+  "unrelatedFeaturesImplemented": false,
+  "phase4Started": false,
+  "model": {
+    "repository": "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "dimensions": 384,
+    "modelChanged": false,
+    "fingerprintUnchanged": true,
+    "artifacts": {
+      "model.onnx": {
+        "size": 90405214,
+        "sha256": "6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452"
+      },
+      "tokenizer.json": {
+        "size": 466247,
+        "sha256": "be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037"
+      }
+    },
+    "existingProvenancePreserved": true
+  },
+  "deployment": {
+    "backendBuiltFromSourceInDocker": true,
+    "hostJavaMavenPythonOrJarRequired": false,
+    "initializer": "model-init (short-lived; no inference server)",
+    "modelVolume": "embedding_models",
+    "nativeCacheVolume": "native_cache",
+    "backendModelMountReadOnly": true,
+    "nativeCacheOwner": "10001:10001",
+    "backendModelUri": "file:/models/model.onnx",
+    "backendTokenizerUri": "file:/models/tokenizer.json",
+    "hostEmbeddingRevisionNotRequired": true,
+    "backendRequiresModelInitSuccess": true,
+    "backendHealthcheck": true,
+    "baseImageDigests": {
+      "initializerPython": "sha256:6dd8b6dab6b3adc7812bab69eca5dbdc1a5cc690ad28306d234ffb4ef8ac9753",
+      "javaBuild": "sha256:4e61d0b3471137e239397789661f6adeaf8db9adcfae45916b22f628c8a32dc0",
+      "javaRuntime": "sha256:affcab5356e1270ac35d2361ee83135af2f03e8d580eca78a6d5d6fdbf048db0"
+    },
+    "imageDigestsObservedFromOfficialImagePulls": true,
+    "imageBuildRunsTests": false
+  },
+  "verification": {
+    "python": {
+      "command": "python3 -B -m unittest discover -s scripts/tests -v",
+      "result": "PASS",
+      "tests": 11,
+      "newArtifactTests": 7,
+      "syntheticArtifactFixturesAreNotRealOnnx": true
+    },
+    "java": {
+      "command": "./mvnw -B -o -Pneural-embeddings,database-tests verify",
+      "result": "PASS",
+      "tests": 54,
+      "postgresqlBackedTests": 31,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        {
+          "name": "com.tewendelabs.investigator.PdfAndVectorTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.tewendelabs.investigator.SecurityDatabaseTest",
+          "tests": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.tewendelabs.investigator.config.ApplicationEnvironmentTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.tewendelabs.investigator.config.DotenvConfigurationTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.tewendelabs.investigator.documentation.DefaultOpenApiTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.tewendelabs.investigator.documentation.LocalOpenApiTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.tewendelabs.investigator.documentation.ProductionOpenApiTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.tewendelabs.investigator.documentation.ProductionProfileSafetyTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.tewendelabs.investigator.investigation.StructuredValidationTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.tewendelabs.investigator.provider.MetaHttpTransportTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.tewendelabs.investigator.security.JwtValidationTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.tewendelabs.investigator.security.LoginThrottleTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "dockerBuild": {
+      "command": "docker compose --env-file .env --profile app build model-init backend",
+      "result": "PASS",
+      "logSha256": "16d5dade02f427a9298647f5ae68d471b1f64edcd85f6caa17edb4df7389df3e"
+    },
+    "realDeployment": {
+      "result": "PASS",
+      "realMetaCalls": 0,
+      "hostModelMountUsed": false,
+      "initialVolumeEmpty": true,
+      "freshDownload": {
+        "result": "PASS",
+        "elapsedMs": 4716,
+        "downloaded": 2,
+        "cached": 0
+      },
+      "offlineCacheReuse": {
+        "result": "PASS",
+        "networkMode": "none",
+        "downloaded": 0,
+        "cached": 2,
+        "hashesSizesAndModificationTimesUnchanged": true
+      },
+      "corruptCacheStartupGate": {
+        "result": "PASS",
+        "isolatedVolume": true,
+        "composeUpFailed": true,
+        "safeError": "INVALID_CACHED_ARTIFACT (model.onnx)",
+        "backendRunning": false
+      },
+      "realOnnxHttpWorkflow": {
+        "result": "PASS",
+        "model": "all-MiniLM-L6-v2",
+        "model_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+        "checks": [
+          "packaged startup",
+          "JWT login",
+          "baseline upload",
+          "durable worker",
+          "real local embeddings",
+          "semantic ranking smoke",
+          "page evidence",
+          "original PDF round-trip",
+          "replacement version",
+          "procedure upload",
+          "cross-department denial",
+          "current membership revocation"
+        ]
+      },
+      "restartAndMounts": {
+        "result": "PASS",
+        "modelsVolume": "ai-policy-investigator_embedding_models",
+        "modelsReadOnly": true,
+        "nativeVolume": "ai-policy-investigator_native_cache",
+        "nativeWritable": true,
+        "user": "10001:10001",
+        "hostJarMount": false,
+        "health": "UP"
+      },
+      "artifactHashes": {
+        "model.onnx": {
+          "size": 90405214,
+          "sha256": "6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452"
+        },
+        "tokenizer.json": {
+          "size": 466247,
+          "sha256": "be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037"
+        }
+      }
+    },
+    "emptyOfflineVolumeFailure": {
+      "result": "PASS",
+      "freshEmptyIsolatedVolume": true,
+      "networkMode": "none",
+      "exitCode": 2,
+      "attempts": 3,
+      "safeError": "DOWNLOAD_NETWORK_OR_IO_FAILED (model.onnx)"
+    },
+    "documentedStartCommand": {
+      "result": "PASS",
+      "command": "docker compose --env-file .env --profile app up --build -d --wait",
+      "health": "healthy",
+      "realMetaCalls": 0
+    },
+    "secretsAndExclusionChecks": {
+      "gitignoreRulesViaRipgrep": {
+        "result": "PASS",
+        "gitCommandsRun": false,
+        "probeFileCount": 10,
+        "controlVisible": true,
+        "envExampleVisible": true,
+        "generatedAndPrivatePathsExcluded": true,
+        "limitation": "No .git metadata exists; this verifies ignore-file behavior, not a tracked/staged index."
+      },
+      "dockerBuildContext": {
+        "result": "PASS",
+        "scratchImageInspected": true,
+        "probeFileCount": 10,
+        "noRealCredentialValuesFound": true,
+        "cleanup": "Temporary image/container and synthetic source probes removed."
+      },
+      "candidateFilesSecretScan": {
+        "result": "PASS",
+        "candidateCount": 108,
+        "knownLocalValuesCheckedWithoutDisclosure": true,
+        "privateKeyMarkersChecked": true,
+        "limitation": "A known-value/marker scan is not proof against every possible unknown secret."
+      },
+      "packagedRuntime": {
+        "result": "PASS",
+        "artifactSha256": "9ec58caa720c24f6507eea14ffb00c48ba07aa3966a32e3a409cf70b5f30c332",
+        "neuralDependenciesPresent": true,
+        "dotenvFilesAbsent": true,
+        "knownLocalValuesAbsentFromOwnClassesAndResources": true
+      },
+      "pythonSyntax": {
+        "result": "PASS",
+        "files": 9,
+        "executionOfMutatingUtilities": false
+      },
+      "destinationProvenance": {
+        "result": "PASS",
+        "files": 4,
+        "sourceCommitVerificationRerun": false,
+        "reason": "Full provenance utility invokes read-only git show; not run under owner-only Git instructions."
+      },
+      "cachedEmbeddingArtifacts": {
+        "result": "PASS",
+        "artifacts": 2,
+        "downloadsPerformed": false
+      },
+      "privateDotenvPermissions": "0o600",
+      "composeConfig": {
+        "result": "PASS",
+        "command": "docker compose --env-file .local/runtime.env --env-file .local/embeddings.env --env-file .env --profile app config --quiet",
+        "servicesStarted": false,
+        "renderedConfigurationPrinted": false
+      }
+    },
+    "backendImageJarSha256": "eb95d5481e23faadc641f68ec3479322ccc835f5637d90f0edc871437589c082",
+    "backendImageJarKnownCredentialScan": "PASS"
+  },
+  "preservedHashes": {
+    "evaluation/phase3-golden.json": "87f20a3aa4005397c81fdd362734a162b7e326fbc9b8f1f7dced9db0194f23c3",
+    "src/main/resources/application.properties": "8542c2c69141f91e44147ae0891649b0b53495a27854fdea0771f16a2f875f5a",
+    "src/main/resources/db/migration/V1__policy_foundation.sql": "f8732829239af6faa957d191dccd0bf56092d87ec6198912509fcf645db1536d",
+    "src/main/resources/db/migration/V2__version_job_progress.sql": "4b7abbca2a49fe6ed38407368aad6806257bddd3c9715cd41c35ac405b90ef89",
+    "src/main/resources/db/migration/V3__investigations.sql": "374d4fbc1c14b5adc978e601d6434919099e53b545ddacdd58cdf3c03ad9aa72",
+    "src/main/resources/db/migration/V4__external_processing_authority.sql": "8ec624bf7d48449a74d32246920f6a5760dae194585f9afe2da54a933043bbff",
+    "src/main/resources/db/migration/V5__configurable_investigation_deadline.sql": "44ba2fef2da5594ffd93699d54f4a07138111811b5ab0b5d027f3e39c8e967bb",
+    ".github/workflows/verify.yml": "6167592049ea687b9d716e5b4e32a1db6f57827cef627970d5cc3b750fb1be75",
+    "docs/verification/lombok-openapi-results.json": "ae7daccd0e5bb522d33ece47c49769468c113dce4e2041072c1e91efb06c6fe6",
+    "docs/verification/phase2-results.json": "8cf2f61734eddbc19d30fddfd91b52e9851ec4d19470ed958c5507edcfa2a4a0",
+    "docs/verification/meta-api-preflight.json": "1f7dd9f27b6e08cf2cc172e4950cb618826ce295cd3ae7e7956076b3534980b3",
+    "docs/verification/phase3-results.json": "a620d9b392ee34c8c32d22f6df84e39ae2b3237ae670f8d647238c0b30b5f76f",
+    "docs/verification/repository-audit.json": "29608e5e2372219f3a726111d8adcdb97ec87f44cee5b940415e63a6577af677",
+    "docs/verification/dotenv-results.json": "8616293a6cb1adc2d9a1922bf9202ef0878a1566b5dee01e4fa56ab42d74f611",
+    "docs/verification/single-config-results.json": "608b83c61b6dd8d19830a4c19591f8ee7ca135c0713660e7f1a2bc6087088ddb",
+    "docs/verification/phase3-demo.json": "bc48b76f2a92a339e36cca7ba1c9788628468ca8f166dd08e0a03cba180b5093",
+    "docs/verification/environment-refactor-results.json": "7e71e69561d391c1fce58631457210bbe01ea9001fd465397cfd43bfc22e7a99",
+    "docs/provenance/embedding-model.json": "08add6b7cb55630efcdf1b960ee2b715f4626e1be7175f467cedd3c5d906f766",
+    "docs/provenance/allowlist.json": "a8855e98a1bd0a42f32c4eb8a6f741c7161d8670122b60ab16b315218e20a9bd",
+    "docs/verification/phase3-attempts/1793077945644131000.json": "5669cbdec3f6240dba97cac26cabbe1c6967971c9cd4cbabcbfd7b70f7663865",
+    "docs/verification/phase3-attempts/1793062908527294000.json": "973301ab631c63aa8a24d79e31639f6e572c889e9b653e7339ebfeb0e02333d3",
+    "docs/verification/meta-api-attempts/acb18eaea6fe30ad452ff25e845dba4f84c47ca4b6c3d20821aea680e071fe6a.json": "acb18eaea6fe30ad452ff25e845dba4f84c47ca4b6c3d20821aea680e071fe6a"
+  },
+  "preservedConcurrentWorkspaceChanges": {
+    "detectedConcurrentJavaFiles": [
+      "src/main/java/com/tewendelabs/investigator/ingestion/PdfExtractor.java",
+      "src/main/java/com/tewendelabs/investigator/ingestion/IngestionWorker.java",
+      "src/main/java/com/tewendelabs/investigator/ingestion/LocalModelCheck.java",
+      "src/main/java/com/tewendelabs/investigator/config/ConfigurationCheck.java",
+      "src/main/java/com/tewendelabs/investigator/config/OpenApiConfiguration.java"
+    ],
+    "imageClassesMatchPassedRegressionClasses": {
+      "src/main/java/com/tewendelabs/investigator/ingestion/PdfExtractor.java": true,
+      "src/main/java/com/tewendelabs/investigator/ingestion/IngestionWorker.java": true,
+      "src/main/java/com/tewendelabs/investigator/ingestion/LocalModelCheck.java": true,
+      "src/main/java/com/tewendelabs/investigator/config/ConfigurationCheck.java": true,
+      "src/main/java/com/tewendelabs/investigator/config/OpenApiConfiguration.java": true
+    },
+    "concurrentPomPackagingAddition": "mainClass",
+    "finalImagePomMatchesCurrentWorkspace": true
+  },
+  "targetedChanges": [
+    "compose.yaml",
+    ".dockerignore",
+    ".env.example",
+    "scripts/fetch_embeddings.py",
+    "scripts/tests/test_fetch_embeddings.py",
+    "deploy/backend/Dockerfile",
+    "deploy/embeddings/Dockerfile",
+    "README.md",
+    "docs/REPOSITORY_AUDIT.md",
+    "docs/provenance/HACKATHON_CONTRIBUTIONS.md",
+    "docs/provenance/commit-ready-files.csv",
+    "docs/verification/model-volume-results.json"
+  ],
+  "notes": [
+    "An early integration harness attempted compose images before a persistent service container existed; it was corrected to inspect the already built image. Successful fresh-volume download evidence was retained.",
+    "Concurrent POM packaging and five Java source edits outside this deployment task were preserved. Final image classes match the classes from the passing regression suite, and final-image POM XML matches the current workspace.",
+    "No actual Meta reasoning request, remote VPS rollout or Angular feature was performed.",
+    "Initializer containers receive no application credentials; download errors are stable codes, not raw URLs or provider errors.",
+    "Public model files and native cache persist in volumes and are not committed into source or baked as model weights into the backend image.",
+    "The verified platform remains Linux x86_64. Initial model/build/native downloads need network access; cache reuse for the model was verified with network disabled."
+  ],
+  "documentationSources": [
+    "https://docs.docker.com/compose/how-tos/init-containers",
+    "https://docs.docker.com/compose/how-tos/production",
+    "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/tree/1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+  ],
+  "actualChangedCandidateFiles": [
+    ".dockerignore",
+    ".env.example",
+    "README.md",
+    "compose.yaml",
+    "deploy/backend/Dockerfile",
+    "deploy/embeddings/Dockerfile",
+    "docs/REPOSITORY_AUDIT.md",
+    "docs/provenance/HACKATHON_CONTRIBUTIONS.md",
+    "docs/provenance/commit-ready-files.csv",
+    "docs/verification/model-volume-results.json",
+    "pom.xml",
+    "scripts/fetch_embeddings.py",
+    "scripts/tests/test_fetch_embeddings.py",
+    "src/main/java/com/tewendelabs/investigator/config/ConfigurationCheck.java",
+    "src/main/java/com/tewendelabs/investigator/config/OpenApiConfiguration.java",
+    "src/main/java/com/tewendelabs/investigator/ingestion/IngestionWorker.java",
+    "src/main/java/com/tewendelabs/investigator/ingestion/LocalModelCheck.java",
+    "src/main/java/com/tewendelabs/investigator/ingestion/PdfExtractor.java"
+  ],
+  "candidateCount": 108
+}

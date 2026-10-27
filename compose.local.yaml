@@ -1,0 +1,7 @@
+# Explicit local environment opt-in; no Spring profile files are needed.
+services:
+  backend:
+    environment:
+      APP_ENVIRONMENT: local
+      LOCAL_OPENAPI_ENABLED: ${LOCAL_OPENAPI_ENABLED:-true}
+      LOCAL_SWAGGER_UI_ENABLED: ${LOCAL_SWAGGER_UI_ENABLED:-true}

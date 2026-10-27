@@ -1,0 +1,15 @@
+{
+  "repository": "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2",
+  "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+  "license": "Apache-2.0 (upstream model card)",
+  "model_path": "onnx/model.onnx",
+  "model_sha256": "6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452",
+  "tokenizer_path": "tokenizer.json",
+  "tokenizer_sha256": "be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037",
+  "tokenizer_git_blob": "cb202bfe2e3c98645018a6d12f182a434c9d3e02",
+  "dimensions": 384,
+  "distributed_in_repository": false,
+  "runtime": "Spring AI 2.0.1; ONNX Runtime 1.21.1; DJL/tokenizers 0.36.0; PyTorch native 2.7.1 for pooling",
+  "verified_platform": "Linux x86_64, Java 21 container",
+  "verification": "Real HTTP smoke with synthetic documents; not a retrieval benchmark"
+}

@@ -1,0 +1,62 @@
+{
+  "verified_date": "2026-10-27",
+  "dependency": "me.paulschwarz:springboot4-dotenv:5.1.0",
+  "bom": "me.paulschwarz:spring-dotenv-bom:5.1.0",
+  "scope": "runtime; optional=false so local executable JAR includes integration",
+  "official_sources": [
+    "https://github.com/paulschwarz/spring-dotenv",
+    "https://github.com/paulschwarz/spring-dotenv/blob/main/CHANGELOG.md",
+    "https://repo.maven.apache.org/maven2/me/paulschwarz/springboot4-dotenv/maven-metadata.xml",
+    "https://docs.spring.io/spring-boot/maven-plugin/packaging.html"
+  ],
+  "build_command": "./mvnw -B -o -Pneural-embeddings,database-tests verify",
+  "build": "PASS",
+  "tests": [
+    {
+      "suite": "com.tewendelabs.investigator.PdfAndVectorTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.tewendelabs.investigator.SecurityDatabaseTest",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.tewendelabs.investigator.config.DotenvConfigurationTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.tewendelabs.investigator.security.JwtValidationTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.tewendelabs.investigator.security.LoginThrottleTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "total_tests": 28,
+  "python_preflight_validation_tests": 4,
+  "packaged_spring_key_availability": true,
+  "meta_live_verification": "PASS",
+  "jar_env_and_credential_exclusion": "PASS",
+  "docker_filtered_context_image_env_and_credential_exclusion": "PASS",
+  "git_ignore_env_and_allow_example": "PASS",
+  "root_env_content_replaced": false,
+  "root_env_permissions": "0600",
+  "real_credentials_created": false,
+  "phase2_verification_preserved": true
+}

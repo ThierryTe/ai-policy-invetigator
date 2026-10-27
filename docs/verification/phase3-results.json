@@ -1,0 +1,347 @@
+{
+  "phase": 3,
+  "status": "PASS",
+  "realProvider": "Meta Model API",
+  "model": "muse-spark-1.3",
+  "build": {
+    "command": "./mvnw -B -o -Pneural-embeddings,database-tests verify",
+    "result": "PASS",
+    "tests": 45,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "artifactSha256": "12fbbfef352a0736b015425db4314e68c5129ec3a50a25294b1d2a984cc045e5",
+    "logSha256": "821af1ce65fa0fb88d201503617abe9a6875f8b63a83f271b0b6215459eada69",
+    "suites": [
+      {
+        "class": "com.tewendelabs.investigator.PdfAndVectorTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 5.863,
+        "cases": [
+          "refusesMixedEmptyPagesInsteadOfClaimingCompleteExtraction",
+          "rejectsUnsafeNamesAndInvalidVectors",
+          "childJvmPreservesDistinctPageTextAndLocations",
+          "unicodeOffsetsRoundTripWithoutSplittingCharacters",
+          "rejectsMalformedAndEmptyPdf"
+        ]
+      },
+      {
+        "class": "com.tewendelabs.investigator.SecurityDatabaseTest",
+        "tests": 25,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 72.283,
+        "cases": [
+          "workflowPreservesPdfPageEvidenceAndImmutableVersions",
+          "fabricatedCitationFailsWithoutPublishingFindings",
+          "adminRoleAndMalformedCrossOrganizationGrantsDoNotBypassScope",
+          "revocationDuringEmbeddingRollsBackAllEvidence",
+          "permissionRevocationBetweenRetryAttemptsStopsPayloads",
+          "incompleteExtractionIsPartialAndNeverNoConflict",
+          "restartRecoveryReusesExtractionCheckpointAndFencesStaleLease",
+          "runtimeCannotReadQueueCredentialsOrBypassImmutability",
+          "jdbcJpaAndConnectionReuseDenyOtherDepartment",
+          "providerTimeoutRetriesAreBoundedAndConsentWithdrawalStopsDispatch",
+          "explicitGrantWorksAndRevocationTakesEffectForJpaAndSql",
+          "totalDeadlineIsConfigurableAndNotResetDuringRecovery",
+          "incompatibleEmbeddingRevisionCannotLookLikeAnEmptySearch",
+          "investigationCompletesWithValidatedRequirementsAndPendingHumanReview",
+          "consentChangesRequireOwningDepartmentAdminInApiAndSql",
+          "realJwtAndHttpUploadEnforceCurrentAccountStatus",
+          "idempotencyAndLeaseRecoveryRejectDuplicatesAndStaleWorkers",
+          "unauthorizedSearchNeverReachesEmbeddingModel",
+          "inaccessibleExistingCitationIsRejected",
+          "deletedAccountCannotUseAnAlreadyIssuedJwt",
+          "consentRevokedDuringSuccessfulCallPreventsResultPersistence",
+          "jpaWritesCannotCrossDepartmentBoundary",
+          "revokedRequesterCannotIngestAndCannotReadPreviouslyCreatedContent",
+          "forgedEvidenceCannotBeInsertedEvenByAnAuthorizedWriter",
+          "malformedProviderOutputAndPermanentAuthenticationFailureDoNotRetry"
+        ]
+      },
+      {
+        "class": "com.tewendelabs.investigator.config.DotenvConfigurationTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 7.42,
+        "cases": [
+          "productionProfileDoesNotReadLocalDotenv",
+          "realProcessEnvironmentOverridesDotenv",
+          "loadsRootDotenvThroughSpringBoot4",
+          "deliberatelyEmptyProcessVariableDoesNotFallBackToDotenv",
+          "missingDotenvDoesNotBreakProductionConfiguration",
+          "productionEnvironmentCanDisableDotenv"
+        ]
+      },
+      {
+        "class": "com.tewendelabs.investigator.investigation.StructuredValidationTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.005,
+        "cases": [
+          "fabricatedSourceOrQuoteCannotPass",
+          "completeRequiresAllSourceIds",
+          "preservesUnknownsAndAssignsIdsOnlyOnServer",
+          "rejectsMalformedJsonAndUndeclaredFields"
+        ]
+      },
+      {
+        "class": "com.tewendelabs.investigator.provider.MetaHttpTransportTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.835,
+        "cases": [
+          "credentialsAreNeverFollowedAcrossRedirects",
+          "bodyReadSharesTheRequestDeadline"
+        ]
+      },
+      {
+        "class": "com.tewendelabs.investigator.security.JwtValidationTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.243,
+        "cases": [
+          "acceptsOnlyExpectedIssuerAudienceSubjectAndExpiration",
+          "rejectsWeakKeysAndSignaturesFromAnotherApplication"
+        ]
+      },
+      {
+        "class": "com.tewendelabs.investigator.security.LoginThrottleTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.023,
+        "cases": [
+          "spoofedForwardingHeadersCannotResetLoginThrottle"
+        ]
+      }
+    ]
+  },
+  "pythonTests": {
+    "command": "python3 -m unittest discover -s scripts/tests -v",
+    "passed": 4,
+    "failed": 0
+  },
+  "provenance": {
+    "command": "python3 scripts/verify_provenance.py",
+    "result": "PASS",
+    "unchangedAllowlistedImports": 4,
+    "newReferenceImports": 0,
+    "originalRepositoriesUnmodifiedByThisIncrement": true,
+    "frontendPreExistingStatus": "M README.md",
+    "preservedEvidenceAndMigrations": {
+      "docs/verification/phase2-results.json": true,
+      "docs/verification/meta-api-preflight.json": true,
+      "docs/verification/dotenv-results.json": true,
+      "src/main/resources/db/migration/V1__policy_foundation.sql": true,
+      "src/main/resources/db/migration/V2__version_job_progress.sql": true,
+      "docs/provenance/allowlist.json": true,
+      "docs/provenance/adaptations.json": true,
+      "docs/provenance/files.csv": true
+    },
+    "references": [
+      {
+        "url": "https://github.com/ThierryTe/spring-ai-rag",
+        "commit": "c22f3b1e0f690aa195e85e0ea37c98d8ffe43cb1",
+        "status": "clean, unchanged"
+      },
+      {
+        "url": "https://github.com/ThierryTe/spring-ai-rag-frontend",
+        "commit": "282991b0df41f156aeef61c79e8738509c56eab8",
+        "status": "pre-existing M README.md, unchanged by this work"
+      }
+    ]
+  },
+  "configurationSecurity": {
+    "knownPrivateCredentialsAbsentFromDistributableFilesAndOwnPackagedClasses": true,
+    "dotenvAbsentFromJar": true,
+    "privateDotenvMode": "0600",
+    "dotenvOrCredentialsImported": false
+  },
+  "security": {
+    "forcedRlsTables": 7,
+    "currentIdentityJdbcJpaAndWorkers": true,
+    "providerGatedBeforeEveryAttempt": true,
+    "consentRecheckedBeforePersistence": true,
+    "owningDepartmentAdminConsentSqlAndApi": true,
+    "fabricatedAndInaccessibleCitationsRejected": true,
+    "restartCheckpointAndLeaseFencingTested": true,
+    "failedOrIncompleteNeverPublishedAsNoConflict": true,
+    "configuredDeadlinePreservedOnRecovery": true
+  },
+  "limits": [
+    "Two synthetic procedure cases are not a general accuracy benchmark.",
+    "Selected procedure scope only; no automatic enterprise-wide discovery.",
+    "Source identity/quote validation does not prove semantic interpretation.",
+    "Pending human review only; review submission and Angular are deferred.",
+    "Permission checks cannot retract an earlier authorized in-flight request.",
+    "Runtime checks do not constrain privileged DBA/owner maintenance.",
+    "Last response may exceed reported-token threshold; timeout billing can be unknown.",
+    "Concurrency is per instance; production load and global rate limiting are unverified."
+  ],
+  "earlierTestFailures": "Initial runs exposed a null-list check, test-double restubbing and inherited-role consent guard; each was corrected and the complete final Java rerun passed.",
+  "phase4Started": false,
+  "recordedAt": "2026-10-27T05:17:50.203516+00:00",
+  "realInvestigation": {
+    "result": "PASS",
+    "script": "python3 scripts/smoke_investigation.py",
+    "evidence": "phase3-demo.json",
+    "artifactSha256": "12fbbfef352a0736b015425db4314e68c5129ec3a50a25294b1d2a984cc045e5",
+    "elapsedMs": 48732,
+    "progress": {
+      "id": "1c74afef-4771-48aa-a2d6-e07ff87ad4ca",
+      "state": "COMPLETED",
+      "stage": "COMPLETED",
+      "error_code": null,
+      "attempts": 1,
+      "calls": 5,
+      "metered_calls": 5,
+      "prompt_tokens": 6368,
+      "completion_tokens": 8200,
+      "latency_ms": 47469
+    },
+    "classifications": [
+      "CONTRADICTION",
+      "NO_CONFLICT"
+    ],
+    "verifiedCitationInstances": 25,
+    "goldenDatasetSha256": "87f20a3aa4005397c81fdd362734a162b7e326fbc9b8f1f7dced9db0194f23c3",
+    "evaluation": {
+      "positiveProcedureCases": 1,
+      "negativeProcedureCases": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "citationCorrectness": 1.0,
+      "limitation": "Two selected synthetic procedure cases; does not establish general accuracy."
+    },
+    "priorSuccessfulRunsPreserved": 2
+  },
+  "phase2RegressionSmoke": {
+    "script": "python3 scripts/smoke_workflow.py --container",
+    "result": "PASS",
+    "model": "all-MiniLM-L6-v2",
+    "model_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "checks": [
+      "packaged startup",
+      "JWT login",
+      "baseline upload",
+      "durable worker",
+      "real local embeddings",
+      "semantic ranking smoke",
+      "page evidence",
+      "original PDF round-trip",
+      "replacement version",
+      "procedure upload",
+      "cross-department denial",
+      "current membership revocation"
+    ]
+  },
+  "configuration": {
+    "providerTimeoutSeconds": {
+      "default": 30,
+      "allowed": [
+        1,
+        60
+      ]
+    },
+    "maxRetries": {
+      "default": 2,
+      "allowed": [
+        0,
+        2
+      ]
+    },
+    "providerConcurrency": {
+      "default": 2,
+      "allowed": [
+        1,
+        4
+      ]
+    },
+    "totalJobBudgetSeconds": {
+      "default": 240,
+      "allowed": [
+        30,
+        600
+      ]
+    },
+    "maxCalls": 20,
+    "reportedTokenDispatchThreshold": 40000
+  },
+  "implementationHashes": {
+    "scripts/verify_meta_access.py": "2d532dfab3348b07479ca09e912b71781ac20665866690434eb12e825111a06b",
+    "scripts/verify_provenance.py": "3b33119f76ed0d29fd1de499310f62abac729421f4a1ee6b2ff3ce1d3e5c049e",
+    "scripts/init_local.py": "0ae41346cfb3decf45259142b202e1a5a5d4fa120f12553f439228078fbed9e6",
+    "scripts/provision_user.sql": "1a0a3e63e28a49a39a06c81815c2afadcef3ae71313173314010be94eb278855",
+    "scripts/smoke_workflow.py": "b497f6980ec5fbc1916ae27c56aba0bee68bb010233a6d419d4682399960f3aa",
+    "scripts/run_local.py": "ab92f8e00dda5d1b48786f6718985ae3738eb3aa43d3f9393e87c6afd875fe4f",
+    "scripts/smoke_investigation.py": "c0279db5016debbf41797eddd487e18b3a6645427c606a6b59ccdd13fa82f865",
+    "scripts/fetch_embeddings.py": "ef8e74a31e4f9aeefd347bba8d327a8eee30f206042d0ea2f9e9a5de4c9e687d",
+    "evaluation/phase3-golden.json": "87f20a3aa4005397c81fdd362734a162b7e326fbc9b8f1f7dced9db0194f23c3",
+    "src/main/resources/application-prod.properties": "93bfa79720f3166c58505c43f7f3894ef9bd2cc179d3999486f42cf3ee0c23aa",
+    "src/main/resources/application.properties": "77189d97d81b7d7559bd5cd2d725b86ab1f727be08cf007350dfb62cc5dbfa86",
+    "src/main/java/com/tewendelabs/investigator/InvestigatorApplication.java": "540b497fd7a0a3282b70cf71cf226f117e91efe1f5f64f6a9cf1e0e5987cfc33",
+    "src/main/java/com/tewendelabs/investigator/ingestion/PdfExtractor.java": "810553fabc8156c721db51fdb850893d360fb87105dd3fb20e96f6a778bbae22",
+    "src/main/java/com/tewendelabs/investigator/ingestion/EmbeddingGateway.java": "d62a75b33afc81dbaa567a0a990d06c56deb0b9a3e739f3fa5ec10b417e40399",
+    "src/main/java/com/tewendelabs/investigator/ingestion/IngestionWorker.java": "8cf36b12fb46d74673d3c5e542f97508b3ea1c3266a45917832f68c78f0a6c67",
+    "src/main/java/com/tewendelabs/investigator/ingestion/PdfSandbox.java": "a8ad3fd14d3b3f24755af36b05ba9ef184ca8e9f684d2d28cf1d8d3a9388c411",
+    "src/main/java/com/tewendelabs/investigator/ingestion/LocalModelCheck.java": "1627a3c83ddc3d1eb5410873b24ea39807427650a53dad9bd4770003b547aceb",
+    "src/main/java/com/tewendelabs/investigator/ingestion/SourceChunker.java": "ca218a4b083cc46d50e4ca409e96bdd123609f264db83d8fee1c2411bff0bbd5",
+    "src/main/java/com/tewendelabs/investigator/ingestion/TextCleaningService.java": "95862bdbf9ef29d4dcb80a093ef22f0a2bace64d479e7caf99d117c937eb7f1e",
+    "src/main/java/com/tewendelabs/investigator/ingestion/EmbeddingArtifactCheck.java": "115bce5a2aa47eb47a127af9a0f748daeb63c3e3d87fbbf3cabf21c6dfa7f1bd",
+    "src/main/java/com/tewendelabs/investigator/config/ConfigurationCheck.java": "6f366d78886718950fd7aba1ffa047993ddaf97df2028adbfa69fd3c14007b91",
+    "src/main/java/com/tewendelabs/investigator/security/LoginThrottle.java": "9affb5503c7abd5dfbaefed81c2d647dfc4830080ed8c1894a6b90b2907a1a0b",
+    "src/main/java/com/tewendelabs/investigator/security/DatabaseSafetyCheck.java": "8df8ca8201863ba40137a342a659ca0e92c4cda459031c7f31b91298cc3def25",
+    "src/main/java/com/tewendelabs/investigator/security/AuthController.java": "f98e81a8080286827c32cafd6f15dcd7ff7e8b7328cd9674fb4e3d6c63729e3e",
+    "src/main/java/com/tewendelabs/investigator/security/ScopedAccess.java": "3d70a3539c094985cfb21bb3c609857603494bea3399e0f84ed2b5cd9f5f650f",
+    "src/main/java/com/tewendelabs/investigator/security/IdentityService.java": "3881d20d27f6cbf3915df980da7eae7849dfa08005cbe39013cacc82bab218db",
+    "src/main/java/com/tewendelabs/investigator/security/SecurityConfiguration.java": "cda6b39e6abb8c181310f48620c68b0018f60ddb53adff841ec0f62770a7ffc0",
+    "src/main/java/com/tewendelabs/investigator/provider/MetaPolicyReasoningProvider.java": "b5b4b52143a2eb130bd981e14bc30e9f6614a87d35957254470a99922f3c20c1",
+    "src/main/java/com/tewendelabs/investigator/provider/MetaTransport.java": "34fa05f65773d0a5e5b04277cfc3dfe3ced8beeed76aae521325eeca9d08002c",
+    "src/main/java/com/tewendelabs/investigator/provider/PolicyReasoningProvider.java": "ebeaf8b11e3bb4ff0da12ecb03552c057f51c6c40ab3d0ca617555783d8fdba9",
+    "src/main/java/com/tewendelabs/investigator/provider/MetaHttpTransport.java": "923f38819e7c8e70fdaeea5e1b07ff05e4d33a0adff430360b43dba62a5fbd47",
+    "src/main/java/com/tewendelabs/investigator/provider/ProviderGate.java": "5c7f6995b7922285228a8cb627b7033e58f7ba80ea01ebe665c8be40e11f3f31",
+    "src/main/java/com/tewendelabs/investigator/investigation/InvestigationSchemas.java": "75520a4a29e3375490a8cf4e39a2d8e3bfe1a0565ad39d95d08d71aded6e1eb6",
+    "src/main/java/com/tewendelabs/investigator/investigation/JsonContract.java": "575fade666ec65f753bc8ec0c137c6afcfd8775a760e19777965bfade530660c",
+    "src/main/java/com/tewendelabs/investigator/investigation/InvestigationController.java": "826ded6a92c3fc5f1d9d7aad9ce991ba1df4f9b41f655dc8bcb0f2428ac53d7d",
+    "src/main/java/com/tewendelabs/investigator/investigation/InvestigationWorker.java": "401290ebd9a027aa2caf21e1678394a23cd8af925ba7a0eb9aae9bab677e2982",
+    "src/main/java/com/tewendelabs/investigator/investigation/InvestigationService.java": "07b61da5dc8bbbbcc1eafbb53ca078b2ca02fb2c0f627debeee59bf7297693e3",
+    "src/main/java/com/tewendelabs/investigator/investigation/EvidenceValidator.java": "ab718f2249354cfc286f6a98ce7ea0d31d5fc1c9e0bee7c02735903e25c19170",
+    "src/main/java/com/tewendelabs/investigator/api/ApiErrors.java": "500577beeb229e4713d25d9a764c9e415b40644f647855d1cbdb6b335c940d33",
+    "src/main/java/com/tewendelabs/investigator/api/ApiFailure.java": "70febb8e8634e2b8c5aaae9a5bae7c02a5467c90c3ebbdd9b5ad6ec797ef5af5",
+    "src/main/java/com/tewendelabs/investigator/policy/PolicyRepository.java": "4c7ba75a2fd82cb30fa6fc71c819395659d1a86f34d8f862a48902eb58e51168",
+    "src/main/java/com/tewendelabs/investigator/policy/PolicyService.java": "0c0750dd3bed598948b907bb76fad747bc054dc6684785ddba507fdc42d20603",
+    "src/main/java/com/tewendelabs/investigator/policy/PolicyController.java": "fbbed77d4f5893ab986b392732b4f5bc62822bce7d6bd8d6f463c99b2a5d59ef",
+    "src/main/java/com/tewendelabs/investigator/policy/Policy.java": "934db6525311952158b29deba6fafbb50f3f493dc4507a417ba80cbfeb33d9e1",
+    "src/main/resources/db/migration/V1__policy_foundation.sql": "f8732829239af6faa957d191dccd0bf56092d87ec6198912509fcf645db1536d",
+    "src/main/resources/db/migration/V2__version_job_progress.sql": "4b7abbca2a49fe6ed38407368aad6806257bddd3c9715cd41c35ac405b90ef89",
+    "src/main/resources/db/migration/V3__investigations.sql": "374d4fbc1c14b5adc978e601d6434919099e53b545ddacdd58cdf3c03ad9aa72",
+    "src/main/resources/db/migration/V4__external_processing_authority.sql": "8ec624bf7d48449a74d32246920f6a5760dae194585f9afe2da54a933043bbff",
+    "src/main/resources/db/migration/V5__configurable_investigation_deadline.sql": "44ba2fef2da5594ffd93699d54f4a07138111811b5ab0b5d027f3e39c8e967bb",
+    "src/test/java/com/tewendelabs/investigator/PdfAndVectorTest.java": "84b21de1e01cb2025c6a4a764509a3af373917d6a1da56b3afaa721a63fc9ebe",
+    "src/test/java/com/tewendelabs/investigator/SecurityDatabaseTest.java": "0d6a749520537e43abe6aa574d4bf4bb0701ee571cc3b60888d241cc6548ffbd",
+    "src/test/java/com/tewendelabs/investigator/config/DotenvConfigurationTest.java": "4bd613893ad413b3816ba3b7e2210144628685573ff21569f438212c6206cdfb",
+    "src/test/java/com/tewendelabs/investigator/config/DotenvProbeFixture.java": "d63b1ae844e658014852ea783733e7aa9c6937bef62bbfb800fbbd535e58d2e3",
+    "src/test/java/com/tewendelabs/investigator/security/LoginThrottleTest.java": "213b6ee30fd2d3597669fb32a0afa912f5e30308c56592fec57401e9e38f6f9c",
+    "src/test/java/com/tewendelabs/investigator/security/JwtValidationTest.java": "58cba16b88513ef37f67909cbd4bf805b574f366d4c32517a623e3f1e6ccac16",
+    "src/test/java/com/tewendelabs/investigator/provider/MetaHttpTransportTest.java": "7c85206a0f05ece83aeae6ef746845d9125b20352cc8870b611831c8057f46d2",
+    "src/test/java/com/tewendelabs/investigator/investigation/StructuredValidationTest.java": "d6c4a62504e1017e4ce5230ef0ef572966c015f2527e6a1e14a9ebd5fb54b43a",
+    "scripts/tests/test_verify_meta_access.py": "1ef2493347297f90986f32d8b307ad4f63f521a4b03abcd8bd3cfd485a2307f6"
+  }
+}

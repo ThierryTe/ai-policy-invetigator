@@ -1,0 +1,72 @@
+[
+  {
+    "repository": "https://github.com/ThierryTe/spring-ai-rag",
+    "commit": "c22f3b1e0f690aa195e85e0ea37c98d8ffe43cb1",
+    "source_path": "src/main/java/com/tewendelabs/airag/service/AuthService.java",
+    "source_sha256": "ed193849258dd84cc0cce7eaf3998c872c8ff7135c47493d3619e5a8cea3f19f",
+    "destination": "src/main/java/com/tewendelabs/investigator/security/AuthController.java",
+    "classification": "ADAPT_DESIGN",
+    "copied_source_bytes": false,
+    "adaptations": "Retained BCrypt/login/me concepts; new DTOs, issuer/audience, active-account enforcement; no copied source bytes."
+  },
+  {
+    "repository": "https://github.com/ThierryTe/spring-ai-rag",
+    "commit": "c22f3b1e0f690aa195e85e0ea37c98d8ffe43cb1",
+    "source_path": "src/main/java/com/tewendelabs/airag/config/SecurityConfig.java",
+    "source_sha256": "1fac469ec226e5c7a8cb6896769727ce86b274081843d769b06e5b37c59a7085",
+    "destination": "src/main/java/com/tewendelabs/investigator/security/SecurityConfiguration.java",
+    "classification": "ADAPT_DESIGN",
+    "copied_source_bytes": false,
+    "adaptations": "Retained stateless security structure; replaced custom bearer filter with Spring Resource Server; removed demo and monitoring credentials."
+  },
+  {
+    "repository": "https://github.com/ThierryTe/spring-ai-rag",
+    "commit": "c22f3b1e0f690aa195e85e0ea37c98d8ffe43cb1",
+    "source_path": "src/main/java/com/tewendelabs/airag/security/LoginRateLimitFilter.java",
+    "source_sha256": "c4acfe33b20f6b0f1f9d331e0564b497a1e7e960e0055b782bf94468412e69c0",
+    "destination": "src/main/java/com/tewendelabs/investigator/security/LoginThrottle.java",
+    "classification": "ADAPT_DESIGN",
+    "copied_source_bytes": false,
+    "adaptations": "Retained bounded per-peer throttling concept; new implementation without IP logs or Bucket4j dependency."
+  },
+  {
+    "repository": "https://github.com/ThierryTe/spring-ai-rag",
+    "commit": "c22f3b1e0f690aa195e85e0ea37c98d8ffe43cb1",
+    "source_path": "src/main/java/com/tewendelabs/airag/ingestion/FileValidationService.java",
+    "source_sha256": "5862067023bb5566e9843252fdabba205e2b4db7f8611d6aeef12930830ca3af",
+    "destination": "src/main/java/com/tewendelabs/investigator/policy/PolicyService.java",
+    "classification": "ADAPT_DESIGN",
+    "copied_source_bytes": false,
+    "adaptations": "Retained filename/size checks; PDF-only signature preflight plus isolated parser; removed general Tika parsing."
+  },
+  {
+    "repository": "https://github.com/ThierryTe/spring-ai-rag",
+    "commit": "c22f3b1e0f690aa195e85e0ea37c98d8ffe43cb1",
+    "source_path": "src/main/java/com/tewendelabs/airag/repository/ChunkSearchRepository.java",
+    "source_sha256": "d0a8554a7783bc69481f597b6bd876edf86ccf32362137baf2d7d34d16e25861",
+    "destination": "src/main/java/com/tewendelabs/investigator/policy/PolicyService.java",
+    "classification": "ADAPT_DESIGN",
+    "copied_source_bytes": false,
+    "adaptations": "Retained parameterized JDBC cosine search; new schema, authoritative joins, forced RLS and model-revision filter."
+  },
+  {
+    "repository": "https://github.com/ThierryTe/spring-ai-rag",
+    "commit": "c22f3b1e0f690aa195e85e0ea37c98d8ffe43cb1",
+    "source_path": "src/main/java/com/tewendelabs/airag/ingestion/EmbeddingBatchService.java",
+    "source_sha256": "da820fb827d3691de4a1025580ebbe3e084a252d8232aadce434a3db97082119",
+    "destination": "src/main/java/com/tewendelabs/investigator/ingestion/EmbeddingGateway.java",
+    "classification": "ADAPT_DESIGN",
+    "copied_source_bytes": false,
+    "adaptations": "Retained Spring AI EmbeddingModel boundary; bounded batches, vector validation and local model wiring."
+  },
+  {
+    "repository": "https://github.com/ThierryTe/spring-ai-rag",
+    "commit": "c22f3b1e0f690aa195e85e0ea37c98d8ffe43cb1",
+    "source_path": "src/main/java/com/tewendelabs/airag/config/AsyncConfig.java",
+    "source_sha256": "19f1934134f80cbc88e1b627fdeb2bd54edaa7d7d9bd232053d05b329633f462",
+    "destination": "src/main/java/com/tewendelabs/investigator/ingestion/IngestionWorker.java",
+    "classification": "ADAPT_DESIGN",
+    "copied_source_bytes": false,
+    "adaptations": "Retained bounded-concurrency intent; rebuilt execution around persistent leases/current requester authorization."
+  }
+]

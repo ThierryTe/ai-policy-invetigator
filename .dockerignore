@@ -1,0 +1,24 @@
+**
+!pom.xml
+!src/
+!src/**
+# Exact build-tool/bootstrap allowlist; local environments, weights and artifacts stay excluded.
+!mvnw
+!.mvn/
+!.mvn/wrapper/
+!.mvn/wrapper/maven-wrapper.properties
+!scripts/
+!scripts/fetch_embeddings.py
+# Final exclusions also protect against a misplaced dotenv file under src/.
+.env
+.env.*
+**/.env
+**/.env.*
+**/*.env
+**/*.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.jks
+**/*.keystore

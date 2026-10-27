@@ -1,0 +1,270 @@
+{
+  "scope": "Post-Phase 3 documentation, tooling/deployment audit and verification only",
+  "recordedAt": "2026-10-27T05:48:39.802058+00:00",
+  "status": "PASS_WITH_DOCUMENTED_DEPLOYMENT_GAPS",
+  "gitCommandsExecuted": false,
+  "gitMetadataPresent": false,
+  "gitIndexOrHistoryInspected": false,
+  "phase4Started": false,
+  "applicationOrMigrationChanges": false,
+  "ciOrDeploymentServiceChanges": false,
+  "realMetaRequestsThisAudit": 0,
+  "existingPhase3EvidencePreserved": true,
+  "tests": {
+    "maven": {
+      "command": "./mvnw -B -o -Pdatabase-tests verify",
+      "result": "PASS",
+      "tests": 45,
+      "databaseTests": 25,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        {
+          "class": "com.tewendelabs.investigator.PdfAndVectorTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.SecurityDatabaseTest",
+          "tests": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.config.DotenvConfigurationTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.investigation.StructuredValidationTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.provider.MetaHttpTransportTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.security.JwtValidationTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.security.LoginThrottleTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "logSha256": "8b72939d478fe7c272a23b6a9f7f610189f6b6ea4b530148413528dad20788c3",
+      "remoteGitHubActionsExecuted": false
+    },
+    "runtimePackage": {
+      "command": "./mvnw -B -o -Pneural-embeddings -DskipTests package",
+      "result": "PASS",
+      "testsRunByThisPackagingCommand": false
+    },
+    "python": {
+      "command": "python3 -B -m unittest discover -s scripts/tests -v",
+      "result": "PASS",
+      "tests": 4,
+      "liveProviderCalls": 0
+    },
+    "initializerSyntax": {
+      "command": "sh -n deploy/postgres/init.sh",
+      "result": "PASS",
+      "initializerExecuted": false
+    },
+    "springConfiguration": {
+      "command": "java -jar target/ai-policy-investigator-0.1.0-SNAPSHOT.jar --verify-configuration",
+      "result": "PASS",
+      "keyAvailable": true,
+      "credentialValuesPrinted": false,
+      "providerCalls": 0
+    },
+    "gitignoreRulesViaRipgrep": {
+      "result": "PASS",
+      "gitCommandsRun": false,
+      "probeFileCount": 10,
+      "controlVisible": true,
+      "envExampleVisible": true,
+      "generatedAndPrivatePathsExcluded": true,
+      "limitation": "No .git metadata exists; this verifies ignore-file behavior, not a tracked/staged index."
+    },
+    "dockerBuildContext": {
+      "result": "PASS",
+      "scratchImageInspected": true,
+      "probeFileCount": 10,
+      "noRealCredentialValuesFound": true,
+      "cleanup": "Temporary image/container and synthetic source probes removed."
+    },
+    "candidateFilesSecretScan": {
+      "result": "PASS",
+      "candidateCount": 93,
+      "knownLocalValuesCheckedWithoutDisclosure": true,
+      "privateKeyMarkersChecked": true,
+      "limitation": "A known-value/marker scan is not proof against every possible unknown secret.",
+      "modelCredentialIncludedWithoutDisclosure": true
+    },
+    "packagedRuntime": {
+      "result": "PASS",
+      "artifactSha256": "12fbbfef352a0736b015425db4314e68c5129ec3a50a25294b1d2a984cc045e5",
+      "neuralDependenciesPresent": true,
+      "dotenvFilesAbsent": true,
+      "knownLocalValuesAbsentFromOwnClassesAndResources": true
+    },
+    "pythonSyntax": {
+      "result": "PASS",
+      "files": 8,
+      "executionOfMutatingUtilities": false
+    },
+    "destinationProvenance": {
+      "result": "PASS",
+      "files": 4,
+      "sourceCommitVerificationRerun": false,
+      "reason": "Full provenance utility invokes read-only git show; not run under owner-only Git instructions."
+    },
+    "cachedEmbeddingArtifacts": {
+      "result": "PASS",
+      "artifacts": 2,
+      "downloadsPerformed": false
+    },
+    "privateDotenvPermissions": "0o600",
+    "composeConfig": {
+      "result": "PASS",
+      "command": "docker compose --env-file .local/runtime.env --env-file .local/embeddings.env --env-file .env --profile app config --quiet",
+      "servicesStarted": false,
+      "renderedConfigurationPrinted": false
+    },
+    "documentationLinks": {
+      "result": "PASS",
+      "files": [
+        "README.md",
+        "docs/REPOSITORY_AUDIT.md"
+      ]
+    }
+  },
+  "preservedHashes": {
+    "pom.xml": "cbf9b38d6fc8978f8d134d341acbea1bae1a318d5bbe53fbbe10100ff0a27029",
+    "compose.yaml": "ad27070c75345357312fdeae011d3d8064589e8759a40898a64571f5e7d648ca",
+    "scripts/verify_meta_access.py": "2d532dfab3348b07479ca09e912b71781ac20665866690434eb12e825111a06b",
+    "scripts/verify_provenance.py": "3b33119f76ed0d29fd1de499310f62abac729421f4a1ee6b2ff3ce1d3e5c049e",
+    "scripts/init_local.py": "0ae41346cfb3decf45259142b202e1a5a5d4fa120f12553f439228078fbed9e6",
+    "scripts/provision_user.sql": "1a0a3e63e28a49a39a06c81815c2afadcef3ae71313173314010be94eb278855",
+    "scripts/smoke_workflow.py": "b497f6980ec5fbc1916ae27c56aba0bee68bb010233a6d419d4682399960f3aa",
+    "scripts/run_local.py": "ab92f8e00dda5d1b48786f6718985ae3738eb3aa43d3f9393e87c6afd875fe4f",
+    "scripts/smoke_investigation.py": "c0279db5016debbf41797eddd487e18b3a6645427c606a6b59ccdd13fa82f865",
+    "scripts/fetch_embeddings.py": "ef8e74a31e4f9aeefd347bba8d327a8eee30f206042d0ea2f9e9a5de4c9e687d",
+    "evaluation/phase3-golden.json": "87f20a3aa4005397c81fdd362734a162b7e326fbc9b8f1f7dced9db0194f23c3",
+    "src/main/resources/application-prod.properties": "93bfa79720f3166c58505c43f7f3894ef9bd2cc179d3999486f42cf3ee0c23aa",
+    "src/main/resources/application.properties": "77189d97d81b7d7559bd5cd2d725b86ab1f727be08cf007350dfb62cc5dbfa86",
+    "src/main/java/com/tewendelabs/investigator/InvestigatorApplication.java": "540b497fd7a0a3282b70cf71cf226f117e91efe1f5f64f6a9cf1e0e5987cfc33",
+    "src/main/java/com/tewendelabs/investigator/ingestion/PdfExtractor.java": "810553fabc8156c721db51fdb850893d360fb87105dd3fb20e96f6a778bbae22",
+    "src/main/java/com/tewendelabs/investigator/ingestion/EmbeddingGateway.java": "d62a75b33afc81dbaa567a0a990d06c56deb0b9a3e739f3fa5ec10b417e40399",
+    "src/main/java/com/tewendelabs/investigator/ingestion/IngestionWorker.java": "8cf36b12fb46d74673d3c5e542f97508b3ea1c3266a45917832f68c78f0a6c67",
+    "src/main/java/com/tewendelabs/investigator/ingestion/PdfSandbox.java": "a8ad3fd14d3b3f24755af36b05ba9ef184ca8e9f684d2d28cf1d8d3a9388c411",
+    "src/main/java/com/tewendelabs/investigator/ingestion/LocalModelCheck.java": "1627a3c83ddc3d1eb5410873b24ea39807427650a53dad9bd4770003b547aceb",
+    "src/main/java/com/tewendelabs/investigator/ingestion/SourceChunker.java": "ca218a4b083cc46d50e4ca409e96bdd123609f264db83d8fee1c2411bff0bbd5",
+    "src/main/java/com/tewendelabs/investigator/ingestion/TextCleaningService.java": "95862bdbf9ef29d4dcb80a093ef22f0a2bace64d479e7caf99d117c937eb7f1e",
+    "src/main/java/com/tewendelabs/investigator/ingestion/EmbeddingArtifactCheck.java": "115bce5a2aa47eb47a127af9a0f748daeb63c3e3d87fbbf3cabf21c6dfa7f1bd",
+    "src/main/java/com/tewendelabs/investigator/config/ConfigurationCheck.java": "6f366d78886718950fd7aba1ffa047993ddaf97df2028adbfa69fd3c14007b91",
+    "src/main/java/com/tewendelabs/investigator/security/LoginThrottle.java": "9affb5503c7abd5dfbaefed81c2d647dfc4830080ed8c1894a6b90b2907a1a0b",
+    "src/main/java/com/tewendelabs/investigator/security/DatabaseSafetyCheck.java": "8df8ca8201863ba40137a342a659ca0e92c4cda459031c7f31b91298cc3def25",
+    "src/main/java/com/tewendelabs/investigator/security/AuthController.java": "f98e81a8080286827c32cafd6f15dcd7ff7e8b7328cd9674fb4e3d6c63729e3e",
+    "src/main/java/com/tewendelabs/investigator/security/ScopedAccess.java": "3d70a3539c094985cfb21bb3c609857603494bea3399e0f84ed2b5cd9f5f650f",
+    "src/main/java/com/tewendelabs/investigator/security/IdentityService.java": "3881d20d27f6cbf3915df980da7eae7849dfa08005cbe39013cacc82bab218db",
+    "src/main/java/com/tewendelabs/investigator/security/SecurityConfiguration.java": "cda6b39e6abb8c181310f48620c68b0018f60ddb53adff841ec0f62770a7ffc0",
+    "src/main/java/com/tewendelabs/investigator/provider/MetaPolicyReasoningProvider.java": "b5b4b52143a2eb130bd981e14bc30e9f6614a87d35957254470a99922f3c20c1",
+    "src/main/java/com/tewendelabs/investigator/provider/MetaTransport.java": "34fa05f65773d0a5e5b04277cfc3dfe3ced8beeed76aae521325eeca9d08002c",
+    "src/main/java/com/tewendelabs/investigator/provider/PolicyReasoningProvider.java": "ebeaf8b11e3bb4ff0da12ecb03552c057f51c6c40ab3d0ca617555783d8fdba9",
+    "src/main/java/com/tewendelabs/investigator/provider/MetaHttpTransport.java": "923f38819e7c8e70fdaeea5e1b07ff05e4d33a0adff430360b43dba62a5fbd47",
+    "src/main/java/com/tewendelabs/investigator/provider/ProviderGate.java": "5c7f6995b7922285228a8cb627b7033e58f7ba80ea01ebe665c8be40e11f3f31",
+    "src/main/java/com/tewendelabs/investigator/investigation/InvestigationSchemas.java": "75520a4a29e3375490a8cf4e39a2d8e3bfe1a0565ad39d95d08d71aded6e1eb6",
+    "src/main/java/com/tewendelabs/investigator/investigation/JsonContract.java": "575fade666ec65f753bc8ec0c137c6afcfd8775a760e19777965bfade530660c",
+    "src/main/java/com/tewendelabs/investigator/investigation/InvestigationController.java": "826ded6a92c3fc5f1d9d7aad9ce991ba1df4f9b41f655dc8bcb0f2428ac53d7d",
+    "src/main/java/com/tewendelabs/investigator/investigation/InvestigationWorker.java": "401290ebd9a027aa2caf21e1678394a23cd8af925ba7a0eb9aae9bab677e2982",
+    "src/main/java/com/tewendelabs/investigator/investigation/InvestigationService.java": "07b61da5dc8bbbbcc1eafbb53ca078b2ca02fb2c0f627debeee59bf7297693e3",
+    "src/main/java/com/tewendelabs/investigator/investigation/EvidenceValidator.java": "ab718f2249354cfc286f6a98ce7ea0d31d5fc1c9e0bee7c02735903e25c19170",
+    "src/main/java/com/tewendelabs/investigator/api/ApiErrors.java": "500577beeb229e4713d25d9a764c9e415b40644f647855d1cbdb6b335c940d33",
+    "src/main/java/com/tewendelabs/investigator/api/ApiFailure.java": "70febb8e8634e2b8c5aaae9a5bae7c02a5467c90c3ebbdd9b5ad6ec797ef5af5",
+    "src/main/java/com/tewendelabs/investigator/policy/PolicyRepository.java": "4c7ba75a2fd82cb30fa6fc71c819395659d1a86f34d8f862a48902eb58e51168",
+    "src/main/java/com/tewendelabs/investigator/policy/PolicyService.java": "0c0750dd3bed598948b907bb76fad747bc054dc6684785ddba507fdc42d20603",
+    "src/main/java/com/tewendelabs/investigator/policy/PolicyController.java": "fbbed77d4f5893ab986b392732b4f5bc62822bce7d6bd8d6f463c99b2a5d59ef",
+    "src/main/java/com/tewendelabs/investigator/policy/Policy.java": "934db6525311952158b29deba6fafbb50f3f493dc4507a417ba80cbfeb33d9e1",
+    "src/main/resources/db/migration/V1__policy_foundation.sql": "f8732829239af6faa957d191dccd0bf56092d87ec6198912509fcf645db1536d",
+    "src/main/resources/db/migration/V2__version_job_progress.sql": "4b7abbca2a49fe6ed38407368aad6806257bddd3c9715cd41c35ac405b90ef89",
+    "src/main/resources/db/migration/V3__investigations.sql": "374d4fbc1c14b5adc978e601d6434919099e53b545ddacdd58cdf3c03ad9aa72",
+    "src/main/resources/db/migration/V4__external_processing_authority.sql": "8ec624bf7d48449a74d32246920f6a5760dae194585f9afe2da54a933043bbff",
+    "src/main/resources/db/migration/V5__configurable_investigation_deadline.sql": "44ba2fef2da5594ffd93699d54f4a07138111811b5ab0b5d027f3e39c8e967bb",
+    "src/test/java/com/tewendelabs/investigator/PdfAndVectorTest.java": "84b21de1e01cb2025c6a4a764509a3af373917d6a1da56b3afaa721a63fc9ebe",
+    "src/test/java/com/tewendelabs/investigator/SecurityDatabaseTest.java": "0d6a749520537e43abe6aa574d4bf4bb0701ee571cc3b60888d241cc6548ffbd",
+    "src/test/java/com/tewendelabs/investigator/config/DotenvConfigurationTest.java": "4bd613893ad413b3816ba3b7e2210144628685573ff21569f438212c6206cdfb",
+    "src/test/java/com/tewendelabs/investigator/config/DotenvProbeFixture.java": "d63b1ae844e658014852ea783733e7aa9c6937bef62bbfb800fbbd535e58d2e3",
+    "src/test/java/com/tewendelabs/investigator/security/LoginThrottleTest.java": "213b6ee30fd2d3597669fb32a0afa912f5e30308c56592fec57401e9e38f6f9c",
+    "src/test/java/com/tewendelabs/investigator/security/JwtValidationTest.java": "58cba16b88513ef37f67909cbd4bf805b574f366d4c32517a623e3f1e6ccac16",
+    "src/test/java/com/tewendelabs/investigator/provider/MetaHttpTransportTest.java": "7c85206a0f05ece83aeae6ef746845d9125b20352cc8870b611831c8057f46d2",
+    "src/test/java/com/tewendelabs/investigator/investigation/StructuredValidationTest.java": "d6c4a62504e1017e4ce5230ef0ef572966c015f2527e6a1e14a9ebd5fb54b43a",
+    ".github/workflows/verify.yml": "6167592049ea687b9d716e5b4e32a1db6f57827cef627970d5cc3b750fb1be75",
+    "scripts/tests/test_verify_meta_access.py": "1ef2493347297f90986f32d8b307ad4f63f521a4b03abcd8bd3cfd485a2307f6",
+    "docs/verification/phase2-results.json": "8cf2f61734eddbc19d30fddfd91b52e9851ec4d19470ed958c5507edcfa2a4a0",
+    "docs/verification/meta-api-preflight.json": "1f7dd9f27b6e08cf2cc172e4950cb618826ce295cd3ae7e7956076b3534980b3",
+    "docs/verification/phase3-results.json": "a620d9b392ee34c8c32d22f6df84e39ae2b3237ae670f8d647238c0b30b5f76f",
+    "docs/verification/dotenv-results.json": "8616293a6cb1adc2d9a1922bf9202ef0878a1566b5dee01e4fa56ab42d74f611",
+    "docs/verification/phase3-demo.json": "bc48b76f2a92a339e36cca7ba1c9788628468ca8f166dd08e0a03cba180b5093",
+    "docs/verification/phase3-attempts/1793077945644131000.json": "5669cbdec3f6240dba97cac26cabbe1c6967971c9cd4cbabcbfd7b70f7663865",
+    "docs/verification/phase3-attempts/1793062908527294000.json": "973301ab631c63aa8a24d79e31639f6e572c889e9b653e7339ebfeb0e02333d3",
+    "docs/verification/meta-api-attempts/acb18eaea6fe30ad452ff25e845dba4f84c47ca4b6c3d20821aea680e071fe6a.json": "acb18eaea6fe30ad452ff25e845dba4f84c47ca4b6c3d20821aea680e071fe6a",
+    "deploy/postgres/init.sh": "8a8bf87c66a2dad9efa0a1934fa7d58eea93e04469e15043f3f25e4a51a94261"
+  },
+  "documentationSources": [
+    "https://docs.docker.com/compose/how-tos/production",
+    "https://docs.docker.com/compose/how-tos/multiple-compose-files/merge",
+    "https://github.com/docker/compose/blob/main/pkg/compose/create.go"
+  ],
+  "notRun": [
+    "Remote GitHub Actions",
+    "VPS deployment or production override",
+    "Live Meta preflight/investigation (historical Phase 3 results preserved)",
+    "Mutating local initializer, local launcher, provisioning helper or demonstration scripts",
+    "Full provenance source-commit verifier (invokes read-only git show)",
+    "Database initializer against the existing volume",
+    "Production application image build, load test or ARM compatibility test"
+  ],
+  "remainingConcerns": [
+    "No Git index/history exists to inspect; owner must review manual commit selection.",
+    "CI lacks Python checks and explicit production runtime-package verification; its name still says Phase 2.",
+    "VPS needs release image/artifact, production paths/secret injection, proxy network/TLS, restart/readiness and backups/restoration.",
+    "The Java process retains migration-owner credentials for startup Flyway.",
+    "Arbitrary local resource names can bypass dotenv-only Maven resource filters; current artifact scan passed.",
+    "Known-value and private-key-marker scans do not detect every possible unknown secret.",
+    "Python preflight and demo are baseline-specific tooling; generic evaluation and broader cases remain deferred."
+  ],
+  "candidateManifest": "docs/provenance/commit-ready-files.csv",
+  "actualChangedFiles": [
+    ".dockerignore",
+    ".gitignore",
+    "README.md",
+    "docs/REPOSITORY_AUDIT.md",
+    "docs/provenance/HACKATHON_CONTRIBUTIONS.md",
+    "docs/provenance/commit-ready-files.csv",
+    "docs/verification/repository-audit.json"
+  ],
+  "candidateCount": 93,
+  "verificationNotes": [
+    "An initial one-off exclusion harness could not locate rg in the IDE PATH. The rerun used its existing absolute path; final checks passed and temporary probes were removed."
+  ]
+}

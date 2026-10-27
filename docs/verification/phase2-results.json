@@ -1,0 +1,92 @@
+{
+  "verified_date": "2026-10-27",
+  "build_command": "./mvnw -B -o -Pneural-embeddings,database-tests verify",
+  "build": "PASS",
+  "maven": "3.9.16 wrapper",
+  "java": "21.0.11",
+  "database": "Fresh PostgreSQL 16.10 / pgvector 0.8.0 container",
+  "total_tests": 22,
+  "suites": [
+    {
+      "suite": "com.tewendelabs.investigator.PdfAndVectorTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "refusesMixedEmptyPagesInsteadOfClaimingCompleteExtraction",
+        "rejectsUnsafeNamesAndInvalidVectors",
+        "childJvmPreservesDistinctPageTextAndLocations",
+        "unicodeOffsetsRoundTripWithoutSplittingCharacters",
+        "rejectsMalformedAndEmptyPdf"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.SecurityDatabaseTest",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "workflowPreservesPdfPageEvidenceAndImmutableVersions",
+        "adminRoleAndMalformedCrossOrganizationGrantsDoNotBypassScope",
+        "revocationDuringEmbeddingRollsBackAllEvidence",
+        "runtimeCannotReadQueueCredentialsOrBypassImmutability",
+        "jdbcJpaAndConnectionReuseDenyOtherDepartment",
+        "explicitGrantWorksAndRevocationTakesEffectForJpaAndSql",
+        "incompatibleEmbeddingRevisionCannotLookLikeAnEmptySearch",
+        "realJwtAndHttpUploadEnforceCurrentAccountStatus",
+        "idempotencyAndLeaseRecoveryRejectDuplicatesAndStaleWorkers",
+        "unauthorizedSearchNeverReachesEmbeddingModel",
+        "deletedAccountCannotUseAnAlreadyIssuedJwt",
+        "jpaWritesCannotCrossDepartmentBoundary",
+        "revokedRequesterCannotIngestAndCannotReadPreviouslyCreatedContent",
+        "forgedEvidenceCannotBeInsertedEvenByAnAuthorizedWriter"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.security.JwtValidationTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "acceptsOnlyExpectedIssuerAudienceSubjectAndExpiration",
+        "rejectsWeakKeysAndSignaturesFromAnotherApplication"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.security.LoginThrottleTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "spoofedForwardingHeadersCannotResetLoginThrottle"
+      ]
+    }
+  ],
+  "real_model_smoke": {
+    "result": "PASS",
+    "model": "all-MiniLM-L6-v2",
+    "model_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "checks": [
+      "packaged startup",
+      "JWT login",
+      "baseline upload",
+      "durable worker",
+      "real local embeddings",
+      "semantic ranking smoke",
+      "page evidence",
+      "original PDF round-trip",
+      "replacement version",
+      "procedure upload",
+      "cross-department denial",
+      "current membership revocation"
+    ]
+  },
+  "reference_repositories_modified": false,
+  "frontend_imported": false,
+  "meta_api_called": false,
+  "remote_ci_run_claimed": false
+}

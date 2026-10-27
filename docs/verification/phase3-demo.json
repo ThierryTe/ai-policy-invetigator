@@ -1,0 +1,474 @@
+{
+  "recordedAt": "2026-10-27T05:12:25.642454+00:00",
+  "provider": "Meta Model API",
+  "model": "muse-spark-1.3",
+  "syntheticOnly": true,
+  "result": "PASS",
+  "goldenDatasetVersion": "phase3-training-access-v1",
+  "investigationId": "1c74afef-4771-48aa-a2d6-e07ff87ad4ca",
+  "scope": {
+    "baselineVersionId": "241faf0b-07fa-4427-940b-8fe99469b89d",
+    "replacementVersionId": "f87768f9-5faf-4c0b-845b-6235dfb11f64",
+    "procedureVersionIds": [
+      "86fcd644-c0a0-4661-bbc7-de63fe15ba96",
+      "186ca5e7-c63f-4eeb-a131-9f6dd59fa9ba"
+    ],
+    "analysisDate": "2026-10-27"
+  },
+  "expectedContradictionProcedure": "86fcd644-c0a0-4661-bbc7-de63fe15ba96",
+  "expectedCompatibleProcedure": "186ca5e7-c63f-4eeb-a131-9f6dd59fa9ba",
+  "elapsedMs": 48732,
+  "progress": {
+    "id": "1c74afef-4771-48aa-a2d6-e07ff87ad4ca",
+    "state": "COMPLETED",
+    "stage": "COMPLETED",
+    "error_code": null,
+    "attempts": 1,
+    "calls": 5,
+    "metered_calls": 5,
+    "prompt_tokens": 6368,
+    "completion_tokens": 8200,
+    "latency_ms": 47469
+  },
+  "extractions": [
+    {
+      "version_id": "186ca5e7-c63f-4eeb-a131-9f6dd59fa9ba",
+      "payload": {
+        "complete": true,
+        "limitations": [],
+        "requirements": [
+          {
+            "id": "2ebc9541-05dc-3757-b3e0-111a3d2d323f",
+            "actor": "HR",
+            "scope": "all employees using sensitive production systems",
+            "action": "withhold sensitive production-system access",
+            "deadline": null,
+            "condition": "until the employee has completed security training",
+            "exceptions": [],
+            "obligation": "MUST",
+            "effectiveDate": "2026-10-26",
+            "unknownFields": [
+              "deadline"
+            ],
+            "sourceReferences": [
+              {
+                "quote": "HR\nmust withhold sensitive production-system access until the employee has\ncompleted security training.",
+                "sourceId": "064ba9a6-d4d0-4db2-836e-b452ec5a7484"
+              },
+              {
+                "quote": "Scope: all employees using sensitive production systems.",
+                "sourceId": "064ba9a6-d4d0-4db2-836e-b452ec5a7484"
+              },
+              {
+                "quote": "No exceptions apply.",
+                "sourceId": "064ba9a6-d4d0-4db2-836e-b452ec5a7484"
+              }
+            ]
+          }
+        ],
+        "processedSourceIds": [
+          "064ba9a6-d4d0-4db2-836e-b452ec5a7484"
+        ]
+      },
+      "model": "muse-spark-1.3",
+      "prompt_version": "policy-investigator-2026-10-27-v1",
+      "schema_version": "requirements-v1"
+    },
+    {
+      "version_id": "241faf0b-07fa-4427-940b-8fe99469b89d",
+      "payload": {
+        "complete": true,
+        "limitations": [],
+        "requirements": [
+          {
+            "id": "7fa6c052-3764-3aed-81b8-a45aa2197d51",
+            "actor": "Employees",
+            "scope": "all employees using sensitive production systems",
+            "action": "complete security training",
+            "deadline": "within 30 days after first sensitive production-system access",
+            "condition": "after first sensitive production-system access",
+            "exceptions": [],
+            "obligation": "MUST",
+            "effectiveDate": "2026-10-26",
+            "unknownFields": [],
+            "sourceReferences": [
+              {
+                "quote": "Employees must complete security training within 30 days after first\nsensitive production-system access.",
+                "sourceId": "2e18e48c-b804-49f3-99a0-d46ee68c4a53"
+              },
+              {
+                "quote": "Scope: all employees using sensitive production\nsystems.",
+                "sourceId": "2e18e48c-b804-49f3-99a0-d46ee68c4a53"
+              },
+              {
+                "quote": "No exceptions apply.",
+                "sourceId": "2e18e48c-b804-49f3-99a0-d46ee68c4a53"
+              }
+            ]
+          }
+        ],
+        "processedSourceIds": [
+          "2e18e48c-b804-49f3-99a0-d46ee68c4a53"
+        ]
+      },
+      "model": "muse-spark-1.3",
+      "prompt_version": "policy-investigator-2026-10-27-v1",
+      "schema_version": "requirements-v1"
+    },
+    {
+      "version_id": "86fcd644-c0a0-4661-bbc7-de63fe15ba96",
+      "payload": {
+        "complete": true,
+        "limitations": [],
+        "requirements": [
+          {
+            "id": "cde46b4e-c8be-380b-afb7-f4e4958b4da8",
+            "actor": "HR",
+            "scope": "all employees using sensitive production systems",
+            "action": "grant employees sensitive production-system access",
+            "deadline": "on their first day of employment",
+            "condition": null,
+            "exceptions": [],
+            "obligation": "MUST",
+            "effectiveDate": "2026-10-26",
+            "unknownFields": [
+              "condition"
+            ],
+            "sourceReferences": [
+              {
+                "quote": "Scope: all employees using sensitive production systems.",
+                "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f"
+              },
+              {
+                "quote": "HR\nmust grant employees sensitive production-system access on their first day of\nemployment.",
+                "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f"
+              },
+              {
+                "quote": "No exceptions apply.",
+                "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f"
+              }
+            ]
+          },
+          {
+            "id": "2fbbd4b2-1911-34c3-9a18-7569976231fa",
+            "actor": "Employees",
+            "scope": "all employees using sensitive production systems",
+            "action": "complete security training",
+            "deadline": "within 30 days after their first day",
+            "condition": null,
+            "exceptions": [],
+            "obligation": "MAY",
+            "effectiveDate": "2026-10-26",
+            "unknownFields": [
+              "condition"
+            ],
+            "sourceReferences": [
+              {
+                "quote": "Scope: all employees using sensitive production systems.",
+                "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f"
+              },
+              {
+                "quote": "Employees may complete security training within 30 days after\ntheir first day.",
+                "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f"
+              },
+              {
+                "quote": "No exceptions apply.",
+                "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f"
+              }
+            ]
+          }
+        ],
+        "processedSourceIds": [
+          "2f0fd0d0-645e-468c-ac77-a6f62f0f109f"
+        ]
+      },
+      "model": "muse-spark-1.3",
+      "prompt_version": "policy-investigator-2026-10-27-v1",
+      "schema_version": "requirements-v1"
+    },
+    {
+      "version_id": "f87768f9-5faf-4c0b-845b-6235dfb11f64",
+      "payload": {
+        "complete": true,
+        "limitations": [],
+        "requirements": [
+          {
+            "id": "a7de6a36-85a0-3819-a369-c20c95adfad2",
+            "actor": "Employees",
+            "scope": "all employees using sensitive production systems",
+            "action": "complete security training",
+            "deadline": null,
+            "condition": "before any sensitive production-system access is granted",
+            "exceptions": [],
+            "obligation": "MUST",
+            "effectiveDate": "2026-10-27",
+            "unknownFields": [
+              "deadline"
+            ],
+            "sourceReferences": [
+              {
+                "quote": "Scope: all employees using sensitive production\nsystems.",
+                "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e"
+              },
+              {
+                "quote": "Employees must complete security training before any sensitive\nproduction-system access is granted.",
+                "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e"
+              },
+              {
+                "quote": "No exceptions apply.",
+                "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e"
+              }
+            ]
+          }
+        ],
+        "processedSourceIds": [
+          "1c4a08f7-45df-4e7c-8176-f58fd8914e6e"
+        ]
+      },
+      "model": "muse-spark-1.3",
+      "prompt_version": "policy-investigator-2026-10-27-v1",
+      "schema_version": "requirements-v1"
+    }
+  ],
+  "findings": {
+    "payload": {
+      "changes": [
+        {
+          "reason": "Condition and timing changed from post-access completion within 30 days to pre-access completion before any access is granted.",
+          "changeType": "MODIFIED",
+          "sourceReferences": [
+            {
+              "quote": "Employees must complete security training within 30 days after first\nsensitive production-system access.",
+              "sourceId": "2e18e48c-b804-49f3-99a0-d46ee68c4a53"
+            },
+            {
+              "quote": "Employees must complete security training before any sensitive\nproduction-system access is granted.",
+              "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e"
+            }
+          ],
+          "baselineRequirementId": "7fa6c052-3764-3aed-81b8-a45aa2197d51",
+          "replacementRequirementId": "a7de6a36-85a0-3819-a369-c20c95adfad2"
+        }
+      ],
+      "complete": true,
+      "assessments": [
+        {
+          "id": "b5f636a9-aa44-4215-8d81-41021ecfcb81",
+          "severity": "HIGH",
+          "rationale": "Procedure A requires granting sensitive access on day one and permits training within 30 days after, which directly violates replacement policy requiring training before any access with no exceptions.",
+          "reviewStatus": "PENDING_REVIEW",
+          "classification": "CONTRADICTION",
+          "suggestedAction": "Revise HR procedure A to withhold sensitive access until training is completed, aligning with replacement pre-access requirement.",
+          "scopeExplanation": "Same scope: all employees using sensitive production systems, so procedure applies to all policy subjects.",
+          "sourceReferences": [
+            {
+              "quote": "Employees must complete security training before any sensitive\nproduction-system access is granted.",
+              "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e"
+            },
+            {
+              "quote": "No exceptions apply.",
+              "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e"
+            },
+            {
+              "quote": "HR\nmust grant employees sensitive production-system access on their first day of\nemployment.",
+              "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f"
+            },
+            {
+              "quote": "Employees may complete security training within 30 days after\ntheir first day.",
+              "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f"
+            }
+          ],
+          "procedureVersionId": "86fcd644-c0a0-4661-bbc7-de63fe15ba96",
+          "policyRequirementId": "a7de6a36-85a0-3819-a369-c20c95adfad2",
+          "relatedProcedureRequirementIds": [
+            "cde46b4e-c8be-380b-afb7-f4e4958b4da8",
+            "2fbbd4b2-1911-34c3-9a18-7569976231fa"
+          ]
+        },
+        {
+          "id": "5cdb70f8-39f7-40f9-bbc6-1883849416c5",
+          "severity": "NONE",
+          "rationale": "Procedure B withholds sensitive access until training is completed with no sensitive permissions on day-one accounts, satisfying replacement requirement for training before any access.",
+          "reviewStatus": "NOT_REQUIRED",
+          "classification": "NO_CONFLICT",
+          "suggestedAction": null,
+          "scopeExplanation": "Same scope: all employees using sensitive production systems, so procedure fully covers policy subjects with compatible condition.",
+          "sourceReferences": [
+            {
+              "quote": "Employees must complete security training before any sensitive\nproduction-system access is granted.",
+              "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e"
+            },
+            {
+              "quote": "Scope: all employees using sensitive production\nsystems.",
+              "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e"
+            },
+            {
+              "quote": "HR\nmust withhold sensitive production-system access until the employee has\ncompleted security training.",
+              "sourceId": "064ba9a6-d4d0-4db2-836e-b452ec5a7484"
+            },
+            {
+              "quote": "Day-one onboarding accounts have no sensitive\nproduction-system permissions.",
+              "sourceId": "064ba9a6-d4d0-4db2-836e-b452ec5a7484"
+            }
+          ],
+          "procedureVersionId": "186ca5e7-c63f-4eeb-a131-9f6dd59fa9ba",
+          "policyRequirementId": "a7de6a36-85a0-3819-a369-c20c95adfad2",
+          "relatedProcedureRequirementIds": [
+            "2ebc9541-05dc-3757-b3e0-111a3d2d323f"
+          ]
+        }
+      ],
+      "limitations": []
+    },
+    "model": "muse-spark-1.3",
+    "prompt_version": "policy-investigator-2026-10-27-v1",
+    "schema_version": "impact-v1"
+  },
+  "verifiedCitations": [
+    {
+      "sourceId": "064ba9a6-d4d0-4db2-836e-b452ec5a7484",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "064ba9a6-d4d0-4db2-836e-b452ec5a7484",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "064ba9a6-d4d0-4db2-836e-b452ec5a7484",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "2e18e48c-b804-49f3-99a0-d46ee68c4a53",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "2e18e48c-b804-49f3-99a0-d46ee68c4a53",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "2e18e48c-b804-49f3-99a0-d46ee68c4a53",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "2f0fd0d0-645e-468c-ac77-a6f62f0f109f",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "064ba9a6-d4d0-4db2-836e-b452ec5a7484",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "064ba9a6-d4d0-4db2-836e-b452ec5a7484",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "2e18e48c-b804-49f3-99a0-d46ee68c4a53",
+      "page": 1,
+      "quoteMatches": true
+    },
+    {
+      "sourceId": "1c4a08f7-45df-4e7c-8176-f58fd8914e6e",
+      "page": 1,
+      "quoteMatches": true
+    }
+  ],
+  "checks": [
+    "real Meta extraction",
+    "real Meta comparison",
+    "pending human review",
+    "non-conflict control",
+    "citation lookup",
+    "cross-department denial",
+    "current permission revocation"
+  ],
+  "evaluation": {
+    "positiveProcedureCases": 1,
+    "negativeProcedureCases": 1,
+    "truePositives": 1,
+    "falsePositives": 0,
+    "falseNegatives": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "citationCorrectness": 1.0,
+    "limitation": "Two selected synthetic procedure cases; does not establish general accuracy."
+  }
+}

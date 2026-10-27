@@ -1,0 +1,94 @@
+
+name: ai-policy-investigator
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.0-pg16
+    ports:
+      - '127.0.0.1:5546:5432'
+    environment:
+      POSTGRES_DB: investigator
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Run scripts/init_local.py}
+      OWNER_DB_PASSWORD: ${OWNER_DB_PASSWORD:?Run scripts/init_local.py}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Run scripts/init_local.py}
+    volumes:
+      - investigator_data:/var/lib/postgresql/data
+      - ./deploy/postgres/init.sh:/docker-entrypoint-initdb.d/01-investigator.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d investigator']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  model-init:
+    profiles: ['app']
+    build:
+      context: .
+      dockerfile: deploy/embeddings/Dockerfile
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    mem_limit: 192m
+    volumes:
+      - embedding_models:/models
+      - native_cache:/runtime
+  backend:
+    profiles: ['app']
+    build:
+      context: .
+      dockerfile: deploy/backend/Dockerfile
+    user: '10001:10001'
+    read_only: true
+    tmpfs:
+      - /tmp:rw,exec,size=384m
+    mem_limit: 1536m
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--spider', 'http://127.0.0.1:8080/actuator/health']
+      interval: 5s
+      timeout: 3s
+      start_period: 120s
+      retries: 12
+    ports:
+      - '127.0.0.1:18080:8080'
+    environment:
+      SPRINGDOTENV_ENABLED: "false"
+      APP_ENVIRONMENT: production
+      MODEL_API_KEY: ${MODEL_API_KEY:-}
+      META_MODEL_ID: ${META_MODEL_ID:-muse-spark-1.3}
+      META_TIMEOUT_SECONDS: ${META_TIMEOUT_SECONDS:-30}
+      META_MAX_RETRIES: ${META_MAX_RETRIES:-2}
+      META_CONCURRENCY: ${META_CONCURRENCY:-2}
+      META_INVESTIGATION_BUDGET_SECONDS: ${META_INVESTIGATION_BUDGET_SECONDS:-240}
+      DB_URL: jdbc:postgresql://postgres:5432/investigator
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Run scripts/init_local.py}
+      OWNER_DB_PASSWORD: ${OWNER_DB_PASSWORD:?Run scripts/init_local.py}
+      JWT_SECRET: ${JWT_SECRET:?Run scripts/init_local.py}
+      APP_DB_USERNAME: ${APP_DB_USERNAME:-investigator_app}
+      OWNER_DB_USERNAME: ${OWNER_DB_USERNAME:-investigator_owner}
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-6}
+      JWT_ISSUER: ${JWT_ISSUER:-ai-policy-investigator}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-policy-api}
+      UPLOAD_MAX_FILE_SIZE: ${UPLOAD_MAX_FILE_SIZE:-10MB}
+      UPLOAD_MAX_REQUEST_SIZE: ${UPLOAD_MAX_REQUEST_SIZE:-11MB}
+      APP_WORKER_ENABLED: ${APP_WORKER_ENABLED:-true}
+      APP_INVESTIGATION_WORKER_ENABLED: ${APP_INVESTIGATION_WORKER_ENABLED:-true}
+      LOCAL_OPENAPI_ENABLED: "false"
+      LOCAL_SWAGGER_UI_ENABLED: "false"
+      SWAGGER_TRY_IT_OUT_ENABLED: ${SWAGGER_TRY_IT_OUT_ENABLED:-false}
+      EMBEDDING_MODEL_URI: file:/models/model.onnx
+      EMBEDDING_TOKENIZER_URI: file:/models/tokenizer.json
+      # Exact fingerprint of the same artifacts verified locally; no VPS-side env generation.
+      EMBEDDING_REVISION: 6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452:be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037
+    volumes:
+      - embedding_models:/models:ro
+      - native_cache:/runtime
+    depends_on:
+      postgres:
+        condition: service_healthy
+      model-init:
+        condition: service_completed_successfully
+
+volumes:
+  investigator_data:
+  embedding_models:
+  native_cache:
