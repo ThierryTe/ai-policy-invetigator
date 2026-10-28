@@ -185,3 +185,46 @@ and are not claimed as new. No reference repository code, credentials or Git his
 was imported. No Git command, VPS deployment or new Meta inference was performed.
 See `docs/PHASE6A.md`, `docs/verification/phase6a-results.json` and
 `docs/provenance/phase6a-files.csv`.
+
+
+## Phase 6B — Confirmed NPM integration preparation — October 28, 2026
+
+Newly authored work: production backend/frontend Compose overlays with no published
+ports, dedicated internal application/database networks, unique frontend NPM DNS alias,
+configuration verification/negative tests, operator-only empty-identity-store initial
+ADMIN provisioning with COPY secret transport and BCrypt/atomic-refusal tests, and
+NPM/environment/backup/restore/image-rollback instructions. The frontend overlay is
+backend-owned integration configuration referencing the independent frontend checkout;
+no frontend application source or Git history is copied into this repository.
+The earlier Nginx access-log fix is already present and is not claimed as new Phase 6B work.
+
+Existing Dockerfiles, model initializer/revision/hash/dimensions, PostgreSQL volume,
+application authentication/authorization, domain/provider code, migrations and frontend
+Signals implementation remain unchanged. No reference code, production credentials
+or model artifacts were imported. No Git operation, SSH, Compose application startup,
+Docker network creation, NPM/firewall change or new Meta inference was performed.
+PostgreSQL tests use disposable test containers; no existing application identity
+store was seeded and no production backup/restore was executed. See
+`docs/PHASE6B.md`, `docs/verification/phase6b-results.json` and
+`docs/provenance/phase6b-files.csv` for the exact scope and evidence.
+
+
+## Phase 6C — Minimal CI and optional GHCR publication — October 28, 2026
+
+New work: scoped develop/main CI, read-only normal-job permissions, pinned official
+actions, Java/PostgreSQL/Python/Compose/Docker checks, frontend Node/npm/test/build
+workflow files, main-only manual full-SHA GHCR publishers and digest-image deployment
+overlays/documentation. Frontend workflow files are delivered under docs/ci/frontend
+for owner installation; direct frontend writes were rejected by workspace policy.
+They were validated against a temporary frontend workspace, not installed in its Git
+working copy. No external reference application code or Git history was imported.
+
+The only cross-project snapshot is the new frontend's existing compose.yaml, copied
+as a reviewed non-secret CI contract into .ci/frontend with its source URL, inspected
+commit context and exact worktree SHA-256. It is pre-existing configuration and is not
+claimed as new infrastructure. Original reference repositories remain untouched. The
+existing topology tests gained only an explicit CI fixture directory selection and
+a local source/fixture drift check. Domain, authorization, schema, provider, model
+initializer and existing production topology files remain unchanged. No Git command,
+hosted workflow dispatch, registry publication, real Meta request or VPS deployment
+was performed. See docs/PHASE6C.md and the Phase 6C evidence/file inventory.
