@@ -3,6 +3,9 @@ name: ai-policy-investigator
 services:
   postgres:
     image: pgvector/pgvector:0.8.0-pg16
+    restart: unless-stopped
+    networks:
+      - database
     ports:
       - '127.0.0.1:5546:5432'
     environment:
@@ -34,6 +37,10 @@ services:
       - native_cache:/runtime
   backend:
     profiles: ['app']
+    restart: unless-stopped
+    networks:
+      - default
+      - database
     build:
       context: .
       dockerfile: deploy/backend/Dockerfile
@@ -87,6 +94,11 @@ services:
         condition: service_healthy
       model-init:
         condition: service_completed_successfully
+
+networks:
+  default:
+  database:
+    # Separate from the frontend network; keep the loopback host workflow reachable.
 
 volumes:
   investigator_data:

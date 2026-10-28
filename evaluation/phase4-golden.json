@@ -1,0 +1,46 @@
+{
+  "version": "phase4-training-impact-v1",
+  "syntheticOnly": true,
+  "analysisDate": "2026-10-27",
+  "limitation": "Ten hand-authored synthetic cases, one run per case; neither a general accuracy estimate nor a production benchmark.",
+  "groups": [
+    {
+      "id": "strict-training",
+      "baseline": "Security baseline. Scope: employees accessing sensitive production systems. Employees must complete security training within 30 days after first sensitive production-system access. No exceptions apply.",
+      "replacement": "Security replacement. Scope: employees accessing sensitive production systems. Employees must complete security training before any sensitive production-system access is granted. No exceptions apply.",
+      "cases": [
+        {"id": "day-one-before-training", "category": "contradiction", "procedure": "HR procedure. Scope: employees accessing sensitive production systems. HR must grant sensitive production-system access on day one even when employees have not completed security training. Employees may finish training within 30 days after access. No exceptions apply.", "expected": "CONTRADICTION", "reason": "Explicit access before training conflicts in the same scope."},
+        {"id": "access-gated", "category": "non-conflict", "procedure": "HR procedure. Scope: employees accessing sensitive production systems. HR must withhold all sensitive production-system access until security training is complete. No exceptions apply.", "expected": "NO_CONFLICT", "reason": "The access gate satisfies the replacement policy."},
+        {"id": "sandbox-only", "category": "different-scope", "procedure": "HR sandbox procedure. Scope: employees using only a non-sensitive demonstration sandbox with no connection or permission to production systems. HR must grant sandbox access before security training. This procedure never grants sensitive production-system access.", "expected": "NO_CONFLICT", "reason": "Only non-sensitive sandbox access is granted; the policy applies to sensitive production access."},
+        {"id": "grace-period-production", "category": "contradiction", "procedure": "IT procedure. Scope: employees accessing sensitive production systems. IT must permit employees to use sensitive production systems for a seven-day grace period before security training is complete. No exceptions apply.", "expected": "CONTRADICTION", "reason": "An explicit untrained grace period violates the access prerequisite."}
+      ]
+    },
+    {
+      "id": "explicit-exception",
+      "baseline": "Security baseline. Scope: employees accessing sensitive production systems. Employees must complete security training within 30 days after first sensitive production-system access.",
+      "replacement": "Security replacement. Scope: employees accessing sensitive production systems. Employees must complete security training before sensitive production-system access, except designated emergency responders during a declared incident, who may complete training within 24 hours after emergency access. This is the only exception.",
+      "cases": [
+        {"id": "valid-emergency-exception", "category": "exception", "procedure": "Emergency HR procedure. Scope: designated employee emergency responders only during a declared incident. HR may grant emergency sensitive production-system access before security training; responders must complete training within 24 hours after that access. No other access is granted by this procedure.", "expected": "NO_CONFLICT", "reason": "Actor, condition and deadline match the explicit exception."},
+        {"id": "exception-outside-incident", "category": "contradiction", "procedure": "Routine HR procedure. Scope: designated employee emergency responders on routine working days with no declared incident. HR must grant sensitive production-system access before security training and allow training within 24 hours after access.", "expected": "CONTRADICTION", "reason": "The emergency exception cannot apply without a declared incident."},
+        {"id": "stricter-than-exception", "category": "non-conflict", "procedure": "HR procedure. Scope: all employees including emergency responders in every situation. HR must withhold sensitive production-system access until security training is complete, including during declared incidents.", "expected": "NO_CONFLICT", "reason": "A permitted exception need not be used; the stricter gate is compatible."},
+        {"id": "complete-scope-missing-gate", "category": "missing-requirement", "procedure": "Complete routine employee sensitive production-system onboarding procedure; no declared incidents are covered. HR must verify the employee's identity before provisioning sensitive production-system access. This is the entire selected procedure. It specifies no security-training prerequisite, deadline or exception and no other onboarding requirement.", "expected": "MISSING_REQUIREMENT", "reason": "A fully supplied procedure lacks the policy's training gate; absence is limited to this selected scope."}
+      ]
+    },
+    {
+      "id": "ambiguous-scope",
+      "baseline": "Security baseline. Employees must complete security training within 30 days after first sensitive production-system access.",
+      "replacement": "Security replacement. Employees must complete security training before sensitive production-system access. No exceptions apply.",
+      "cases": [
+        {"id": "undefined-access", "category": "ambiguity", "procedure": "HR procedure. HR must grant employees system access on day one, before training. The term system access is not defined; this procedure does not say whether it includes sensitive production systems or only non-sensitive onboarding tools.", "expected": "AMBIGUITY", "reason": "Applicability cannot be resolved because system permissions are undefined."}
+      ]
+    },
+    {
+      "id": "insufficient-evidence",
+      "baseline": "Security baseline. Employees must complete security training within 30 days after first sensitive production-system access.",
+      "replacement": "Security replacement. Employees must complete security training before sensitive production-system access. No exceptions apply.",
+      "cases": [
+        {"id": "unavailable-procedure-page", "category": "insufficient-evidence", "procedure": "HR sensitive production-system access procedure, incomplete scan. The page containing the access authorization and security-training requirements is missing. Only this cover note is available. Access timing, training deadline, conditions and exceptions cannot be determined from this document.", "expected": "ABSTAIN", "reason": "Missing source content requires an incomplete result or ambiguity; it must never produce NO_CONFLICT."}
+      ]
+    }
+  ]
+}

@@ -29,7 +29,7 @@ class LocalOpenApiTest extends DocumentationDatabaseSupport {
         assertThat(spec.path("security").get(0).has("bearerAuth")).isTrue();
         assertThat(spec.path("paths").path("/api/auth/login").path("post").path("security").isEmpty()).isTrue();
         assertThat(spec.path("paths").path("/api/auth/login").path("post").has("security")).isTrue();
-        Set<String> paths = Set.of("/api/auth/login", "/api/auth/me", "/api/policies", "/api/policies/{id}", "/api/policies/{id}/versions", "/api/policies/{id}/versions/{version}/content", "/api/jobs/{id}", "/api/evidence/{id}", "/api/versions/{id}/search", "/api/investigations", "/api/investigations/{id}", "/api/investigations/{id}/requirements", "/api/investigations/{id}/findings", "/api/policies/{id}/external-processing");
+        Set<String> paths = Set.of("/api/auth/login", "/api/auth/me", "/api/policies", "/api/policies/{id}", "/api/policies/{id}/versions", "/api/policies/{id}/versions/{version}/content", "/api/jobs/{id}", "/api/evidence/{id}", "/api/versions/{id}/search", "/api/investigations", "/api/investigations/{id}", "/api/investigations/{id}/requirements", "/api/investigations/{id}/findings", "/api/policies/{id}/external-processing", "/api/investigations/{id}/graph", "/api/investigations/{id}/findings/{findingId}/reviews");
         assertThat(spec.path("paths").propertyNames()).containsExactlyInAnyOrderElementsOf(paths);
         var schemas = spec.path("components").path("schemas");
         assertThat(schemas.has("PolicyRequirement")).isTrue();
@@ -41,6 +41,8 @@ class LocalOpenApiTest extends DocumentationDatabaseSupport {
         for (String code : Set.of("400", "401", "404", "409", "500"))
             assertThat(spec.path("paths").path("/api/investigations").path("post").path("responses").has(code)).isTrue();
         assertThat(raw).doesNotContain(actor.token(), actor.hiddenTitle(), actor.hiddenPolicy().toString(), "documentation-fixture-only", "password_hash", "jdbc:", "MODEL_API_KEY", "JWT_SECRET");
+        assertThat(schemas.path("CompletedFindings").path("properties").has("reviews")).isTrue();
+        assertThat(spec.path("paths").path("/api/investigations/{id}/graph").path("get").path("responses").has("200")).isTrue();
         verifyNoInteractions(metaTransport, embeddings);
     }
 

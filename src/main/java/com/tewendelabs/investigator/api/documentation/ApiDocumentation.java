@@ -132,7 +132,7 @@ public final class ApiDocumentation {
                                        String rationale, @Schema(nullable = true) String suggestedAction,
                                        String scopeExplanation,
                                        List<SourceReference> sourceReferences,
-                                       @Schema(allowableValues = {"PENDING_REVIEW", "NOT_REQUIRED"}, description = "Actionable findings require human review. Review submission is not implemented.") String reviewStatus) {
+                                       @Schema(allowableValues = {"PENDING_REVIEW", "NOT_REQUIRED"}, description = "Original AI review requirement, unchanged by later review events.") String reviewStatus) {
     }
 
     @Schema(name = "AssessmentPayload")
@@ -142,12 +142,14 @@ public final class ApiDocumentation {
 
     @Schema(name = "CompletedFindings")
     public record CompletedFindings(AssessmentPayload payload, String model, String prompt_version,
-                                    String schema_version) {
+                                    String schema_version, boolean canReview,
+                                    List<com.tewendelabs.investigator.investigation.InvestigationDashboardService.ReviewState> reviews) {
     }
 
     @Schema(name = "IncompleteFindings", description = "complete is false; changes/assessments are empty. Never interpret this as NO_CONFLICT.")
     public record IncompleteFindings(boolean complete, List<RequirementChange> changes,
-                                     List<InvestigationFinding> assessments, InvestigationProgress progress) {
+                                     List<InvestigationFinding> assessments, InvestigationProgress progress, boolean canReview,
+                                     List<com.tewendelabs.investigator.investigation.InvestigationDashboardService.ReviewState> reviews) {
     }
 
     @Schema(name = "SafeProblem", description = "Safe application problem details. Authentication/filter failures can instead have an empty body.")

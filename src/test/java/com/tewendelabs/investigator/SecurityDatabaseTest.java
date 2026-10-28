@@ -556,4 +556,173 @@ class SecurityDatabaseTest {
         assertThat(investigationService.progress(analyst, fixture.id()).get("calls")).isEqualTo(5);
     }
 
+    private String token(UUID actor) {
+        return (String) auth.login(new AuthController.Login(actor + "@test.invalid", loginPassword)).get("token");
+    }
+
+    @Autowired
+    com.tewendelabs.investigator.investigation.InvestigationDashboardService dashboard;
+
+    @Test
+    void graphUsesPersistedRequirementsAndVerifiedEvidenceAndDeniesRevocation() throws Exception {
+        var fixture = investigationFixture();
+        assertThat(dashboard.graph(analyst, fixture.id()).complete()).isFalse();
+        assertThat(dashboard.graph(analyst, fixture.id()).nodes()).hasSize(3);
+        successfulTransport(fixture);
+        investigationWorker.process(investigationLease(fixture.id()));
+        clearInvocations(metaTransport, model);
+        var graph = dashboard.graph(analyst, fixture.id());
+        verifyNoInteractions(metaTransport, model);
+        assertThat(graph.complete()).isTrue();
+        assertThat(graph.nodes()).hasSize(7);
+        assertThat(graph.edges()).allSatisfy(e -> {
+            assertThat(graph.nodes()).anyMatch(n -> n.id().equals(e.source()));
+            assertThat(graph.nodes()).anyMatch(n -> n.id().equals(e.target()));
+        });
+        assertThat(graph.edges()).anyMatch(e -> e.type().equals("AFFECTS"));
+        assertThatThrownBy(() -> dashboard.graph(outsider, fixture.id())).hasMessage("NOT_FOUND");
+        mvc.perform(get("/api/investigations/" + fixture.id() + "/graph").header("Authorization", "Bearer " + token(analyst)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.nodes.length()").value(7));
+        admin.update("delete from memberships where user_id=?", analyst);
+        assertThatThrownBy(() -> dashboard.graph(analyst, fixture.id())).hasMessage("NOT_FOUND");
+    }
+
+    @Test
+    void reviewHistoryPreservesAiOutputRequiresReviewerAndCurrentDocumentAccess() throws Exception {
+        var fixture = investigationFixture();
+        successfulTransport(fixture);
+        investigationWorker.process(investigationLease(fixture.id()));
+        var original = (tools.jackson.databind.JsonNode) investigationService.findings(analyst, fixture.id()).get("payload");
+        UUID finding = UUID.fromString(original.path("assessments").get(0).path("id").asString());
+        var confirm = new com.tewendelabs.investigator.investigation.InvestigationDashboardService.ReviewRequest(
+                com.tewendelabs.investigator.investigation.InvestigationDashboardService.ReviewAction.CONFIRM, "Checked source timing");
+        assertThat(investigationService.findings(analyst, fixture.id()).get("canReview")).isEqualTo(false);
+        assertThatThrownBy(() -> dashboard.review(analyst, fixture.id(), finding, confirm)).hasMessage("REVIEW_PERMISSION_REQUIRED");
+        assertThatThrownBy(() -> scope.as(analyst, () -> jdbc.update(
+                "insert into finding_reviews(id,investigation_id,finding_id,reviewer_id,action) values(?,?,?,?,'CONFIRM')",
+                UUID.randomUUID(), fixture.id(), finding, analyst))).isInstanceOf(RuntimeException.class);
+        admin.update("update memberships set role='REVIEWER' where user_id=? and department_id=?", analyst, finance);
+        var state = dashboard.review(analyst, fixture.id(), finding, confirm);
+        assertThat(state.status()).isEqualTo("CONFIRMED");
+        assertThat(state.history().getFirst().reviewerId()).isEqualTo(analyst);
+        assertThat(state.history().getFirst().createdAt()).isNotNull();
+        String reviewRoute = "/api/investigations/" + fixture.id() + "/findings/" + finding + "/reviews";
+        mvc.perform(post(reviewRoute).header("Authorization", "Bearer " + token(analyst)).contentType("application/json")
+                .content("{\"action\":\"ADD_NOTE\",\"note\":\"Source owner contacted\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.history.length()").value(2));
+        var dismissed = dashboard.review(analyst, fixture.id(), finding,
+                new com.tewendelabs.investigator.investigation.InvestigationDashboardService.ReviewRequest(
+                        com.tewendelabs.investigator.investigation.InvestigationDashboardService.ReviewAction.DISMISS, "Approved exception"));
+        assertThat(dismissed.status()).isEqualTo("DISMISSED");
+        assertThat(dismissed.history()).hasSize(3);
+        assertThat(investigationService.findings(analyst, fixture.id()).get("payload")).isEqualTo(original);
+        assertThatThrownBy(() -> scope.as(analyst, () -> jdbc.update("delete from finding_reviews where investigation_id=?", fixture.id())))
+                .isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> scope.as(analyst, () -> jdbc.update("update finding_reviews set note='changed' where investigation_id=?", fixture.id())))
+                .isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> dashboard.review(analyst, fixture.id(), UUID.randomUUID(), confirm)).hasMessage("NOT_FOUND");
+        assertThatThrownBy(() -> scope.as(analyst, () -> jdbc.update(
+                "insert into finding_reviews(id,investigation_id,finding_id,reviewer_id,action) values(?,?,?,?,'CONFIRM')",
+                UUID.randomUUID(), fixture.id(), UUID.randomUUID(), analyst))).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> dashboard.review(outsider, fixture.id(), finding, confirm)).hasMessage("NOT_FOUND");
+        admin.update("insert into policy_grants select distinct policy_id,?,'READ' from policy_versions where id in (?,?,?)", hr, fixture.baseline(), fixture.replacement(), fixture.procedure());
+        admin.update("update memberships set role='REVIEWER' where user_id=?", outsider);
+        assertThat(investigationService.findings(outsider, fixture.id()).get("canReview")).isEqualTo(false);
+        assertThatThrownBy(() -> dashboard.review(outsider, fixture.id(), finding, confirm)).hasMessage("REVIEW_PERMISSION_REQUIRED");
+        admin.update("delete from policy_grants where department_id=?", hr);
+        assertThatThrownBy(() -> dashboard.graph(outsider, fixture.id())).hasMessage("NOT_FOUND");
+        admin.update("update memberships set role='VIEWER' where user_id=?", analyst);
+        assertThatThrownBy(() -> dashboard.review(analyst, fixture.id(), finding, confirm)).hasMessage("REVIEW_PERMISSION_REQUIRED");
+        assertThat(investigationService.findings(analyst, fixture.id()).get("reviews")).asList().hasSize(1);
+        admin.update("delete from memberships where user_id=?", analyst);
+        assertThatThrownBy(() -> dashboard.review(analyst, fixture.id(), finding, confirm)).hasMessage("NOT_FOUND");
+        assertThat(scope.as(outsider, () -> jdbc.queryForList("select * from finding_reviews where investigation_id=?", fixture.id()))).isEmpty();
+    }
+
+    @Test
+    void reviewRejectsInvalidInputAndGraphsRejectTamperedPersistedCitations() throws Exception {
+        var fixture = investigationFixture();
+        successfulTransport(fixture);
+        investigationWorker.process(investigationLease(fixture.id()));
+        var original = (tools.jackson.databind.JsonNode) investigationService.findings(analyst, fixture.id()).get("payload");
+        UUID finding = UUID.fromString(original.path("assessments").get(0).path("id").asString());
+        var invalid = new com.tewendelabs.investigator.investigation.InvestigationDashboardService.ReviewRequest(
+                com.tewendelabs.investigator.investigation.InvestigationDashboardService.ReviewAction.ADD_NOTE, " ");
+        assertThatThrownBy(() -> dashboard.review(analyst, fixture.id(), finding, invalid)).hasMessage("INVALID_REVIEW");
+        mvc.perform(post("/api/investigations/" + fixture.id() + "/findings/" + finding + "/reviews")
+                .header("Authorization", "Bearer " + token(analyst)).contentType("application/json")
+                .content("{\"action\":\"INVALID\"}")).andExpect(status().isBadRequest());
+        admin.update("update investigation_assessments set payload=jsonb_set(payload,'{assessments,0,sourceReferences,0,quote}','\"fabricated\"'::jsonb) where investigation_id=?", fixture.id());
+        assertThatThrownBy(() -> dashboard.graph(analyst, fixture.id())).hasMessage("UNVERIFIED_GRAPH_DATA");
+    }
+
+    private static final UUID DEMO_USER = UUID.fromString("d3000000-0000-4000-8000-000000000004");
+    private static final UUID DEMO_SECURITY = UUID.fromString("d3000000-0000-4000-8000-000000000002");
+
+    private void seedDemo(java.sql.Connection connection, String enabled, String environment, String password) throws Exception {
+        String[] parts = java.nio.file.Files.readString(java.nio.file.Path.of("scripts/seed_demo.sql")).split("-- DEMO_INPUT --", -1);
+        assertThat(parts).hasSize(2);
+        connection.createStatement().execute(parts[0]);
+        String encoded = Base64.getEncoder().encodeToString(password.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        connection.unwrap(org.postgresql.PGConnection.class).getCopyAPI().copyIn(
+                "COPY pg_temp.demo_seed_input FROM STDIN", new java.io.StringReader(enabled + "\t" + environment + "\t" + encoded + "\n"));
+        connection.createStatement().execute(parts[1]);
+    }
+
+    private void seedDemo(String enabled, String environment, String password) throws Exception {
+        try (var connection = admin.getDataSource().getConnection()) {
+            seedDemo(connection, enabled, environment, password);
+        }
+    }
+
+    @Test
+    void demoOperatorSeedIsIdempotentAndUsesNormalJwtAndDepartmentAuthorization() throws Exception {
+        String password = UUID.randomUUID().toString();
+        seedDemo("true", "local", password);
+        String hash = admin.queryForObject("select password_hash from app_users where id=?", String.class, DEMO_USER);
+        seedDemo("true", "local", password);
+        assertThat(admin.queryForObject("select password_hash from app_users where id=?", String.class, DEMO_USER)).isEqualTo(hash);
+        assertThat(admin.queryForObject("select count(*) from app_users where email='demo@policy-investigator.local'", Integer.class)).isEqualTo(1);
+        assertThat(passwords.matches(password, hash)).isTrue();
+        assertThat(admin.queryForList("select role from memberships where user_id=?", DEMO_USER)).hasSize(2)
+                .allSatisfy(row -> assertThat(row.get("role")).isEqualTo("ADMIN"));
+        var response = mvc.perform(post("/api/auth/login").contentType("application/json")
+                        .content(com.tewendelabs.investigator.investigation.JsonContract.encode(Map.of("email", "demo@policy-investigator.local", "password", password))))
+                .andExpect(status().isOk()).andReturn().getResponse();
+        String jwt = com.tewendelabs.investigator.investigation.JsonContract.parse(response.getContentAsString()).path("token").asString();
+        mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + jwt))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.memberships.length()").value(2));
+        var document = service.upload(DEMO_USER, UUID.randomUUID(), null, DEMO_SECURITY, "Synthetic demo policy", "POLICY", null,
+                LocalDate.of(2026, 10, 27), "demo.pdf", PdfAndVectorTest.pdf("Training before access."));
+        assertThat(scope.as(DEMO_USER, () -> repository.findById(document.policyId()))).isPresent();
+        assertThat(scope.as(analyst, () -> repository.findById(document.policyId()))).isEmpty();
+        assertThat(scope.as(DEMO_USER, () -> repository.findAll())).hasSize(1);
+        // Same-password reseeding is stable; an explicit changed password rotates only the demo account.
+        String rotated = UUID.randomUUID().toString();
+        seedDemo("true", "local", rotated);
+        assertThatThrownBy(() -> auth.login(new AuthController.Login("demo@policy-investigator.local", password))).hasMessage("INVALID_CREDENTIALS");
+        assertThat(auth.login(new AuthController.Login("demo@policy-investigator.local", rotated))).containsKey("token");
+    }
+
+    @Test
+    void demoSqlRefusesDisabledProductionAndUnrelatedIdentityCollisions() throws Exception {
+        String password = UUID.randomUUID().toString();
+        seedDemo("true", "local", password);
+        String hash = admin.queryForObject("select password_hash from app_users where id=?", String.class, DEMO_USER);
+        assertThatThrownBy(() -> seedDemo("false", "local", password)).hasMessageContaining("DEMO_SEED_DISABLED");
+        assertThatThrownBy(() -> seedDemo("true", "production", password)).hasMessageContaining("DEMO_SEED_DISABLED");
+        assertThatThrownBy(() -> seedDemo("true", "local", "short")).hasMessageContaining("DEMO_PASSWORD_INVALID");
+        assertThat(admin.queryForObject("select password_hash from app_users where id=?", String.class, DEMO_USER)).isEqualTo(hash);
+        try (var connection = admin.getDataSource().getConnection()) {
+            connection.createStatement().execute("BEGIN");
+            try (var statement = connection.prepareStatement("update app_users set organization_id=? where id=?")) {
+                statement.setObject(1, org); statement.setObject(2, DEMO_USER); statement.executeUpdate();
+            }
+            assertThatThrownBy(() -> seedDemo(connection, "true", "local", UUID.randomUUID().toString())).hasMessageContaining("DEMO_IDENTITY_COLLISION");
+            connection.createStatement().execute("ROLLBACK");
+        }
+        assertThat(admin.queryForObject("select password_hash from app_users where id=?", String.class, DEMO_USER)).isEqualTo(hash);
+    }
+
 }

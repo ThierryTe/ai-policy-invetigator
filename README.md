@@ -7,9 +7,13 @@ An analyst uploads a replacement policy, selects a baseline and procedure versio
 and receives source-backed potential conflicts from a durable investigation job.
 There is no generic chat endpoint.
 
-**Implemented through Phase 3.** Phase 4 has not started. Angular, graph endpoints,
-review submission and exported impact reports are not implemented. Actionable
-findings remain `PENDING_REVIEW`; the application never applies suggested changes.
+**Backend implemented through the Phase 4 MVP.** Persisted impact graphs, append-only
+human reviews and a ten-case synthetic evaluation extend the verified Phase 3 pipeline.
+The approved Phase 5 Angular application is implemented in the separate
+[frontend repository](https://github.com/ThierryTe/ai-policy-investigator-frontend).
+Phase 6A prepares Docker deployment and records local verification; VPS deployment
+has not been performed. Exported report files remain outside the MVP. AI classifications
+and evidence remain immutable; human decisions are separate, and no changes are applied automatically.
 
 ## Implemented capabilities
 
@@ -21,6 +25,8 @@ findings remain `PENDING_REVIEW`; the application never applies suggested change
 | Requirements | Actor, action, obligation, condition, scope, deadline, exceptions, effective date, null/unknown fields and verified citations |
 | Investigations | Baseline/replacement alignment and comparison against 1–4 explicitly selected procedure versions; durable jobs and polling |
 | Findings | CONTRADICTION, MISSING_REQUIREMENT, AMBIGUITY or NO_CONFLICT; model/prompt/schema metadata and mandatory pending review for actionable findings |
+| Impact graph | Authorized selected versions, extracted requirements, persisted alignment and finding relationships; no inference on graph reads |
+| Human review | Confirm, Dismiss and Add Note; current owning-department REVIEWER/ADMIN permission, append-only identity/timestamp history |
 | Reliability | Configurable timeouts/deadline/concurrency, bounded retries, checkpoints, lease fencing, safe failure codes and reported usage |
 
 The bounded MVP compares all requirements in the selected authorized procedure
@@ -65,7 +71,7 @@ independently upgrading it. Both CI and neural-runtime Maven profiles passed 50 
 and production denial. Actual results are recorded
 in [the follow-up results](docs/verification/lombok-openapi-results.json).
 
-Only `PolicyService` and `InvestigationService` use `@RequiredArgsConstructor`,
+`PolicyService`, `InvestigationService` and the new `InvestigationDashboardService` use `@RequiredArgsConstructor`,
 replacing dependency-assignment constructors with the same parameter order and
 visibility. Validating/resource-initializing constructors and security services remain
 explicit. The JPA entity has no Lombok annotations; no `@Data` is used. API request
@@ -136,6 +142,29 @@ See [real investigation evidence](docs/verification/phase3-demo.json),
 separately in [repository audit](docs/REPOSITORY_AUDIT.md) and
 [audit verification](docs/verification/repository-audit.json).
 
+## Phase 4 MVP verification
+
+The persisted graph and human review APIs are implemented and verified. The final
+Java build passed **57 tests** (34 PostgreSQL-backed); Python tooling passed **15 tests**.
+See [Phase 4 report](docs/PHASE4.md), [Angular API contracts](docs/api/phase4.md) and
+[actual verification evidence](docs/verification/phase4-results.json).
+
+The real `muse-spark-1.3` evaluation used ten synthetic cases. The initial run matched
+6/10; a four-procedure exception comparison produced incomplete output, leaving four
+cases as errors. A separately recorded retry with two procedures per investigation
+completed those four cases: 3 matched and 1 disagreed with the golden NO_CONFLICT label.
+Muse treated the stricter training gate as contradicting a permitted emergency exception.
+The expected label is unchanged; this is a false positive against the golden dataset
+and needs human adjudication. Nine distinct cases ultimately matched after the retry,
+including a safe incomplete-evidence abstention. This is not a single-run 90% accuracy claim.
+
+Across both recorded runs: **31 real calls**, **296,572 ms** summed metered provider
+latency, **38,359 prompt / 68,141 completion tokens**, and **119/119** source/quote
+instances verified. Initial errors remain visible and their usage is included.
+Citation correspondence does not establish semantic correctness. The dataset is too
+small and selected to estimate general accuracy. Keep comparison scopes small under
+the existing completion limit; an incomplete result must remain visibly partial.
+
 ## Docker Compose deployment: local machine or VPS
 
 The hackathon deployment needs Docker Engine with modern Docker Compose/BuildKit,
@@ -152,8 +181,8 @@ runtime is Linux x86_64; other native architectures remain unverified.
 2. Validate configuration without printing secrets, then build and start:
 
    ```sh
-   docker compose --env-file .env --profile app config --quiet
-   docker compose --env-file .env --profile app up --build -d --wait
+   docker compose --env-file .env -f compose.yaml -f compose.production.yaml --profile app config --quiet
+   docker compose --env-file .env -f compose.yaml -f compose.production.yaml --profile app up --build -d --force-recreate --wait
    ```
 
    The backend JAR is built inside a Java 21 stage and copied into the nonroot runtime
@@ -174,11 +203,17 @@ runtime is Linux x86_64; other native architectures remain unverified.
    must complete successfully before Spring Boot starts. The backend healthcheck lets
    `up --wait` wait for HTTP readiness; initial builds and native downloads take longer.
 
-The long-running application services remain Spring Boot and PostgreSQL 16/pgvector.
-Angular can be added in its approved phase. No Kubernetes, queue broker or separate
-model-serving infrastructure is introduced. Base Compose retains production mode,
-dotenv off, documentation denied, and loopback-only ports 18080/5546. Connect your
-existing VPS HTTPS reverse proxy to the backend as described below.
+The backend services remain Spring Boot and PostgreSQL 16/pgvector, with a one-shot
+model initializer. The Angular frontend lives in its separate repository. Route the
+whole browser origin through that frontend and its same-origin `/api/` proxy. Base
+Compose retains production mode, dotenv off, documentation denied, and loopback-only
+ports 18080/5546. PostgreSQL now uses a separate project-managed bridge network;
+only Spring Boot joins both networks. The production override removes PostgreSQL
+host publication; base Compose retains port 5546 on loopback for local tools.
+PostgreSQL and Spring Boot restart unless
+explicitly stopped. No database volumes or migration scripts change. See the
+[Phase 6A deployment preparation](docs/PHASE6A.md) for commands, audit findings and
+the pending frontend access-log patch. No VPS deployment has been performed.
 
 ### Pinned model download and persistence
 
@@ -223,7 +258,7 @@ model directory or host cache permission setup is needed for Docker.
 A normal subsequent startup reuses both volumes:
 
 ```sh
-docker compose --env-file .env --profile app up -d --wait
+docker compose --env-file .env -f compose.yaml -f compose.production.yaml --profile app up -d --wait
 ```
 
 To explicitly recheck the model cache without starting dependencies:
@@ -257,7 +292,13 @@ runtime grant role, and the vector/pgcrypto extensions on a fresh volume. Flyway
 then runs migrations as the non-superuser owner. Existing PostgreSQL data directories
 are not reinitialized; this script is not an upgrade or password-rotation utility.
 
-For synthetic local users after migrations, see `scripts/provision_user.sql` and
+For a working local login, follow [Demo credentials and end-to-end walkthrough](docs/DEMO.md).
+The explicitly enabled `scripts/setup_demo.py` command provisions
+`demo@policy-investigator.local` using an environment-supplied private password and
+exports the existing four synthetic PDFs. It does not run during application startup,
+change JWT/security configuration, or require frontend source changes.
+
+For other synthetic local users after migrations, see `scripts/provision_user.sql` and
 its environment inputs. It uses a fixed synthetic organization and is not a general
 production account-provisioning tool. Membership/grant administration currently
 requires operator SQL; there is no public signup or administration UI.
@@ -352,12 +393,15 @@ Java investigations do not require it.
    replacementVersionId, procedureVersionIds and analysisDate.
 6. Poll `GET /api/investigations/{id}` and fetch `/requirements` and `/findings`.
 7. Resolve cited source IDs through `GET /api/evidence/{id}` before human assessment.
+8. Fetch `GET /api/investigations/{id}/graph` and submit review events through
+   `POST /api/investigations/{id}/findings/{findingId}/reviews`.
 
 The replacement must directly follow the baseline in the same policy. All selected
 versions must be indexed, effective, readable and externally consented; the requester
 must retain replacement write permission. Findings require access to every contributing
 version. See exact fields, state transitions and failure handling in the
-[document APIs](docs/api/phase2.md) and [investigation APIs](docs/api/phase3.md).
+[document APIs](docs/api/phase2.md), [investigation APIs](docs/api/phase3.md), and
+[exact Angular dashboard contracts](docs/api/phase4.md).
 
 ## Scripts, evaluation and tests
 
@@ -367,18 +411,43 @@ in [detail](docs/REPOSITORY_AUDIT.md); their side effects differ.
 | Script | Purpose and side effects |
 |---|---|
 | `scripts/init_local.py` | Generates ignored local-only credentials; refuses overwrite; creates cache directories |
+| `scripts/setup_demo.py` | Explicit local-only idempotent demo account provisioning and export of existing synthetic PDFs; reads DEMO_PASSWORD from the environment, never prints credentials, makes no model calls |
 | `scripts/fetch_embeddings.py` | Shared integrity-checked model initializer; Docker volume mode or optional host artifact/configuration setup |
 | `scripts/run_local.py` | Starts the packaged Java application with optional local configuration fallbacks |
 | `scripts/verify_meta_access.py` | Live synthetic discovery/inference; writes sanitized preflight evidence/history; standalone configuration differs from the Spring wrapper |
 | `scripts/verify_provenance.py` | Checks four allowlisted imports using read-only Git source reads and destination hashes; requires the reference backend checkout |
 | `scripts/smoke_workflow.py` | Creates synthetic SQL fixtures, runs real local embeddings and HTTP checks, then stops its backend |
 | `scripts/smoke_investigation.py` | Creates synthetic fixtures, runs real Meta extraction/comparison, verifies citations/isolation and writes evidence/history |
+| `scripts/evaluate_phase4.py` | Runs ten synthetic cases through real PDF ingestion, consent, Meta investigations, graph/review APIs and citation checks; creates isolated synthetic SQL fixtures, disables fixture accounts on exit, writes sanitized results/history |
+| `scripts/tests/test_phase4_evaluation.py` | Guards scoring of provider failures, abstentions, false positives and dataset coverage; no provider calls |
 | `scripts/tests/test_verify_meta_access.py` | Four local validation tests; no real provider call |
 
 `evaluation/phase3-golden.json` contains the synthetic training/access baseline,
 replacement and two expected procedure outcomes. The demo is coupled to those two
-case positions and fixed dates; it is not a generic benchmark runner. Broader
-exception, ambiguity and missing-requirement evaluation is deferred to Phase 4.
+case positions and fixed dates; it is not a generic benchmark runner.
+`evaluation/phase4-golden.json` adds ten independently specified cases in four bounded
+investigations, covering contradictions, compatible gates, exceptions, different
+scopes, ambiguity, missing requirements and insufficient evidence. The runner uses
+real `muse-spark-1.3` through the existing authorization/consent gates, not a substitute.
+Provider/validation failures are reported as errors, not successful abstentions.
+
+To reproduce on the **dedicated local demo database** with populated `.env` and
+`.local/runtime.env` from the existing local setup:
+
+```sh
+python3 scripts/evaluate_phase4.py --start-backend
+```
+
+This builds/starts the existing Compose backend and stops it afterward. Without
+`--start-backend`, it uses an already running backend without changing its lifecycle.
+Do not run this fixture-creating evaluator on a shared VPS database. It uses local
+operator SQL only to provision synthetic identities; document/model/review operations
+use authenticated APIs and real consent. Results and prior attempts are retained in
+`docs/verification/phase4-evaluation.json` and `phase4-attempts/`. The runner defaults
+to two procedures per comparison to keep output within the existing token bound.
+Use `--group explicit-exception --max-procedures 2` for a targeted exception retry;
+it writes a separate `phase4-explicit-exception-evaluation.json`. No secret values
+are recorded. The ten-case run is a targeted demonstration, not general accuracy.
 
 ```sh
 python3 -B -m unittest discover -s scripts/tests -v
@@ -394,7 +463,7 @@ Maven build omits production embedding dependencies, so package/run with the neu
 profile when starting the real backend.
 
 The existing `.github/workflows/verify.yml` is named **Verify Phase 2**, but its
-`-Pdatabase-tests verify` command discovers the Phase 3 tests too. It runs on pushes
+`-Pdatabase-tests verify` command discovers the Phase 3 and Phase 4 tests too. It runs on pushes
 and pull requests with Java 21 and read-only repository permission. It does not
 run Python tests, fetch models, call Meta, publish images or deploy. The original audit ran its Maven profile successfully with 45 tests, including
 25 PostgreSQL tests. The follow-up adds documentation/security integration tests;
@@ -435,13 +504,16 @@ For your VPS configuration, preserve this service design and adapt the deploymen
   A release registry/image-publishing workflow is still an owner-managed future step.
 - Retain the named model/native-cache volumes. The initializer prepares model file
   read permissions and UID/GID 10001 cache ownership; no host model/cache mount is needed.
-- Keep PostgreSQL on the private service network. A host reverse proxy can reach
-  `127.0.0.1:18080`; a containerized proxy needs a shared proxy network and unique
-  backend alias, not the host's loopback address. Keep the database off that network.
-- Terminate HTTPS at the existing proxy and serve the future frontend/API on one
-  origin. Review forwarded-header/login-throttle behavior and multipart size limits.
-- The backend now has an HTTP healthcheck. Configure restart policy, external
-  monitoring and shutdown/backup procedures to match your VPS operations.
+- Keep PostgreSQL on its separate `database` bridge; the frontend continues joining
+  the existing backend default network. A host HTTPS reverse proxy should send the
+  whole origin to the frontend at `127.0.0.1:18081`. A containerized proxy needs the
+  owner's actual shared-network configuration; no VPS network or domain is assumed.
+  Do not publish PostgreSQL or Spring Boot on public interfaces.
+- Retain same-origin `/api/` routing. Review the documented shared-peer login limit
+  and proxy upload/time limits against the actual HTTPS proxy before deployment.
+- PostgreSQL, Spring Boot and the frontend use `restart: unless-stopped`.
+  Healthchecks measure readiness; an unhealthy status alone does not trigger a
+  Docker restart. External monitoring and backup/restore remain owner-managed.
 - Inject production secrets through runtime environment configuration outside the
   checkout. Keep `APP_ENVIRONMENT=production` and `SPRINGDOTENV_ENABLED=false`,
   as configured by base Compose. Do not include the local override. Compose forwards
@@ -457,7 +529,9 @@ For your VPS configuration, preserve this service design and adapt the deploymen
 
 Docker recommends a production-specific Compose override for environment-specific
 mounts, ports and restart settings. See [Docker's production guidance](https://docs.docker.com/compose/how-tos/production).
-No production override was created or deployed in this documentation increment.
+The earlier documentation increment did not add a production override. Phase 6A
+adds `compose.production.yaml` solely to remove the database host-port publication
+while preserving the existing local workflow; use it for all VPS lifecycle commands.
 
 ## Secrets and commit readiness
 
@@ -471,11 +545,16 @@ into an otherwise legitimate source file, or every arbitrary local resource file
 The audit scanned candidate files and own packaged classes/resources for known
 local credential values and private-key markers, and inspected a scratch Docker
 build context with synthetic exclusion probes. Actual credentials were not printed
-or copied. There is no `.git` directory in the inspected workspace: ignore behavior
-was checked with ripgrep's Gitignore reader, not a tracked/staged-index inspection.
+or copied. The earlier pre-commit audit had no `.git` directory and used ripgrep's Gitignore
+reader. Phase 6A additionally inspected both current Git indexes read-only: no
+dotenv, private fixture, key or keystore paths were tracked. It also checked both
+actual Docker build contexts, packaged application resources and known local
+credential values; see the current [verification record](docs/verification/phase6a-results.json).
+These checks do not prove that arbitrary unknown secrets never existed in history.
 
-Review the [candidate file manifest](docs/provenance/commit-ready-files.csv) and
-[remaining concerns](docs/REPOSITORY_AUDIT.md) before your manual first commit.
+The [pre-first-commit candidate manifest](docs/provenance/commit-ready-files.csv) and
+[repository audit](docs/REPOSITORY_AUDIT.md) remain historical records. Review the
+[new Phase 4 file inventory](docs/provenance/phase4-files.csv) for this increment.
 Private `.env`/`.local` files, caches, model weights, logs and built artifacts are
 excluded from that manifest. No Git commands, commits, pushes, tags or history edits
 were performed during the audit. All Git operations remain with the owner.
@@ -491,7 +570,11 @@ records the four exact imports, source commits, paths and hashes;
 [event contributions](docs/provenance/HACKATHON_CONTRIBUTIONS.md) distinguish reuse
 from new work. Reference repositories remain unchanged by this project work.
 
-Phase 4 requires explicit approval. The initial audit changed documentation and
-exclusion rules. The follow-up adds targeted constructor generation and local-only
-OpenAPI/Swagger support, without investigation/domain changes, frontend work or
-production deployment changes.
+Phase 4 was explicitly approved after the owner's first commit and push. Its additions
+are the persisted graph projection, append-only review migration/API, ten synthetic
+evaluation cases and frontend API contracts. No reference code was imported in this
+phase. The working deployment and model/provider configuration remain unchanged.
+Phase 5 was subsequently approved and implemented in the separate Angular repository.
+Phase 6A audits Docker deployment and prepares local verification; Phase 6B VPS
+deployment requires explicit approval. The [Phase 6A report](docs/PHASE6A.md) records
+what is applied, what remains pending and which checks were actually executed.

@@ -1,0 +1,1626 @@
+{
+  "recordedAt": "2026-10-27T19:47:33.039593+00:00",
+  "model": "muse-spark-1.3",
+  "provider": "Meta Model API",
+  "syntheticOnly": true,
+  "datasetVersion": "phase4-training-impact-v1",
+  "selectedGroup": "explicit-exception",
+  "maxProceduresPerInvestigation": 2,
+  "datasetSha256": "e4d558dee51e382e1324ffdc56a7aa7f7d1799d2224587a251006e0f1de7419f",
+  "limitation": "Ten hand-authored synthetic cases, one run per case; neither a general accuracy estimate nor a production benchmark.",
+  "groups": [
+    {
+      "id": "explicit-exception-1",
+      "investigationId": "30fe858e-cefb-4c25-bc7d-aa96c5d21055",
+      "elapsedMs": 51706,
+      "progress": {
+        "id": "30fe858e-cefb-4c25-bc7d-aa96c5d21055",
+        "state": "COMPLETED",
+        "stage": "COMPLETED",
+        "error_code": null,
+        "attempts": 1,
+        "calls": 5,
+        "metered_calls": 5,
+        "prompt_tokens": 6552,
+        "completion_tokens": 11748,
+        "latency_ms": 48837
+      },
+      "findings": {
+        "payload": {
+          "changes": [
+            {
+              "reason": "Deadline tightened from within 30 days after first access to before access, and a sole exception for designated emergency responders during a declared incident added with effective date 2026-10-27.",
+              "changeType": "MODIFIED",
+              "sourceReferences": [
+                {
+                  "quote": "Employees must complete security training within 30 days after first sensitive",
+                  "sourceId": "97a1dcab-1116-4134-9bab-3783662b0cc2"
+                },
+                {
+                  "quote": "Employees must complete security training before sensitive production-system",
+                  "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                },
+                {
+                  "quote": "This is the only\nexception.",
+                  "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                }
+              ],
+              "baselineRequirementId": "59585300-4f7a-35a6-a2b3-4625e6e19c01",
+              "replacementRequirementId": "4c1c4d54-025c-31e5-883e-14bf713d2a53"
+            },
+            {
+              "reason": "New permission for designated emergency responders during a declared incident to complete training within 24 hours after emergency access; no corresponding baseline requirement existed.",
+              "changeType": "ADDED",
+              "sourceReferences": [
+                {
+                  "quote": "may complete training within 24 hours after emergency access.",
+                  "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                },
+                {
+                  "quote": "designated emergency responders during a declared incident, who",
+                  "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                }
+              ],
+              "baselineRequirementId": null,
+              "replacementRequirementId": "16757f10-5f99-3ecb-93f5-a0e28da66fd4"
+            }
+          ],
+          "complete": true,
+          "assessments": [
+            {
+              "id": "eced14d2-de1d-4224-b108-b968ff308efb",
+              "severity": "NONE",
+              "rationale": "Replacement requires training before access with sole exception for designated emergency responders during a declared incident. Procedure implements only that exception, granting emergency access before training during a declared incident and requiring training within 24 hours, matching the policy exception and the only-exception limit.",
+              "reviewStatus": "NOT_REQUIRED",
+              "classification": "NO_CONFLICT",
+              "suggestedAction": null,
+              "scopeExplanation": "Same scope applies: employees accessing sensitive systems, with procedure limited to the policy's excepted subgroup of designated employee emergency responders during a declared incident.",
+              "sourceReferences": [
+                {
+                  "quote": "Employees must complete security training before sensitive production-system",
+                  "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                },
+                {
+                  "quote": "except designated emergency responders during a declared incident",
+                  "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                },
+                {
+                  "quote": "HR may grant emergency sensitive production-system\naccess before security training",
+                  "sourceId": "3872d979-310b-4883-8183-468703829d4d"
+                },
+                {
+                  "quote": "No other access is granted by this procedure.",
+                  "sourceId": "3872d979-310b-4883-8183-468703829d4d"
+                }
+              ],
+              "procedureVersionId": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+              "policyRequirementId": "4c1c4d54-025c-31e5-883e-14bf713d2a53",
+              "relatedProcedureRequirementIds": [
+                "38eb1547-6873-3e2e-85d1-976aad50f90d",
+                "21e0716d-c86c-3bf7-8138-b9d31270cfed",
+                "fbd8e5ac-3531-3ec6-a2ea-41db06dd3f07"
+              ]
+            },
+            {
+              "id": "4c3bd53a-c782-4a29-be3b-80adfb587a3d",
+              "severity": "HIGH",
+              "rationale": "Replacement mandates training before access for all employees with the only exception being designated emergency responders during a declared incident. Procedure mandates granting access before training on routine days with no declared incident, which falls outside the sole allowed exception and directly violates the before-access deadline.",
+              "reviewStatus": "PENDING_REVIEW",
+              "classification": "CONTRADICTION",
+              "suggestedAction": "Remove or revise routine pre-training access to require training before access, or seek policy amendment if routine exception is intended.",
+              "scopeExplanation": "Procedure scope of designated employee emergency responders on routine working days is within the policy scope of employees accessing sensitive systems, but its no-incident condition is explicitly excluded from the policy's only exception.",
+              "sourceReferences": [
+                {
+                  "quote": "This is the only\nexception.",
+                  "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                },
+                {
+                  "quote": "Employees must complete security training before sensitive production-system",
+                  "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                },
+                {
+                  "quote": "routine working days with no declared incident.",
+                  "sourceId": "82e6efab-81f5-4a01-b378-5a27aa9e73cb"
+                },
+                {
+                  "quote": "HR must grant sensitive\nproduction-system access before security training",
+                  "sourceId": "82e6efab-81f5-4a01-b378-5a27aa9e73cb"
+                }
+              ],
+              "procedureVersionId": "c2cd576d-f4a5-455b-999d-55a26d328772",
+              "policyRequirementId": "4c1c4d54-025c-31e5-883e-14bf713d2a53",
+              "relatedProcedureRequirementIds": [
+                "16e8ed91-7598-3aa7-a7ac-537a8ad6536e"
+              ]
+            },
+            {
+              "id": "85be1e19-dc0d-4e5f-8308-0df663858817",
+              "severity": "NONE",
+              "rationale": "Policy permits designated emergency responders during a declared incident to complete training within 24 hours after emergency access. Procedure requires that same group to complete training within 24 hours after such access. A MUST satisfies a MAY permission and uses the same 24-hour deadline, so it is a compatible stricter implementation.",
+              "reviewStatus": "NOT_REQUIRED",
+              "classification": "NO_CONFLICT",
+              "suggestedAction": null,
+              "scopeExplanation": "Same applicable scope and condition: designated emergency responders during a declared incident completing training after emergency access.",
+              "sourceReferences": [
+                {
+                  "quote": "may complete training within 24 hours after emergency access.",
+                  "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                },
+                {
+                  "quote": "designated emergency responders during a declared incident",
+                  "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                },
+                {
+                  "quote": "responders must complete training within 24\nhours after that access.",
+                  "sourceId": "3872d979-310b-4883-8183-468703829d4d"
+                },
+                {
+                  "quote": "during a declared incident.",
+                  "sourceId": "3872d979-310b-4883-8183-468703829d4d"
+                }
+              ],
+              "procedureVersionId": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+              "policyRequirementId": "16757f10-5f99-3ecb-93f5-a0e28da66fd4",
+              "relatedProcedureRequirementIds": [
+                "21e0716d-c86c-3bf7-8138-b9d31270cfed",
+                "38eb1547-6873-3e2e-85d1-976aad50f90d"
+              ]
+            },
+            {
+              "id": "3f9308df-de17-4266-ad75-44adfece92ed",
+              "severity": "NONE",
+              "rationale": "Policy permission applies only during a declared incident for emergency access. Procedure applies only on routine working days with no declared incident, so its pre-training access does not occur within the applicability condition of this specific MAY requirement.",
+              "reviewStatus": "NOT_REQUIRED",
+              "classification": "NO_CONFLICT",
+              "suggestedAction": null,
+              "scopeExplanation": "Different applicability conditions with no overlap: policy requires during a declared incident, procedure requires with no declared incident, so this specific permission is not triggered by the procedure's routine access.",
+              "sourceReferences": [
+                {
+                  "quote": "designated emergency responders during a declared incident, who",
+                  "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                },
+                {
+                  "quote": "may complete training within 24 hours after emergency access.",
+                  "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                },
+                {
+                  "quote": "routine working days with no declared incident.",
+                  "sourceId": "82e6efab-81f5-4a01-b378-5a27aa9e73cb"
+                },
+                {
+                  "quote": "HR must grant sensitive\nproduction-system access before security training",
+                  "sourceId": "82e6efab-81f5-4a01-b378-5a27aa9e73cb"
+                }
+              ],
+              "procedureVersionId": "c2cd576d-f4a5-455b-999d-55a26d328772",
+              "policyRequirementId": "16757f10-5f99-3ecb-93f5-a0e28da66fd4",
+              "relatedProcedureRequirementIds": [
+                "16e8ed91-7598-3aa7-a7ac-537a8ad6536e"
+              ]
+            }
+          ],
+          "limitations": []
+        },
+        "model": "muse-spark-1.3",
+        "prompt_version": "policy-investigator-2026-10-27-v1",
+        "schema_version": "impact-v1",
+        "canReview": true,
+        "reviews": [
+          {
+            "findingId": "eced14d2-de1d-4224-b108-b968ff308efb",
+            "status": "NOT_REQUIRED",
+            "history": []
+          },
+          {
+            "findingId": "4c3bd53a-c782-4a29-be3b-80adfb587a3d",
+            "status": "PENDING_REVIEW",
+            "history": []
+          },
+          {
+            "findingId": "85be1e19-dc0d-4e5f-8308-0df663858817",
+            "status": "NOT_REQUIRED",
+            "history": []
+          },
+          {
+            "findingId": "3f9308df-de17-4266-ad75-44adfece92ed",
+            "status": "NOT_REQUIRED",
+            "history": []
+          }
+        ]
+      },
+      "extractions": [
+        {
+          "version_id": "61a71a2d-9d9c-4db7-b9f7-7baab7b42b75",
+          "payload": {
+            "complete": true,
+            "limitations": [],
+            "requirements": [
+              {
+                "id": "59585300-4f7a-35a6-a2b3-4625e6e19c01",
+                "actor": "Employees",
+                "scope": "employees accessing sensitive production systems",
+                "action": "complete security training",
+                "deadline": "within 30 days after first sensitive production-system access",
+                "condition": null,
+                "exceptions": null,
+                "obligation": "MUST",
+                "effectiveDate": "2026-10-26",
+                "unknownFields": [
+                  "condition",
+                  "exceptions"
+                ],
+                "sourceReferences": [
+                  {
+                    "quote": "Employees must complete security training within 30 days after first sensitive\nproduction-system access.",
+                    "sourceId": "97a1dcab-1116-4134-9bab-3783662b0cc2"
+                  }
+                ]
+              }
+            ],
+            "processedSourceIds": [
+              "97a1dcab-1116-4134-9bab-3783662b0cc2"
+            ]
+          },
+          "model": "muse-spark-1.3",
+          "prompt_version": "policy-investigator-2026-10-27-v1",
+          "schema_version": "requirements-v1"
+        },
+        {
+          "version_id": "64a963cf-e367-4ce7-aec6-a7eeb8c9a7e6",
+          "payload": {
+            "complete": true,
+            "limitations": [],
+            "requirements": [
+              {
+                "id": "4c1c4d54-025c-31e5-883e-14bf713d2a53",
+                "actor": "Employees",
+                "scope": "employees accessing sensitive production systems",
+                "action": "complete security training",
+                "deadline": "before sensitive production-system access",
+                "condition": null,
+                "exceptions": [
+                  "designated emergency responders during a declared incident"
+                ],
+                "obligation": "MUST",
+                "effectiveDate": "2026-10-27",
+                "unknownFields": [
+                  "condition"
+                ],
+                "sourceReferences": [
+                  {
+                    "quote": "Scope: employees accessing sensitive production systems.",
+                    "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                  },
+                  {
+                    "quote": "Employees must complete security training before sensitive production-system\naccess, except designated emergency responders during a declared incident",
+                    "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                  }
+                ]
+              },
+              {
+                "id": "16757f10-5f99-3ecb-93f5-a0e28da66fd4",
+                "actor": "designated emergency responders during a declared incident",
+                "scope": "employees accessing sensitive production systems",
+                "action": "complete training",
+                "deadline": "within 24 hours after emergency access",
+                "condition": "during a declared incident",
+                "exceptions": [],
+                "obligation": "MAY",
+                "effectiveDate": "2026-10-27",
+                "unknownFields": [],
+                "sourceReferences": [
+                  {
+                    "quote": "Scope: employees accessing sensitive production systems.",
+                    "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                  },
+                  {
+                    "quote": "designated emergency responders during a declared incident, who\nmay complete training within 24 hours after emergency access.",
+                    "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe"
+                  }
+                ]
+              }
+            ],
+            "processedSourceIds": [
+              "c5a9c634-21dd-418c-bfe3-999582145dbe"
+            ]
+          },
+          "model": "muse-spark-1.3",
+          "prompt_version": "policy-investigator-2026-10-27-v1",
+          "schema_version": "requirements-v1"
+        },
+        {
+          "version_id": "c2cd576d-f4a5-455b-999d-55a26d328772",
+          "payload": {
+            "complete": true,
+            "limitations": [],
+            "requirements": [
+              {
+                "id": "16e8ed91-7598-3aa7-a7ac-537a8ad6536e",
+                "actor": "HR",
+                "scope": "designated employee emergency responders",
+                "action": "grant sensitive production-system access before security training and allow training within 24 hours after access",
+                "deadline": "before security training and within 24 hours after access",
+                "condition": "on routine working days with no declared incident",
+                "exceptions": null,
+                "obligation": "MUST",
+                "effectiveDate": "2026-10-26",
+                "unknownFields": [
+                  "exceptions"
+                ],
+                "sourceReferences": [
+                  {
+                    "quote": "HR must grant sensitive\nproduction-system access before security training and allow training within 24\nhours after access.",
+                    "sourceId": "82e6efab-81f5-4a01-b378-5a27aa9e73cb"
+                  }
+                ]
+              }
+            ],
+            "processedSourceIds": [
+              "82e6efab-81f5-4a01-b378-5a27aa9e73cb"
+            ]
+          },
+          "model": "muse-spark-1.3",
+          "prompt_version": "policy-investigator-2026-10-27-v1",
+          "schema_version": "requirements-v1"
+        },
+        {
+          "version_id": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+          "payload": {
+            "complete": true,
+            "limitations": [],
+            "requirements": [
+              {
+                "id": "38eb1547-6873-3e2e-85d1-976aad50f90d",
+                "actor": "HR",
+                "scope": "designated employee emergency responders only",
+                "action": "grant emergency sensitive production-system access before security training",
+                "deadline": null,
+                "condition": "during a declared incident",
+                "exceptions": null,
+                "obligation": "MAY",
+                "effectiveDate": "2026-10-26",
+                "unknownFields": [
+                  "deadline",
+                  "exceptions"
+                ],
+                "sourceReferences": [
+                  {
+                    "quote": "HR may grant emergency sensitive production-system\naccess before security training",
+                    "sourceId": "3872d979-310b-4883-8183-468703829d4d"
+                  },
+                  {
+                    "quote": "Scope: designated employee emergency responders only\nduring a declared incident.",
+                    "sourceId": "3872d979-310b-4883-8183-468703829d4d"
+                  }
+                ]
+              },
+              {
+                "id": "21e0716d-c86c-3bf7-8138-b9d31270cfed",
+                "actor": "responders",
+                "scope": "designated employee emergency responders only during a declared incident",
+                "action": "complete training",
+                "deadline": "within 24 hours after that access",
+                "condition": "after emergency sensitive production-system access granted before security training",
+                "exceptions": null,
+                "obligation": "MUST",
+                "effectiveDate": "2026-10-26",
+                "unknownFields": [
+                  "exceptions"
+                ],
+                "sourceReferences": [
+                  {
+                    "quote": "responders must complete training within 24\nhours after that access.",
+                    "sourceId": "3872d979-310b-4883-8183-468703829d4d"
+                  },
+                  {
+                    "quote": "Scope: designated employee emergency responders only\nduring a declared incident.",
+                    "sourceId": "3872d979-310b-4883-8183-468703829d4d"
+                  }
+                ]
+              },
+              {
+                "id": "fbd8e5ac-3531-3ec6-a2ea-41db06dd3f07",
+                "actor": null,
+                "scope": "designated employee emergency responders only during a declared incident",
+                "action": "grant other access",
+                "deadline": null,
+                "condition": null,
+                "exceptions": null,
+                "obligation": "MUST_NOT",
+                "effectiveDate": "2026-10-26",
+                "unknownFields": [
+                  "actor",
+                  "condition",
+                  "deadline",
+                  "exceptions"
+                ],
+                "sourceReferences": [
+                  {
+                    "quote": "No other access is granted by this procedure.",
+                    "sourceId": "3872d979-310b-4883-8183-468703829d4d"
+                  },
+                  {
+                    "quote": "Scope: designated employee emergency responders only\nduring a declared incident.",
+                    "sourceId": "3872d979-310b-4883-8183-468703829d4d"
+                  }
+                ]
+              }
+            ],
+            "processedSourceIds": [
+              "3872d979-310b-4883-8183-468703829d4d"
+            ]
+          },
+          "model": "muse-spark-1.3",
+          "prompt_version": "policy-investigator-2026-10-27-v1",
+          "schema_version": "requirements-v1"
+        }
+      ],
+      "graph": {
+        "investigationId": "30fe858e-cefb-4c25-bc7d-aa96c5d21055",
+        "complete": true,
+        "nodes": [
+          {
+            "id": "c2cd576d-f4a5-455b-999d-55a26d328772",
+            "type": "PROCEDURE",
+            "label": "Synthetic exception-outside-incident",
+            "versionId": "c2cd576d-f4a5-455b-999d-55a26d328772",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+            "type": "PROCEDURE",
+            "label": "Synthetic valid-emergency-exception",
+            "versionId": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "61a71a2d-9d9c-4db7-b9f7-7baab7b42b75",
+            "type": "BASELINE",
+            "label": "Synthetic explicit-exception-1",
+            "versionId": "61a71a2d-9d9c-4db7-b9f7-7baab7b42b75",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "64a963cf-e367-4ce7-aec6-a7eeb8c9a7e6",
+            "type": "REPLACEMENT",
+            "label": "Synthetic explicit-exception-1",
+            "versionId": "64a963cf-e367-4ce7-aec6-a7eeb8c9a7e6",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "59585300-4f7a-35a6-a2b3-4625e6e19c01",
+            "type": "REQUIREMENT",
+            "label": "complete security training",
+            "versionId": "61a71a2d-9d9c-4db7-b9f7-7baab7b42b75",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "4c1c4d54-025c-31e5-883e-14bf713d2a53",
+            "type": "REQUIREMENT",
+            "label": "complete security training",
+            "versionId": "64a963cf-e367-4ce7-aec6-a7eeb8c9a7e6",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "16757f10-5f99-3ecb-93f5-a0e28da66fd4",
+            "type": "REQUIREMENT",
+            "label": "complete training",
+            "versionId": "64a963cf-e367-4ce7-aec6-a7eeb8c9a7e6",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "16e8ed91-7598-3aa7-a7ac-537a8ad6536e",
+            "type": "REQUIREMENT",
+            "label": "grant sensitive production-system access before security training and allow training within 24 hours after access",
+            "versionId": "c2cd576d-f4a5-455b-999d-55a26d328772",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "38eb1547-6873-3e2e-85d1-976aad50f90d",
+            "type": "REQUIREMENT",
+            "label": "grant emergency sensitive production-system access before security training",
+            "versionId": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "21e0716d-c86c-3bf7-8138-b9d31270cfed",
+            "type": "REQUIREMENT",
+            "label": "complete training",
+            "versionId": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "fbd8e5ac-3531-3ec6-a2ea-41db06dd3f07",
+            "type": "REQUIREMENT",
+            "label": "grant other access",
+            "versionId": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "eced14d2-de1d-4224-b108-b968ff308efb",
+            "type": "FINDING",
+            "label": "NO_CONFLICT",
+            "versionId": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+            "classification": "NO_CONFLICT",
+            "severity": "NONE"
+          },
+          {
+            "id": "4c3bd53a-c782-4a29-be3b-80adfb587a3d",
+            "type": "FINDING",
+            "label": "CONTRADICTION",
+            "versionId": "c2cd576d-f4a5-455b-999d-55a26d328772",
+            "classification": "CONTRADICTION",
+            "severity": "HIGH"
+          },
+          {
+            "id": "85be1e19-dc0d-4e5f-8308-0df663858817",
+            "type": "FINDING",
+            "label": "NO_CONFLICT",
+            "versionId": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+            "classification": "NO_CONFLICT",
+            "severity": "NONE"
+          },
+          {
+            "id": "3f9308df-de17-4266-ad75-44adfece92ed",
+            "type": "FINDING",
+            "label": "NO_CONFLICT",
+            "versionId": "c2cd576d-f4a5-455b-999d-55a26d328772",
+            "classification": "NO_CONFLICT",
+            "severity": "NONE"
+          }
+        ],
+        "edges": [
+          {
+            "source": "61a71a2d-9d9c-4db7-b9f7-7baab7b42b75",
+            "target": "64a963cf-e367-4ce7-aec6-a7eeb8c9a7e6",
+            "type": "REPLACED_BY"
+          },
+          {
+            "source": "61a71a2d-9d9c-4db7-b9f7-7baab7b42b75",
+            "target": "59585300-4f7a-35a6-a2b3-4625e6e19c01",
+            "type": "CONTAINS"
+          },
+          {
+            "source": "64a963cf-e367-4ce7-aec6-a7eeb8c9a7e6",
+            "target": "4c1c4d54-025c-31e5-883e-14bf713d2a53",
+            "type": "CONTAINS"
+          },
+          {
+            "source": "64a963cf-e367-4ce7-aec6-a7eeb8c9a7e6",
+            "target": "16757f10-5f99-3ecb-93f5-a0e28da66fd4",
+            "type": "CONTAINS"
+          },
+          {
+            "source": "c2cd576d-f4a5-455b-999d-55a26d328772",
+            "target": "16e8ed91-7598-3aa7-a7ac-537a8ad6536e",
+            "type": "CONTAINS"
+          },
+          {
+            "source": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+            "target": "38eb1547-6873-3e2e-85d1-976aad50f90d",
+            "type": "CONTAINS"
+          },
+          {
+            "source": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+            "target": "21e0716d-c86c-3bf7-8138-b9d31270cfed",
+            "type": "CONTAINS"
+          },
+          {
+            "source": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+            "target": "fbd8e5ac-3531-3ec6-a2ea-41db06dd3f07",
+            "type": "CONTAINS"
+          },
+          {
+            "source": "59585300-4f7a-35a6-a2b3-4625e6e19c01",
+            "target": "4c1c4d54-025c-31e5-883e-14bf713d2a53",
+            "type": "MODIFIED"
+          },
+          {
+            "source": "4c1c4d54-025c-31e5-883e-14bf713d2a53",
+            "target": "eced14d2-de1d-4224-b108-b968ff308efb",
+            "type": "ASSESSED_AS"
+          },
+          {
+            "source": "eced14d2-de1d-4224-b108-b968ff308efb",
+            "target": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+            "type": "AFFECTS"
+          },
+          {
+            "source": "eced14d2-de1d-4224-b108-b968ff308efb",
+            "target": "38eb1547-6873-3e2e-85d1-976aad50f90d",
+            "type": "SUPPORTED_BY"
+          },
+          {
+            "source": "eced14d2-de1d-4224-b108-b968ff308efb",
+            "target": "21e0716d-c86c-3bf7-8138-b9d31270cfed",
+            "type": "SUPPORTED_BY"
+          },
+          {
+            "source": "eced14d2-de1d-4224-b108-b968ff308efb",
+            "target": "fbd8e5ac-3531-3ec6-a2ea-41db06dd3f07",
+            "type": "SUPPORTED_BY"
+          },
+          {
+            "source": "4c1c4d54-025c-31e5-883e-14bf713d2a53",
+            "target": "4c3bd53a-c782-4a29-be3b-80adfb587a3d",
+            "type": "ASSESSED_AS"
+          },
+          {
+            "source": "4c3bd53a-c782-4a29-be3b-80adfb587a3d",
+            "target": "c2cd576d-f4a5-455b-999d-55a26d328772",
+            "type": "AFFECTS"
+          },
+          {
+            "source": "4c3bd53a-c782-4a29-be3b-80adfb587a3d",
+            "target": "16e8ed91-7598-3aa7-a7ac-537a8ad6536e",
+            "type": "SUPPORTED_BY"
+          },
+          {
+            "source": "16757f10-5f99-3ecb-93f5-a0e28da66fd4",
+            "target": "85be1e19-dc0d-4e5f-8308-0df663858817",
+            "type": "ASSESSED_AS"
+          },
+          {
+            "source": "85be1e19-dc0d-4e5f-8308-0df663858817",
+            "target": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+            "type": "AFFECTS"
+          },
+          {
+            "source": "85be1e19-dc0d-4e5f-8308-0df663858817",
+            "target": "21e0716d-c86c-3bf7-8138-b9d31270cfed",
+            "type": "SUPPORTED_BY"
+          },
+          {
+            "source": "85be1e19-dc0d-4e5f-8308-0df663858817",
+            "target": "38eb1547-6873-3e2e-85d1-976aad50f90d",
+            "type": "SUPPORTED_BY"
+          },
+          {
+            "source": "16757f10-5f99-3ecb-93f5-a0e28da66fd4",
+            "target": "3f9308df-de17-4266-ad75-44adfece92ed",
+            "type": "ASSESSED_AS"
+          },
+          {
+            "source": "3f9308df-de17-4266-ad75-44adfece92ed",
+            "target": "c2cd576d-f4a5-455b-999d-55a26d328772",
+            "type": "AFFECTS"
+          },
+          {
+            "source": "3f9308df-de17-4266-ad75-44adfece92ed",
+            "target": "16e8ed91-7598-3aa7-a7ac-537a8ad6536e",
+            "type": "SUPPORTED_BY"
+          }
+        ]
+      },
+      "verifiedCitations": [
+        {
+          "sourceId": "97a1dcab-1116-4134-9bab-3783662b0cc2",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "82e6efab-81f5-4a01-b378-5a27aa9e73cb",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "3872d979-310b-4883-8183-468703829d4d",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "3872d979-310b-4883-8183-468703829d4d",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "3872d979-310b-4883-8183-468703829d4d",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "3872d979-310b-4883-8183-468703829d4d",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "3872d979-310b-4883-8183-468703829d4d",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "3872d979-310b-4883-8183-468703829d4d",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "97a1dcab-1116-4134-9bab-3783662b0cc2",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "3872d979-310b-4883-8183-468703829d4d",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "3872d979-310b-4883-8183-468703829d4d",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "82e6efab-81f5-4a01-b378-5a27aa9e73cb",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "82e6efab-81f5-4a01-b378-5a27aa9e73cb",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "3872d979-310b-4883-8183-468703829d4d",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "3872d979-310b-4883-8183-468703829d4d",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "c5a9c634-21dd-418c-bfe3-999582145dbe",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "82e6efab-81f5-4a01-b378-5a27aa9e73cb",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "82e6efab-81f5-4a01-b378-5a27aa9e73cb",
+          "page": 1,
+          "quoteMatches": true
+        }
+      ],
+      "authorizationDenialsVerified": true
+    },
+    {
+      "id": "explicit-exception-2",
+      "investigationId": "3afdfb22-bf36-44f9-a7b2-233b10a0e7e4",
+      "elapsedMs": 50109,
+      "progress": {
+        "id": "3afdfb22-bf36-44f9-a7b2-233b10a0e7e4",
+        "state": "COMPLETED",
+        "stage": "COMPLETED",
+        "error_code": null,
+        "attempts": 1,
+        "calls": 5,
+        "metered_calls": 5,
+        "prompt_tokens": 6230,
+        "completion_tokens": 11257,
+        "latency_ms": 48592
+      },
+      "findings": {
+        "payload": {
+          "changes": [
+            {
+              "reason": "Deadline tightened from within 30 days after first access to before access, and a sole exception for designated emergency responders with 24-hour post-access completion was added.",
+              "changeType": "MODIFIED",
+              "sourceReferences": [
+                {
+                  "quote": "Employees must complete security training within 30 days after first sensitive\nproduction-system access.",
+                  "sourceId": "b93f6656-33ea-4588-ab28-6871d81d17fb"
+                },
+                {
+                  "quote": "Employees must complete security training before sensitive production-system\naccess, except designated emergency responders during a declared incident, who\nmay complete training within 24 hours after emergency access.",
+                  "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba"
+                }
+              ],
+              "baselineRequirementId": "181c3147-57fd-3a2a-a1fa-27433e7a3873",
+              "replacementRequirementId": "196149bf-6c46-3ba7-8aa0-bb641da1f866"
+            },
+            {
+              "reason": "New permissive requirement allowing designated emergency responders during declared incident to complete training within 24 hours after emergency access; no baseline equivalent.",
+              "changeType": "ADDED",
+              "sourceReferences": [
+                {
+                  "quote": "except designated emergency responders during a declared incident, who\nmay complete training within 24 hours after emergency access.",
+                  "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba"
+                }
+              ],
+              "baselineRequirementId": null,
+              "replacementRequirementId": "4100e361-366e-341a-8045-ae05b8558b14"
+            }
+          ],
+          "complete": true,
+          "assessments": [
+            {
+              "id": "d69c53ee-e9d9-4bc6-9451-1f705a78b323",
+              "severity": "HIGH",
+              "rationale": "Policy allows designated emergency responders to access before training and complete within 24h after, while procedure requires HR to withhold access until training complete including during declared incidents, directly blocking the allowed exception.",
+              "reviewStatus": "PENDING_REVIEW",
+              "classification": "CONTRADICTION",
+              "suggestedAction": "Align procedure with policy exception for designated emergency responders or seek policy waiver.",
+              "scopeExplanation": "Both apply to employees accessing sensitive systems including emergency responders during declared incidents; scopes overlap with no compatible carve-out.",
+              "sourceReferences": [
+                {
+                  "quote": "Employees must complete security training before sensitive production-system\naccess, except designated emergency responders during a declared incident, who\nmay complete training within 24 hours after emergency access.",
+                  "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba"
+                },
+                {
+                  "quote": "HR must withhold sensitive production-system access until security\ntraining is complete, including during declared incidents.",
+                  "sourceId": "bf0c71ed-ad59-44f2-9c85-e603bf22452d"
+                }
+              ],
+              "procedureVersionId": "6a4c9f4d-7f06-4b46-afbc-da4aab84a7c6",
+              "policyRequirementId": "196149bf-6c46-3ba7-8aa0-bb641da1f866",
+              "relatedProcedureRequirementIds": [
+                "7b1eb7af-0e67-3f28-a2dc-2e404baf2fe9"
+              ]
+            },
+            {
+              "id": "c141fcf3-dc50-4a15-bd15-1ad67470295b",
+              "severity": "HIGH",
+              "rationale": "Policy permits emergency responders to complete training within 24 hours after emergency access, while procedure prohibits any access until training is complete including during declared incidents.",
+              "reviewStatus": "PENDING_REVIEW",
+              "classification": "CONTRADICTION",
+              "suggestedAction": "Amend procedure to allow emergency access with 24-hour post-access training completion.",
+              "scopeExplanation": "Replacement emergency-responder scope is explicitly included in procedure scope of all employees including emergency responders in every situation.",
+              "sourceReferences": [
+                {
+                  "quote": "except designated emergency responders during a declared incident, who\nmay complete training within 24 hours after emergency access.",
+                  "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba"
+                },
+                {
+                  "quote": "HR must withhold sensitive production-system access until security\ntraining is complete, including during declared incidents.",
+                  "sourceId": "bf0c71ed-ad59-44f2-9c85-e603bf22452d"
+                }
+              ],
+              "procedureVersionId": "6a4c9f4d-7f06-4b46-afbc-da4aab84a7c6",
+              "policyRequirementId": "4100e361-366e-341a-8045-ae05b8558b14",
+              "relatedProcedureRequirementIds": [
+                "7b1eb7af-0e67-3f28-a2dc-2e404baf2fe9"
+              ]
+            },
+            {
+              "id": "be4885b5-9871-44df-8abd-c629a8e2c905",
+              "severity": "HIGH",
+              "rationale": "Policy requires training before access for routine employees, but the routine onboarding procedure only requires identity verification and states it specifies no training prerequisite, deadline or exception.",
+              "reviewStatus": "PENDING_REVIEW",
+              "classification": "MISSING_REQUIREMENT",
+              "suggestedAction": "Add training-before-access verification to routine onboarding procedure.",
+              "scopeExplanation": "Routine onboarding procedure scope is a subset of policy scope for employees accessing sensitive systems, so the before-access training rule applies but is absent.",
+              "sourceReferences": [
+                {
+                  "quote": "Employees must complete security training before sensitive production-system\naccess, except designated emergency responders during a declared incident, who\nmay complete training within 24 hours after emergency access.",
+                  "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba"
+                },
+                {
+                  "quote": "It specifies no security-training prerequisite, deadline or\nexception and no other onboarding requirement.",
+                  "sourceId": "f7c04cc5-1c42-40dd-abc0-7c66b16d8d62"
+                }
+              ],
+              "procedureVersionId": "f25cbe4b-5a39-44d4-ac30-86368cef171f",
+              "policyRequirementId": "196149bf-6c46-3ba7-8aa0-bb641da1f866",
+              "relatedProcedureRequirementIds": [
+                "29157e90-b3d6-3937-a5f6-f06000141626"
+              ]
+            },
+            {
+              "id": "cce835c8-2200-4b4e-b32d-07e33f6d6662",
+              "severity": "NONE",
+              "rationale": "Emergency-responder 24-hour rule applies during declared incidents, while the procedure explicitly covers only routine onboarding and no declared incidents are covered, so there is no overlapping obligation.",
+              "reviewStatus": "NOT_REQUIRED",
+              "classification": "NO_CONFLICT",
+              "suggestedAction": null,
+              "scopeExplanation": "Different scope: procedure excludes declared incidents, policy requirement is limited to during a declared incident; no implementation is expected in this procedure.",
+              "sourceReferences": [
+                {
+                  "quote": "except designated emergency responders during a declared incident, who\nmay complete training within 24 hours after emergency access.",
+                  "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba"
+                },
+                {
+                  "quote": "no\ndeclared incidents are covered.",
+                  "sourceId": "f7c04cc5-1c42-40dd-abc0-7c66b16d8d62"
+                }
+              ],
+              "procedureVersionId": "f25cbe4b-5a39-44d4-ac30-86368cef171f",
+              "policyRequirementId": "4100e361-366e-341a-8045-ae05b8558b14",
+              "relatedProcedureRequirementIds": [
+                "29157e90-b3d6-3937-a5f6-f06000141626"
+              ]
+            }
+          ],
+          "limitations": []
+        },
+        "model": "muse-spark-1.3",
+        "prompt_version": "policy-investigator-2026-10-27-v1",
+        "schema_version": "impact-v1",
+        "canReview": true,
+        "reviews": [
+          {
+            "findingId": "d69c53ee-e9d9-4bc6-9451-1f705a78b323",
+            "status": "PENDING_REVIEW",
+            "history": []
+          },
+          {
+            "findingId": "c141fcf3-dc50-4a15-bd15-1ad67470295b",
+            "status": "PENDING_REVIEW",
+            "history": []
+          },
+          {
+            "findingId": "be4885b5-9871-44df-8abd-c629a8e2c905",
+            "status": "PENDING_REVIEW",
+            "history": []
+          },
+          {
+            "findingId": "cce835c8-2200-4b4e-b32d-07e33f6d6662",
+            "status": "NOT_REQUIRED",
+            "history": []
+          }
+        ]
+      },
+      "extractions": [
+        {
+          "version_id": "47611e03-9c2b-45c5-ad45-4668fbc5f650",
+          "payload": {
+            "complete": true,
+            "limitations": [],
+            "requirements": [
+              {
+                "id": "181c3147-57fd-3a2a-a1fa-27433e7a3873",
+                "actor": "Employees",
+                "scope": "employees accessing sensitive production systems",
+                "action": "complete security training",
+                "deadline": "within 30 days after first sensitive production-system access",
+                "condition": "after first sensitive production-system access",
+                "exceptions": null,
+                "obligation": "MUST",
+                "effectiveDate": "2026-10-26",
+                "unknownFields": [
+                  "exceptions"
+                ],
+                "sourceReferences": [
+                  {
+                    "quote": "Scope: employees accessing sensitive production systems.",
+                    "sourceId": "b93f6656-33ea-4588-ab28-6871d81d17fb"
+                  },
+                  {
+                    "quote": "Employees must complete security training within 30 days after first sensitive\nproduction-system access.",
+                    "sourceId": "b93f6656-33ea-4588-ab28-6871d81d17fb"
+                  }
+                ]
+              }
+            ],
+            "processedSourceIds": [
+              "b93f6656-33ea-4588-ab28-6871d81d17fb"
+            ]
+          },
+          "model": "muse-spark-1.3",
+          "prompt_version": "policy-investigator-2026-10-27-v1",
+          "schema_version": "requirements-v1"
+        },
+        {
+          "version_id": "6a4c9f4d-7f06-4b46-afbc-da4aab84a7c6",
+          "payload": {
+            "complete": true,
+            "limitations": [],
+            "requirements": [
+              {
+                "id": "7b1eb7af-0e67-3f28-a2dc-2e404baf2fe9",
+                "actor": "HR",
+                "scope": "all employees including emergency responders in every situation",
+                "action": "withhold sensitive production-system access",
+                "deadline": null,
+                "condition": "until security training is complete, including during declared incidents",
+                "exceptions": null,
+                "obligation": "MUST",
+                "effectiveDate": "2026-10-26",
+                "unknownFields": [
+                  "deadline",
+                  "exceptions"
+                ],
+                "sourceReferences": [
+                  {
+                    "quote": "HR must withhold sensitive production-system access until security\ntraining is complete, including during declared incidents.",
+                    "sourceId": "bf0c71ed-ad59-44f2-9c85-e603bf22452d"
+                  },
+                  {
+                    "quote": "Scope: all employees including emergency responders in every\nsituation.",
+                    "sourceId": "bf0c71ed-ad59-44f2-9c85-e603bf22452d"
+                  }
+                ]
+              }
+            ],
+            "processedSourceIds": [
+              "bf0c71ed-ad59-44f2-9c85-e603bf22452d"
+            ]
+          },
+          "model": "muse-spark-1.3",
+          "prompt_version": "policy-investigator-2026-10-27-v1",
+          "schema_version": "requirements-v1"
+        },
+        {
+          "version_id": "a66e5873-3476-4009-9f89-70e832c08fe8",
+          "payload": {
+            "complete": true,
+            "limitations": [],
+            "requirements": [
+              {
+                "id": "196149bf-6c46-3ba7-8aa0-bb641da1f866",
+                "actor": "Employees",
+                "scope": "employees accessing sensitive production systems",
+                "action": "complete security training",
+                "deadline": "before sensitive production-system access",
+                "condition": null,
+                "exceptions": [
+                  "designated emergency responders during a declared incident, who may complete training within 24 hours after emergency access"
+                ],
+                "obligation": "MUST",
+                "effectiveDate": "2026-10-27",
+                "unknownFields": [
+                  "condition"
+                ],
+                "sourceReferences": [
+                  {
+                    "quote": "Employees must complete security training before sensitive production-system\naccess, except designated emergency responders during a declared incident, who\nmay complete training within 24 hours after emergency access.",
+                    "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba"
+                  },
+                  {
+                    "quote": "Scope: employees accessing sensitive production systems.",
+                    "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba"
+                  },
+                  {
+                    "quote": "This is the only\nexception.",
+                    "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba"
+                  }
+                ]
+              },
+              {
+                "id": "4100e361-366e-341a-8045-ae05b8558b14",
+                "actor": "designated emergency responders",
+                "scope": "employees accessing sensitive production systems",
+                "action": "complete training",
+                "deadline": "within 24 hours after emergency access",
+                "condition": "during a declared incident",
+                "exceptions": null,
+                "obligation": "MAY",
+                "effectiveDate": "2026-10-27",
+                "unknownFields": [
+                  "exceptions"
+                ],
+                "sourceReferences": [
+                  {
+                    "quote": "except designated emergency responders during a declared incident, who\nmay complete training within 24 hours after emergency access.",
+                    "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba"
+                  },
+                  {
+                    "quote": "Scope: employees accessing sensitive production systems.",
+                    "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba"
+                  }
+                ]
+              }
+            ],
+            "processedSourceIds": [
+              "a92119b2-e3eb-41ed-9041-17f456fd90ba"
+            ]
+          },
+          "model": "muse-spark-1.3",
+          "prompt_version": "policy-investigator-2026-10-27-v1",
+          "schema_version": "requirements-v1"
+        },
+        {
+          "version_id": "f25cbe4b-5a39-44d4-ac30-86368cef171f",
+          "payload": {
+            "complete": true,
+            "limitations": [],
+            "requirements": [
+              {
+                "id": "29157e90-b3d6-3937-a5f6-f06000141626",
+                "actor": "HR",
+                "scope": "routine employee sensitive production-system onboarding procedure",
+                "action": "verify the employee\u2019s identity",
+                "deadline": null,
+                "condition": "before provisioning sensitive production-system access",
+                "exceptions": [],
+                "obligation": "MUST",
+                "effectiveDate": "2026-10-26",
+                "unknownFields": [
+                  "deadline"
+                ],
+                "sourceReferences": [
+                  {
+                    "quote": "HR must verify the employee\u2019s identity before\nprovisioning sensitive production-system access.",
+                    "sourceId": "f7c04cc5-1c42-40dd-abc0-7c66b16d8d62"
+                  }
+                ]
+              }
+            ],
+            "processedSourceIds": [
+              "f7c04cc5-1c42-40dd-abc0-7c66b16d8d62"
+            ]
+          },
+          "model": "muse-spark-1.3",
+          "prompt_version": "policy-investigator-2026-10-27-v1",
+          "schema_version": "requirements-v1"
+        }
+      ],
+      "graph": {
+        "investigationId": "3afdfb22-bf36-44f9-a7b2-233b10a0e7e4",
+        "complete": true,
+        "nodes": [
+          {
+            "id": "a66e5873-3476-4009-9f89-70e832c08fe8",
+            "type": "REPLACEMENT",
+            "label": "Synthetic explicit-exception-2",
+            "versionId": "a66e5873-3476-4009-9f89-70e832c08fe8",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "f25cbe4b-5a39-44d4-ac30-86368cef171f",
+            "type": "PROCEDURE",
+            "label": "Synthetic complete-scope-missing-gate",
+            "versionId": "f25cbe4b-5a39-44d4-ac30-86368cef171f",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "47611e03-9c2b-45c5-ad45-4668fbc5f650",
+            "type": "BASELINE",
+            "label": "Synthetic explicit-exception-2",
+            "versionId": "47611e03-9c2b-45c5-ad45-4668fbc5f650",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "6a4c9f4d-7f06-4b46-afbc-da4aab84a7c6",
+            "type": "PROCEDURE",
+            "label": "Synthetic stricter-than-exception",
+            "versionId": "6a4c9f4d-7f06-4b46-afbc-da4aab84a7c6",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "181c3147-57fd-3a2a-a1fa-27433e7a3873",
+            "type": "REQUIREMENT",
+            "label": "complete security training",
+            "versionId": "47611e03-9c2b-45c5-ad45-4668fbc5f650",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "7b1eb7af-0e67-3f28-a2dc-2e404baf2fe9",
+            "type": "REQUIREMENT",
+            "label": "withhold sensitive production-system access",
+            "versionId": "6a4c9f4d-7f06-4b46-afbc-da4aab84a7c6",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "196149bf-6c46-3ba7-8aa0-bb641da1f866",
+            "type": "REQUIREMENT",
+            "label": "complete security training",
+            "versionId": "a66e5873-3476-4009-9f89-70e832c08fe8",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "4100e361-366e-341a-8045-ae05b8558b14",
+            "type": "REQUIREMENT",
+            "label": "complete training",
+            "versionId": "a66e5873-3476-4009-9f89-70e832c08fe8",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "29157e90-b3d6-3937-a5f6-f06000141626",
+            "type": "REQUIREMENT",
+            "label": "verify the employee\u2019s identity",
+            "versionId": "f25cbe4b-5a39-44d4-ac30-86368cef171f",
+            "classification": null,
+            "severity": null
+          },
+          {
+            "id": "d69c53ee-e9d9-4bc6-9451-1f705a78b323",
+            "type": "FINDING",
+            "label": "CONTRADICTION",
+            "versionId": "6a4c9f4d-7f06-4b46-afbc-da4aab84a7c6",
+            "classification": "CONTRADICTION",
+            "severity": "HIGH"
+          },
+          {
+            "id": "c141fcf3-dc50-4a15-bd15-1ad67470295b",
+            "type": "FINDING",
+            "label": "CONTRADICTION",
+            "versionId": "6a4c9f4d-7f06-4b46-afbc-da4aab84a7c6",
+            "classification": "CONTRADICTION",
+            "severity": "HIGH"
+          },
+          {
+            "id": "be4885b5-9871-44df-8abd-c629a8e2c905",
+            "type": "FINDING",
+            "label": "MISSING_REQUIREMENT",
+            "versionId": "f25cbe4b-5a39-44d4-ac30-86368cef171f",
+            "classification": "MISSING_REQUIREMENT",
+            "severity": "HIGH"
+          },
+          {
+            "id": "cce835c8-2200-4b4e-b32d-07e33f6d6662",
+            "type": "FINDING",
+            "label": "NO_CONFLICT",
+            "versionId": "f25cbe4b-5a39-44d4-ac30-86368cef171f",
+            "classification": "NO_CONFLICT",
+            "severity": "NONE"
+          }
+        ],
+        "edges": [
+          {
+            "source": "47611e03-9c2b-45c5-ad45-4668fbc5f650",
+            "target": "a66e5873-3476-4009-9f89-70e832c08fe8",
+            "type": "REPLACED_BY"
+          },
+          {
+            "source": "47611e03-9c2b-45c5-ad45-4668fbc5f650",
+            "target": "181c3147-57fd-3a2a-a1fa-27433e7a3873",
+            "type": "CONTAINS"
+          },
+          {
+            "source": "6a4c9f4d-7f06-4b46-afbc-da4aab84a7c6",
+            "target": "7b1eb7af-0e67-3f28-a2dc-2e404baf2fe9",
+            "type": "CONTAINS"
+          },
+          {
+            "source": "a66e5873-3476-4009-9f89-70e832c08fe8",
+            "target": "196149bf-6c46-3ba7-8aa0-bb641da1f866",
+            "type": "CONTAINS"
+          },
+          {
+            "source": "a66e5873-3476-4009-9f89-70e832c08fe8",
+            "target": "4100e361-366e-341a-8045-ae05b8558b14",
+            "type": "CONTAINS"
+          },
+          {
+            "source": "f25cbe4b-5a39-44d4-ac30-86368cef171f",
+            "target": "29157e90-b3d6-3937-a5f6-f06000141626",
+            "type": "CONTAINS"
+          },
+          {
+            "source": "181c3147-57fd-3a2a-a1fa-27433e7a3873",
+            "target": "196149bf-6c46-3ba7-8aa0-bb641da1f866",
+            "type": "MODIFIED"
+          },
+          {
+            "source": "196149bf-6c46-3ba7-8aa0-bb641da1f866",
+            "target": "d69c53ee-e9d9-4bc6-9451-1f705a78b323",
+            "type": "ASSESSED_AS"
+          },
+          {
+            "source": "d69c53ee-e9d9-4bc6-9451-1f705a78b323",
+            "target": "6a4c9f4d-7f06-4b46-afbc-da4aab84a7c6",
+            "type": "AFFECTS"
+          },
+          {
+            "source": "d69c53ee-e9d9-4bc6-9451-1f705a78b323",
+            "target": "7b1eb7af-0e67-3f28-a2dc-2e404baf2fe9",
+            "type": "SUPPORTED_BY"
+          },
+          {
+            "source": "4100e361-366e-341a-8045-ae05b8558b14",
+            "target": "c141fcf3-dc50-4a15-bd15-1ad67470295b",
+            "type": "ASSESSED_AS"
+          },
+          {
+            "source": "c141fcf3-dc50-4a15-bd15-1ad67470295b",
+            "target": "6a4c9f4d-7f06-4b46-afbc-da4aab84a7c6",
+            "type": "AFFECTS"
+          },
+          {
+            "source": "c141fcf3-dc50-4a15-bd15-1ad67470295b",
+            "target": "7b1eb7af-0e67-3f28-a2dc-2e404baf2fe9",
+            "type": "SUPPORTED_BY"
+          },
+          {
+            "source": "196149bf-6c46-3ba7-8aa0-bb641da1f866",
+            "target": "be4885b5-9871-44df-8abd-c629a8e2c905",
+            "type": "ASSESSED_AS"
+          },
+          {
+            "source": "be4885b5-9871-44df-8abd-c629a8e2c905",
+            "target": "f25cbe4b-5a39-44d4-ac30-86368cef171f",
+            "type": "AFFECTS"
+          },
+          {
+            "source": "be4885b5-9871-44df-8abd-c629a8e2c905",
+            "target": "29157e90-b3d6-3937-a5f6-f06000141626",
+            "type": "SUPPORTED_BY"
+          },
+          {
+            "source": "4100e361-366e-341a-8045-ae05b8558b14",
+            "target": "cce835c8-2200-4b4e-b32d-07e33f6d6662",
+            "type": "ASSESSED_AS"
+          },
+          {
+            "source": "cce835c8-2200-4b4e-b32d-07e33f6d6662",
+            "target": "f25cbe4b-5a39-44d4-ac30-86368cef171f",
+            "type": "AFFECTS"
+          },
+          {
+            "source": "cce835c8-2200-4b4e-b32d-07e33f6d6662",
+            "target": "29157e90-b3d6-3937-a5f6-f06000141626",
+            "type": "SUPPORTED_BY"
+          }
+        ]
+      },
+      "verifiedCitations": [
+        {
+          "sourceId": "b93f6656-33ea-4588-ab28-6871d81d17fb",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "b93f6656-33ea-4588-ab28-6871d81d17fb",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "bf0c71ed-ad59-44f2-9c85-e603bf22452d",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "bf0c71ed-ad59-44f2-9c85-e603bf22452d",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "f7c04cc5-1c42-40dd-abc0-7c66b16d8d62",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "b93f6656-33ea-4588-ab28-6871d81d17fb",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "bf0c71ed-ad59-44f2-9c85-e603bf22452d",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "bf0c71ed-ad59-44f2-9c85-e603bf22452d",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "f7c04cc5-1c42-40dd-abc0-7c66b16d8d62",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "a92119b2-e3eb-41ed-9041-17f456fd90ba",
+          "page": 1,
+          "quoteMatches": true
+        },
+        {
+          "sourceId": "f7c04cc5-1c42-40dd-abc0-7c66b16d8d62",
+          "page": 1,
+          "quoteMatches": true
+        }
+      ],
+      "authorizationDenialsVerified": true
+    }
+  ],
+  "cases": [
+    {
+      "id": "valid-emergency-exception",
+      "category": "exception",
+      "expected": "NO_CONFLICT",
+      "procedureVersionId": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+      "observed": "NO_CONFLICT",
+      "classifications": [
+        "NO_CONFLICT"
+      ],
+      "matched": true,
+      "errorCode": null
+    },
+    {
+      "id": "exception-outside-incident",
+      "category": "contradiction",
+      "expected": "CONTRADICTION",
+      "procedureVersionId": "c2cd576d-f4a5-455b-999d-55a26d328772",
+      "observed": "CONTRADICTION",
+      "classifications": [
+        "CONTRADICTION",
+        "NO_CONFLICT"
+      ],
+      "matched": true,
+      "errorCode": null
+    },
+    {
+      "id": "stricter-than-exception",
+      "category": "non-conflict",
+      "expected": "NO_CONFLICT",
+      "procedureVersionId": "6a4c9f4d-7f06-4b46-afbc-da4aab84a7c6",
+      "observed": "CONTRADICTION",
+      "classifications": [
+        "CONTRADICTION"
+      ],
+      "matched": false,
+      "errorCode": null
+    },
+    {
+      "id": "complete-scope-missing-gate",
+      "category": "missing-requirement",
+      "expected": "MISSING_REQUIREMENT",
+      "procedureVersionId": "f25cbe4b-5a39-44d4-ac30-86368cef171f",
+      "observed": "MISSING_REQUIREMENT",
+      "classifications": [
+        "MISSING_REQUIREMENT",
+        "NO_CONFLICT"
+      ],
+      "matched": true,
+      "errorCode": null
+    }
+  ],
+  "result": "COMPLETED",
+  "metrics": {
+    "cases": 4,
+    "matched": 3,
+    "errors": 0,
+    "contradictionTruePositives": 1,
+    "contradictionFalsePositives": 1,
+    "contradictionFalseNegatives": 0,
+    "contradictionPrecision": 0.5,
+    "contradictionRecall": 1.0,
+    "citationInstances": 54,
+    "verifiedCitationInstances": 54,
+    "citationCorrectness": 1.0,
+    "calls": 10,
+    "metered_calls": 10,
+    "prompt_tokens": 12782,
+    "completion_tokens": 23005,
+    "latency_ms": 97429
+  },
+  "reviewWorkflowVerified": true,
+  "revocationVerified": true
+}

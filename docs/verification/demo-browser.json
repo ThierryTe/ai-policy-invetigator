@@ -1,0 +1,42 @@
+{
+  "recordedAt": "2026-10-27T23:55:02.830Z",
+  "realBackend": true,
+  "realModel": "muse-spark-1.3",
+  "progress": {
+    "id": "a1e0153c-117d-443c-841e-c7333a2fde99",
+    "state": "COMPLETED",
+    "stage": "COMPLETED",
+    "error_code": null,
+    "attempts": 1,
+    "calls": 5,
+    "metered_calls": 5,
+    "prompt_tokens": 6548,
+    "completion_tokens": 9583,
+    "latency_ms": 31674
+  },
+  "classifications": [
+    "CONTRADICTION",
+    "NO_CONFLICT"
+  ],
+  "syntheticOnly": true,
+  "investigationId": "a1e0153c-117d-443c-841e-c7333a2fde99",
+  "checks": [
+    "browser login",
+    "four PDF uploads",
+    "immutable version history",
+    "consent",
+    "durable investigation polling",
+    "contradiction and non-conflict",
+    "verified citation retrieval",
+    "graph navigation",
+    "authenticated PDF blob viewer",
+    "confirm/dismiss/note history",
+    "desktop/mobile layouts",
+    "no browser token storage",
+    "logout content clearing",
+    "reload requires login",
+    "viewer review controls hidden",
+    "cross-department resource denial"
+  ],
+  "consoleErrors": []
+}
