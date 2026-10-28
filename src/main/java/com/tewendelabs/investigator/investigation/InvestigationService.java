@@ -19,6 +19,7 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 public class InvestigationService {
     private final JdbcTemplate jdbc;
     private final ScopedAccess scope;
+    private final InvestigationDashboardService dashboard;
 
     public record Create(@Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID baselineVersionId,
                          @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID replacementVersionId,
@@ -118,13 +119,7 @@ public class InvestigationService {
     }
 
     public Map<String, Object> findings(UUID actor, UUID id) {
-        snapshot(actor, id);
-        var rows = scope.as(actor, () -> jdbc.queryForList("select payload::text,model,prompt_version,schema_version from investigation_assessments where investigation_id=?", id));
-        if (rows.isEmpty())
-            return Map.of("complete", false, "changes", List.of(), "assessments", List.of(), "progress", progress(actor, id));
-        var row = rows.getFirst();
-        row.put("payload", JsonContract.parse((String) row.get("payload")));
-        return row;
+        return dashboard.findings(actor, id);
     }
 
     public void consent(UUID actor, UUID policy, boolean allowed) {

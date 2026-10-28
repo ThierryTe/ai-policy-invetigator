@@ -31,9 +31,11 @@ import com.tewendelabs.investigator.api.documentation.ApiDocumentation;
 @RequestMapping("/api")
 public class InvestigationController {
     private final InvestigationService service;
+    private final InvestigationDashboardService dashboard;
 
-    public InvestigationController(InvestigationService service) {
+    public InvestigationController(InvestigationService service, InvestigationDashboardService dashboard) {
         this.service = service;
+        this.dashboard = dashboard;
     }
 
     @Operation(summary = "Start a policy-change investigation", description = "Requires indexed, effective and externally consented selected versions, baseline/replacement lineage, and current replacement write permission. Processing is asynchronous.")
@@ -63,6 +65,22 @@ public class InvestigationController {
     @GetMapping("/investigations/{id}/findings")
     public Map<String, Object> findings(@Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         return service.findings(UUID.fromString(jwt.getSubject()), id);
+    }
+
+    @Operation(summary = "Read persisted policy impact graph", description = "Current access to all contributing versions is required. No inference is performed; incomplete graphs do not imply no conflict.")
+    @ApiResponse(responseCode = "200", description = "Authorized persisted graph.", content = @Content(mediaType = "application/json", schema = @Schema(implementation = InvestigationDashboardService.Graph.class)))
+    @GetMapping("/investigations/{id}/graph")
+    public InvestigationDashboardService.Graph graph(@Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        return dashboard.graph(UUID.fromString(jwt.getSubject()), id);
+    }
+
+    @Operation(summary = "Review a finding or add a note", description = "Requires REVIEWER or ADMIN in the replacement policy department and current access to all investigation documents. Appends history; preserves AI classification and evidence.")
+    @ApiResponse(responseCode = "200", description = "Current review state and append-only history.", content = @Content(mediaType = "application/json", schema = @Schema(implementation = InvestigationDashboardService.ReviewState.class)))
+    @ApiResponse(responseCode = "403", description = "Current review permission required.")
+    @PostMapping("/investigations/{id}/findings/{findingId}/reviews")
+    public InvestigationDashboardService.ReviewState review(@Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                                            @PathVariable UUID findingId, @RequestBody InvestigationDashboardService.ReviewRequest request) {
+        return dashboard.review(UUID.fromString(jwt.getSubject()), id, findingId, request);
     }
 
     public record Consent(boolean allowed) {

@@ -1,0 +1,78 @@
+{
+  "recordedAt": "2026-10-27T23:56:58.904265+00:00",
+  "scope": "Explicit local demo provisioning; existing authentication/authorization reused",
+  "demoEmail": "demo@policy-investigator.local",
+  "passwordSource": "DEMO_PASSWORD process variable; private ignored .local/demo.env generated without printing value",
+  "gates": {
+    "DEMO_USER_ENABLED": "true",
+    "APP_ENVIRONMENT": "local",
+    "enabledByDefault": false,
+    "appStartupHook": false
+  },
+  "permissions": "ADMIN in isolated demo Security and HR departments; no cross-organization/dept grants",
+  "implementation": [
+    "Existing operator psql/pgcrypto mechanism reused without altering generic provisioner",
+    "Single managed UUID identity, stable password hash on identical rerun, explicit password rotation supported",
+    "Unrelated email/UUID collisions refused transactionally",
+    "Secret passed as COPY data, never SQL literals or argv; DB output suppressed",
+    "Four existing phase3-golden PDFs exported reproducibly; no automatic uploads/consent/model calls"
+  ],
+  "tests": {
+    "javaCommand": "./mvnw -B -o -Pneural-embeddings,database-tests verify",
+    "javaTests": 59,
+    "postgresqlBacked": 36,
+    "javaFailures": 0,
+    "javaErrors": 0,
+    "javaSkipped": 0,
+    "pythonCommand": "python3 -B -m unittest discover -s scripts/tests -v",
+    "pythonTests": 20,
+    "pythonResult": "PASS",
+    "realBrowserWorkflow": "PASS",
+    "browserCommand": "Existing frontend e2e/workflow.spec.ts copied into a temporary runner; demo credentials provided in an ignored private fixture directory; no frontend repository edits",
+    "browserElapsedSeconds": 55.9
+  },
+  "realInvestigation": {
+    "id": "a1e0153c-117d-443c-841e-c7333a2fde99",
+    "state": "COMPLETED",
+    "stage": "COMPLETED",
+    "error_code": null,
+    "attempts": 1,
+    "calls": 5,
+    "metered_calls": 5,
+    "prompt_tokens": 6548,
+    "completion_tokens": 9583,
+    "latency_ms": 31674
+  },
+  "observedClassifications": [
+    "CONTRADICTION",
+    "NO_CONFLICT"
+  ],
+  "realModel": "muse-spark-1.3",
+  "productionAuthenticationChanged": false,
+  "applicationPropertiesChanged": false,
+  "deploymentChanged": false,
+  "pomChanged": false,
+  "frontendChanged": false,
+  "gitCommandsRun": false,
+  "existingApplicationAndGenericProvisionerHashesUnchanged": {
+    "src/main/java/com/tewendelabs/investigator/security/AuthController.java": "e2516cbff2fa1d5ae0f9a13f4e31f913efd61194cbad883a7f1c95d3a84820d0",
+    "src/main/java/com/tewendelabs/investigator/security/SecurityConfiguration.java": "35295d19ca05c46ab607cb4a3c8515ebda4e0d18e94807a4c341cc9188876fe1",
+    "src/main/resources/application.properties": "8542c2c69141f91e44147ae0891649b0b53495a27854fdea0771f16a2f875f5a",
+    "scripts/provision_user.sql": "1a0a3e63e28a49a39a06c81815c2afadcef3ae71313173314010be94eb278855",
+    "compose.yaml": "f412f5945d4c85fbdf000b3943d0718889f4ac8de6fe5f877be4f2ac0922adb8",
+    "pom.xml": "2acf563b53f8c0f7c277d391fbda0e63efa5a4a9d2117fba63a7564250c2db74"
+  },
+  "loginUrls": {
+    "docker": "http://127.0.0.1:18081",
+    "angularDevServer": "http://127.0.0.1:4200"
+  },
+  "crossRepositoryWork": "Start/reuse existing frontend Compose or ng serve. No frontend source change required.",
+  "limits": [
+    "Local operator seed only, not a production registration mechanism",
+    "Persisted demo user remains a normal account after enable flag is unset; explicit operator deactivation supported",
+    "Actual Meta availability and normal budgets remain required for a fresh investigation",
+    "Passwords or private environment contents are not included in this report"
+  ],
+  "finalDemoLoginAndMembershipsVerified": true,
+  "verificationOnlyAccountsDisabled": true
+}

@@ -1,0 +1,5 @@
+# Keep the base loopback database port for host-based local development only.
+# Removing publication also blocks cross-bridge access to the published container port.
+services:
+  postgres:
+    ports: !reset []

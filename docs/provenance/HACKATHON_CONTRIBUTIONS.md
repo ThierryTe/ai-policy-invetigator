@@ -136,3 +136,52 @@ supports host tooling. No reference code, model variant, credentials or Git hist
 was imported, and no model weights are committed. Deployment tests use real artifact
 downloads and ONNX inference; controlled Python fixtures test failure paths separately.
 See docs/verification/model-volume-results.json for actual checks and scope.
+
+## Phase 4 hackathon MVP — October 27, 2026
+
+Authorized after the owner's first commit/push. Newly authored work: an
+investigation-scoped persisted graph projection, append-only human review events
+and forced-RLS migration V6, review role/current-access checks, additive findings
+review state, OpenAPI contracts, ten synthetic golden cases, a real-provider
+API evaluation runner and scoring safety tests. The graph rechecks stored citations
+and emits only persisted version/requirement/alignment/assessment relationships.
+Human actions preserve original AI classifications, source evidence and prior decisions.
+
+No further code was imported from either reference repository. The existing four
+allowlisted imports and source commit records remain unchanged. Deployment files,
+provider/model configuration, embeddings, old migrations and historical verification
+records were preserved. Real evaluation failures are retained alongside targeted
+retries; no fixture-provider result is claimed as real inference. See
+`docs/PHASE4.md`, `docs/verification/phase4-results.json` and
+`docs/provenance/phase4-files.csv` for actual outcomes and paths. No Git command
+was run; the owner retains all Git operations. Angular/Phase 5 has not started.
+
+## Explicit local demo login — October 28, 2026
+
+Added an operator-only, opt-in demo provisioner and transactional SQL seed using the
+existing psql/pgcrypto provisioning approach. New work supplies stable isolated demo
+identities, idempotence/password rotation/collision protection, COPY-based secret
+transport, environment/password validation, reproducible export of the existing
+synthetic golden PDFs, tests and local instructions. Existing fixture-generation
+utilities and JWT/BCrypt/current-role mechanisms are reused, not claimed as new.
+No registration endpoint, application startup seed, runtime privileges, security
+filter, production configuration or frontend source was changed. No code was
+imported from the original reference repositories and no Git command was run.
+Private demo credentials are ignored, never printed and excluded from artifacts.
+See `docs/DEMO.md`, `docs/verification/demo-setup-results.json` and
+`docs/provenance/demo-setup-files.csv` for actual scope, evidence and changed files.
+
+
+## Phase 6A — Docker audit and deployment preparation — October 28, 2026
+
+New work in this increment: restart policies for PostgreSQL/Spring Boot, a dedicated
+project-scoped database bridge, a minimal frontend access-log privacy patch, audit
+evidence and deployment instructions. The frontend patch is delivered for owner
+application because that repository is outside this session's writable workspace;
+it was verified in a temporary build, not applied to the frontend working copy.
+Existing Dockerfiles, model initializer, pinned artifacts, authentication, domain,
+Angular implementation, provider behavior and database migrations are pre-existing
+and are not claimed as new. No reference repository code, credentials or Git history
+was imported. No Git command, VPS deployment or new Meta inference was performed.
+See `docs/PHASE6A.md`, `docs/verification/phase6a-results.json` and
+`docs/provenance/phase6a-files.csv`.

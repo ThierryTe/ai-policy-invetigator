@@ -1,0 +1,983 @@
+{
+  "phase": "6A",
+  "recordedAt": "2026-10-28T10:36:58.213348+00:00",
+  "result": "LOCAL_VERIFICATION_PASSED_FRONTEND_SOURCE_PATCH_PENDING",
+  "scope": {
+    "branches": "develop in both working copies",
+    "gitCommandsExecuted": false,
+    "referenceRepositoriesModified": false,
+    "vpsAccessed": false,
+    "newMetaCalls": 0,
+    "backendDomainSecurityProviderMigrationsChanged": false,
+    "originalFrontendChanged": false,
+    "frontendVerification": "temporary public-source copy plus supplied Nginx patch; original frontend container not replaced"
+  },
+  "confirmedFindings": [
+    {
+      "severity": "MEDIUM",
+      "finding": "No PostgreSQL/backend restart policy",
+      "status": "APPLIED",
+      "files": [
+        "compose.yaml"
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "finding": "Frontend PostgreSQL network access; even private IP reachable when database port published",
+      "status": "APPLIED_FOR_PRODUCTION",
+      "files": [
+        "compose.yaml",
+        "compose.production.yaml"
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "finding": "Nginx default SPA access log includes policy-search query strings",
+      "status": "PATCH_VERIFIED_NOT_APPLIED_TO_FRONTEND_WORKING_COPY",
+      "files": [
+        "../ai-policy-investigator-frontend/deploy/default.conf.template",
+        "docs/deployment/phase6a-frontend.patch"
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "finding": "Login limiter shares a five-per-minute socket-peer allowance behind Nginx",
+      "status": "PRESERVED_AND_DOCUMENTED_REQUIRES_REAL_PROXY_TRUST_CONFIGURATION"
+    }
+  ],
+  "tests": {
+    "java": {
+      "command": "./mvnw -B -o -Pneural-embeddings,database-tests verify",
+      "result": "PASS",
+      "totals": {
+        "tests": 59,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "postgresBackedTests": 36,
+      "suites": [
+        {
+          "class": "com.tewendelabs.investigator.PdfAndVectorTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.SecurityDatabaseTest",
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.config.ApplicationEnvironmentTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.config.DotenvConfigurationTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.documentation.DefaultOpenApiTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.documentation.LocalOpenApiTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.documentation.ProductionOpenApiTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.documentation.ProductionProfileSafetyTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.investigation.StructuredValidationTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.provider.MetaHttpTransportTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.security.JwtValidationTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.security.LoginThrottleTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "python": {
+      "command": "python3 -B -m unittest discover -s scripts/tests -v",
+      "result": "PASS",
+      "tests": 20
+    },
+    "frontendUnit": {
+      "command": "npm test",
+      "workspace": "temporary copy; unchanged Angular source/tests",
+      "result": "PASS",
+      "tests": 29,
+      "testFiles": 6
+    },
+    "builds": {
+      "backend": "PASS",
+      "modelInitializer": "PASS",
+      "frontendPatchedTemporarySource": "PASS",
+      "commands": [
+        "docker compose --env-file .env --profile app build",
+        "docker compose build frontend (temporary patched frontend source)"
+      ]
+    },
+    "browser": {
+      "command": "E2E_BASE_URL=http://127.0.0.1:18082 E2E_DATA_DIR=<private existing demo fixtures> npx playwright test e2e/visual.spec.ts",
+      "result": "PASS",
+      "tests": 1,
+      "productionConfigurationVerified": true,
+      "visual": {
+        "recordedAt": "2026-10-28T10:34:16.012Z",
+        "baseUrl": "http://127.0.0.1:18082",
+        "desktop": {
+          "width": 1536,
+          "height": 1024
+        },
+        "mobile": {
+          "width": 390,
+          "height": 844,
+          "horizontalOverflow": false
+        },
+        "globalStylesApplied": true,
+        "pdfBlobViewer": true,
+        "cspViolations": [],
+        "pageErrors": [],
+        "screenshots": [
+          "screenshots/desktop-real-investigation.png",
+          "screenshots/mobile-real-investigation.png",
+          "screenshots/pdf-real-source.png"
+        ]
+      },
+      "initialFailedAttempts": [
+        {
+          "cause": "Browser login was rate limited after intentional spoofed-header throttle test",
+          "resolution": "Allowed window expiry; preserved limiter"
+        },
+        {
+          "cause": "Browser overlapped local Docker network recreation/startup; PostgreSQL DNS aliases lost during network recreation",
+          "resolution": "Forced local container recreation; reran after healthy"
+        }
+      ]
+    },
+    "offlineModelInit": {
+      "command": "docker run --rm --network none --read-only --tmpfs /tmp:rw,noexec,nosuid,size=32m --memory 192m -v ai-policy-investigator_embedding_models:/models -v ai-policy-investigator_native_cache:/runtime ai-policy-investigator-model-init",
+      "result": "PASS",
+      "cachedArtifacts": 2,
+      "downloadedArtifacts": 0,
+      "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+      "dimensions": 384
+    },
+    "offlineEmbedding": {
+      "result": "PASS",
+      "network": "none",
+      "user": "10001:10001",
+      "rootFilesystemReadOnly": true,
+      "modelsReadOnly": true,
+      "syntheticVectors": 2,
+      "dimensions": 384
+    },
+    "automaticBackendRestart": {
+      "beforeCount": 0,
+      "afterCount": 1,
+      "state": "running",
+      "health": "healthy"
+    }
+  },
+  "composeValidation": {
+    "base": {
+      "valid": true,
+      "postgresPublishedPorts": [
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 5432,
+          "published": "5546",
+          "protocol": "tcp"
+        }
+      ],
+      "backendPublishedPorts": [
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 8080,
+          "published": "18080",
+          "protocol": "tcp"
+        }
+      ],
+      "environment": "production",
+      "restartPolicies": {
+        "backend": "unless-stopped",
+        "model-init": "no",
+        "postgres": "unless-stopped"
+      },
+      "databaseNetworkIsSeparate": true
+    },
+    "local": {
+      "valid": true,
+      "postgresPublishedPorts": [
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 5432,
+          "published": "5546",
+          "protocol": "tcp"
+        }
+      ],
+      "backendPublishedPorts": [
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 8080,
+          "published": "18080",
+          "protocol": "tcp"
+        }
+      ],
+      "environment": "local",
+      "restartPolicies": {
+        "backend": "unless-stopped",
+        "model-init": "no",
+        "postgres": "unless-stopped"
+      },
+      "databaseNetworkIsSeparate": true
+    },
+    "production": {
+      "valid": true,
+      "postgresPublishedPorts": [],
+      "backendPublishedPorts": [
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 8080,
+          "published": "18080",
+          "protocol": "tcp"
+        }
+      ],
+      "environment": "production",
+      "restartPolicies": {
+        "backend": "unless-stopped",
+        "model-init": "no",
+        "postgres": "unless-stopped"
+      },
+      "databaseNetworkIsSeparate": true
+    }
+  },
+  "preFix": {
+    "images": [
+      {
+        "service": "backend",
+        "id": "sha256:4b048ec6d176a38c75764abe903b401f1dc524284a99381a1f4f79c20b08a550",
+        "sizeBytes": 332329050,
+        "architecture": "amd64"
+      },
+      {
+        "service": "model-init",
+        "id": "sha256:57eea39039730c87c08ec2b5b4a51980c9fe2650dfa3bf62e1b4c6b3c6350708",
+        "sizeBytes": 45917439,
+        "architecture": "amd64"
+      },
+      {
+        "service": "postgres",
+        "id": "sha256:a132765ec351c65111b5b675928a3a0515a466a40f97277329db8b8209ad8bc9",
+        "sizeBytes": 156338714,
+        "architecture": "amd64"
+      },
+      {
+        "service": "frontend",
+        "id": "sha256:b2849558d6f50a0e6bbedd77d69bc7ae13d32d9fb403e19f8b7283bb3cc465c1",
+        "sizeBytes": 25719157,
+        "architecture": "amd64"
+      }
+    ],
+    "spaQueryWrittenToAccessLog": true,
+    "frontendCanConnectToDatabase": true
+  },
+  "productionRuntime": {
+    "recordedAt": "2026-10-28T10:33:28.101126+00:00",
+    "vpsAccessed": false,
+    "newMetaCalls": 0,
+    "runtime": [
+      {
+        "service": "postgres",
+        "state": "running",
+        "health": "healthy",
+        "exitCode": 0,
+        "restart": "unless-stopped",
+        "user": "",
+        "rootfsReadOnly": false,
+        "ports": {
+          "5432/tcp": null
+        },
+        "networks": [
+          "ai-policy-investigator_database"
+        ],
+        "mounts": [
+          {
+            "path": "/docker-entrypoint-initdb.d/01-investigator.sh",
+            "rw": false,
+            "name": null
+          },
+          {
+            "path": "/var/lib/postgresql/data",
+            "rw": true,
+            "name": "ai-policy-investigator_investigator_data"
+          }
+        ]
+      },
+      {
+        "service": "backend",
+        "state": "running",
+        "health": "healthy",
+        "exitCode": 0,
+        "restart": "unless-stopped",
+        "user": "10001:10001",
+        "rootfsReadOnly": true,
+        "ports": {
+          "8080/tcp": [
+            {
+              "HostIp": "127.0.0.1",
+              "HostPort": "18080"
+            }
+          ]
+        },
+        "networks": [
+          "ai-policy-investigator_database",
+          "ai-policy-investigator_default"
+        ],
+        "mounts": [
+          {
+            "path": "/models",
+            "rw": false,
+            "name": "ai-policy-investigator_embedding_models"
+          },
+          {
+            "path": "/runtime",
+            "rw": true,
+            "name": "ai-policy-investigator_native_cache"
+          }
+        ]
+      },
+      {
+        "service": "model-init",
+        "state": "exited",
+        "health": null,
+        "exitCode": 0,
+        "restart": "no",
+        "user": "",
+        "rootfsReadOnly": true,
+        "ports": {},
+        "networks": [
+          "ai-policy-investigator_default"
+        ],
+        "mounts": [
+          {
+            "path": "/models",
+            "rw": true,
+            "name": "ai-policy-investigator_embedding_models"
+          },
+          {
+            "path": "/runtime",
+            "rw": true,
+            "name": "ai-policy-investigator_native_cache"
+          }
+        ]
+      }
+    ],
+    "databaseConnectionFromFrontendBlocked": true,
+    "databaseIpConnectionFromFrontendBlocked": true,
+    "databaseInternal": false,
+    "loopbackDatabasePortReachable": false,
+    "http": [
+      {
+        "path": "/healthz",
+        "status": 200,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      },
+      {
+        "path": "/investigations/a1e0153c-117d-443c-841e-c7333a2fde99",
+        "status": 200,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      },
+      {
+        "path": "/api/policies",
+        "status": 401,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      },
+      {
+        "path": "/api/auth/me",
+        "status": 401,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      },
+      {
+        "path": "/v3/api-docs",
+        "status": 404,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      },
+      {
+        "path": "/v3/api-docs.yaml",
+        "status": 404,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      },
+      {
+        "path": "/swagger-ui/index.html",
+        "status": 404,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      },
+      {
+        "path": "/.env",
+        "status": 403,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      }
+    ],
+    "spaQueryWrittenToAccessLogAfterPatch": false,
+    "loginStatus": 200,
+    "cookieIssued": false,
+    "identityStatus": 200,
+    "persistedInvestigation": {
+      "status": 200,
+      "state": "COMPLETED"
+    },
+    "findingsStatus": 200,
+    "classifications": [
+      "CONTRADICTION",
+      "NO_CONFLICT"
+    ],
+    "citationsChecked": 7,
+    "allCitationsMatch": true,
+    "graphStatus": 200,
+    "graphNodes": 12,
+    "authorizedPoliciesStatus": 200,
+    "versionHistoryStatus": 200,
+    "authorizedPdf": {
+      "status": 200,
+      "isPdf": true,
+      "noStore": true
+    },
+    "realOnnxSearch": {
+      "status": 200,
+      "hitCount": 1
+    },
+    "backendDocumentation": [
+      {
+        "path": "/v3/api-docs",
+        "anonymous": 401,
+        "authenticated": 403
+      },
+      {
+        "path": "/swagger-ui/index.html",
+        "anonymous": 401,
+        "authenticated": 403
+      }
+    ],
+    "invalidTokenStatus": 401,
+    "spoofedForwardingLoginStatuses": [
+      401,
+      401,
+      401,
+      401,
+      429,
+      429
+    ]
+  },
+  "baseLocalRuntime": {
+    "recordedAt": "2026-10-28T10:29:23.705597+00:00",
+    "vpsAccessed": false,
+    "newMetaCalls": 0,
+    "runtime": [
+      {
+        "service": "postgres",
+        "state": "running",
+        "health": "healthy",
+        "exitCode": 0,
+        "restart": "unless-stopped",
+        "user": "",
+        "rootfsReadOnly": false,
+        "ports": {
+          "5432/tcp": [
+            {
+              "HostIp": "127.0.0.1",
+              "HostPort": "5546"
+            }
+          ]
+        },
+        "networks": [
+          "ai-policy-investigator_database"
+        ],
+        "mounts": [
+          {
+            "path": "/var/lib/postgresql/data",
+            "rw": true,
+            "name": "ai-policy-investigator_investigator_data"
+          },
+          {
+            "path": "/docker-entrypoint-initdb.d/01-investigator.sh",
+            "rw": false,
+            "name": null
+          }
+        ]
+      },
+      {
+        "service": "backend",
+        "state": "running",
+        "health": "healthy",
+        "exitCode": 0,
+        "restart": "unless-stopped",
+        "user": "10001:10001",
+        "rootfsReadOnly": true,
+        "ports": {
+          "8080/tcp": [
+            {
+              "HostIp": "127.0.0.1",
+              "HostPort": "18080"
+            }
+          ]
+        },
+        "networks": [
+          "ai-policy-investigator_database",
+          "ai-policy-investigator_default"
+        ],
+        "mounts": [
+          {
+            "path": "/models",
+            "rw": false,
+            "name": "ai-policy-investigator_embedding_models"
+          },
+          {
+            "path": "/runtime",
+            "rw": true,
+            "name": "ai-policy-investigator_native_cache"
+          }
+        ]
+      },
+      {
+        "service": "model-init",
+        "state": "exited",
+        "health": null,
+        "exitCode": 0,
+        "restart": "no",
+        "user": "",
+        "rootfsReadOnly": true,
+        "ports": {},
+        "networks": [
+          "ai-policy-investigator_default"
+        ],
+        "mounts": [
+          {
+            "path": "/models",
+            "rw": true,
+            "name": "ai-policy-investigator_embedding_models"
+          },
+          {
+            "path": "/runtime",
+            "rw": true,
+            "name": "ai-policy-investigator_native_cache"
+          }
+        ]
+      }
+    ],
+    "databaseConnectionFromFrontendBlocked": true,
+    "databaseIpConnectionFromFrontendBlocked": false,
+    "databaseInternal": false,
+    "loopbackDatabasePortReachable": true,
+    "http": [
+      {
+        "path": "/healthz",
+        "status": 200,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      },
+      {
+        "path": "/investigations/a1e0153c-117d-443c-841e-c7333a2fde99",
+        "status": 200,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      },
+      {
+        "path": "/api/policies",
+        "status": 401,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      },
+      {
+        "path": "/api/auth/me",
+        "status": 401,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      },
+      {
+        "path": "/v3/api-docs",
+        "status": 404,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      },
+      {
+        "path": "/v3/api-docs.yaml",
+        "status": 404,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      },
+      {
+        "path": "/swagger-ui/index.html",
+        "status": 404,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      },
+      {
+        "path": "/.env",
+        "status": 403,
+        "noStore": true,
+        "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "noSniff": true
+      }
+    ],
+    "spaQueryWrittenToAccessLogAfterPatch": false,
+    "loginStatus": 200,
+    "cookieIssued": false,
+    "identityStatus": 200,
+    "persistedInvestigation": {
+      "status": 200,
+      "state": "COMPLETED"
+    },
+    "findingsStatus": 200,
+    "classifications": [
+      "CONTRADICTION",
+      "NO_CONFLICT"
+    ],
+    "citationsChecked": 7,
+    "allCitationsMatch": true,
+    "graphStatus": 200,
+    "graphNodes": 12,
+    "authorizedPoliciesStatus": 200,
+    "versionHistoryStatus": 200,
+    "authorizedPdf": {
+      "status": 200,
+      "isPdf": true,
+      "noStore": true
+    },
+    "realOnnxSearch": {
+      "status": 200,
+      "hitCount": 1
+    },
+    "backendDocumentation": [
+      {
+        "path": "/v3/api-docs",
+        "anonymous": 401,
+        "authenticated": 403
+      },
+      {
+        "path": "/swagger-ui/index.html",
+        "anonymous": 401,
+        "authenticated": 403
+      }
+    ],
+    "invalidTokenStatus": 401,
+    "spoofedForwardingLoginStatuses": [
+      401,
+      401,
+      401,
+      401,
+      429,
+      429
+    ]
+  },
+  "imagesAndLogScan": {
+    "images": [
+      {
+        "name": "ai-policy-investigator-backend",
+        "id": "sha256:8f0eb9cfff01c0c34599bcbc53968f3f41534bed8b8347b77f921b6ca1964e99",
+        "sizeBytes": 332329050,
+        "architecture": "amd64",
+        "configuredUser": "10001:10001",
+        "knownSecretInImageEnvironmentOrHistory": false,
+        "secretEnvKeys": []
+      },
+      {
+        "name": "ai-policy-investigator-model-init",
+        "id": "sha256:9dd0581ba707eabf243313fc9ee546b789b2f6cfa88a06b1fcf34cf9d0ca86c8",
+        "sizeBytes": 45917439,
+        "architecture": "amd64",
+        "configuredUser": null,
+        "knownSecretInImageEnvironmentOrHistory": false,
+        "secretEnvKeys": []
+      },
+      {
+        "name": "ai-policy-investigator-ui-frontend",
+        "id": "sha256:e24d87e7d0a51bf13e4038bc560cccdbbd156ef64e9c574e41eca1fdb5bc09aa",
+        "sizeBytes": 25722367,
+        "architecture": "amd64",
+        "configuredUser": "101",
+        "knownSecretInImageEnvironmentOrHistory": false,
+        "secretEnvKeys": []
+      },
+      {
+        "name": "pgvector/pgvector:0.8.0-pg16",
+        "id": "sha256:a132765ec351c65111b5b675928a3a0515a466a40f97277329db8b8209ad8bc9",
+        "sizeBytes": 156338714,
+        "architecture": "amd64",
+        "configuredUser": null,
+        "knownSecretInImageEnvironmentOrHistory": false,
+        "secretEnvKeys": []
+      }
+    ],
+    "runtimeTools": {
+      "ai-policy-investigator-backend": [
+        "java"
+      ],
+      "ai-policy-investigator-ui-frontend": [
+        "nginx"
+      ]
+    },
+    "logs": [
+      {
+        "service": "backend",
+        "knownSecretMatch": false,
+        "jwtShapedValue": false,
+        "pdfBodyMarker": false
+      },
+      {
+        "service": "postgres",
+        "knownSecretMatch": false,
+        "jwtShapedValue": false,
+        "pdfBodyMarker": false
+      }
+    ]
+  },
+  "secretChecks": {
+    "knownSecretCountChecked": 6,
+    "contexts": {
+      "backend": {
+        "fileCount": 83,
+        "sensitivePaths": [],
+        "knownSecretMatches": []
+      },
+      "frontend": {
+        "fileCount": 41,
+        "sensitivePaths": [],
+        "knownSecretMatches": []
+      }
+    },
+    "candidateSourceMatches": [],
+    "jar": {
+      "ownFiles": 90,
+      "dotenvResources": [],
+      "knownSecretMatches": []
+    },
+    "privateEnvFilesOwnerOnly": {
+      ".env": true,
+      ".local/runtime.env": true,
+      ".local/demo.env": true
+    }
+  },
+  "readOnlyGitIndexChecks": {
+    "aI-policy-investigator-backend": {
+      "indexVersion": 2,
+      "trackedFiles": 108,
+      "sensitivePathsTracked": [],
+      "developBranch": true
+    },
+    "ai-policy-investigator-frontend": {
+      "indexVersion": 2,
+      "trackedFiles": 82,
+      "sensitivePathsTracked": [],
+      "developBranch": true
+    }
+  },
+  "additionalRuntimeChecks": {
+    "automaticBackendRestart": {
+      "beforeCount": 0,
+      "afterCount": 1,
+      "state": "running",
+      "health": "healthy"
+    },
+    "postgresProcessUsers": [],
+    "compose": {
+      "base": {
+        "valid": true,
+        "postgresPublishedPorts": [
+          {
+            "mode": "ingress",
+            "host_ip": "127.0.0.1",
+            "target": 5432,
+            "published": "5546",
+            "protocol": "tcp"
+          }
+        ],
+        "backendPublishedPorts": [
+          {
+            "mode": "ingress",
+            "host_ip": "127.0.0.1",
+            "target": 8080,
+            "published": "18080",
+            "protocol": "tcp"
+          }
+        ],
+        "environment": "production",
+        "restartPolicies": {
+          "backend": "unless-stopped",
+          "model-init": "no",
+          "postgres": "unless-stopped"
+        },
+        "databaseNetworkIsSeparate": true
+      },
+      "local": {
+        "valid": true,
+        "postgresPublishedPorts": [
+          {
+            "mode": "ingress",
+            "host_ip": "127.0.0.1",
+            "target": 5432,
+            "published": "5546",
+            "protocol": "tcp"
+          }
+        ],
+        "backendPublishedPorts": [
+          {
+            "mode": "ingress",
+            "host_ip": "127.0.0.1",
+            "target": 8080,
+            "published": "18080",
+            "protocol": "tcp"
+          }
+        ],
+        "environment": "local",
+        "restartPolicies": {
+          "backend": "unless-stopped",
+          "model-init": "no",
+          "postgres": "unless-stopped"
+        },
+        "databaseNetworkIsSeparate": true
+      },
+      "production": {
+        "valid": true,
+        "postgresPublishedPorts": [],
+        "backendPublishedPorts": [
+          {
+            "mode": "ingress",
+            "host_ip": "127.0.0.1",
+            "target": 8080,
+            "published": "18080",
+            "protocol": "tcp"
+          }
+        ],
+        "environment": "production",
+        "restartPolicies": {
+          "backend": "unless-stopped",
+          "model-init": "no",
+          "postgres": "unless-stopped"
+        },
+        "databaseNetworkIsSeparate": true
+      }
+    },
+    "untrustedOrigin": {
+      "status": 401,
+      "allowOrigin": null
+    },
+    "backendLogs": {
+      "downloadStarted": false,
+      "started": true,
+      "pdfBodyMarker": false
+    },
+    "postgresProcessIdentity": {
+      "pid1Uid": "Uid:\t999\t999\t999\t999",
+      "postgresIdentity": "uid=999(postgres) gid=999(postgres) groups=999(postgres),101(ssl-cert)"
+    }
+  },
+  "pendingFrontendPatch": {
+    "file": "docs/deployment/phase6a-frontend.patch",
+    "target": "deploy/default.conf.template",
+    "beforeSha256": "44bae78f320ab27179c98312d891b067a783c9c3eba4741be992e12a9456c517",
+    "afterSha256": "c9ad7a1023837d5e2fb1d2bb5782c85a6eb95808a3ea9a1220d4f4fe0bfc663c",
+    "reason": "Frontend repository is outside permitted writable roots; direct patch was rejected by workspace policy",
+    "dryRunAgainstOriginalTemplate": "PASS"
+  },
+  "limitations": [
+    "VPS access, domains, existing proxy configuration and trusted proxy addresses not supplied; no VPS deployment or public TLS/firewall checks",
+    "Frontend working copy still requires supplied log patch before production build",
+    "No complete Git-history secret audit or image CVE scan",
+    "No physical daemon/host reboot test or ARM validation",
+    "Fresh VPS authorized account provisioning and backup/restore remain owner prerequisites",
+    "Base local PostgreSQL loopback publication intentionally remains; production override is required to remove host publication",
+    "internal:true was tested then removed after breaking host database access; final bridge isolation plus production port removal were tested",
+    "Historical real Muse results were re-read and verified; no new inference or accuracy claim"
+  ],
+  "restoredLocalState": {
+    "baseLocalDatabasePortReachable": true,
+    "backend": {
+      "state": "running",
+      "health": "healthy",
+      "restart": "unless-stopped"
+    },
+    "postgres": {
+      "state": "running",
+      "health": "healthy",
+      "restart": "unless-stopped"
+    },
+    "originalFrontendHealthStatus": 200,
+    "temporaryFrontendContainerRemoved": true
+  }
+}

@@ -28,7 +28,7 @@ public class DatabaseSafetyCheck implements ApplicationRunner {
         Boolean unsafe = jdbc.queryForObject("""
                 select exists(select 1 from pg_roles where rolname=current_user and (rolsuper or rolbypassrls))
                  or exists(select 1 from pg_class c join pg_roles r on r.oid=c.relowner
-                           where c.relnamespace='public'::regnamespace and c.relname in ('policies','policy_versions','document_pages','chunks','investigations','requirement_extractions','investigation_assessments')
+                           where c.relnamespace='public'::regnamespace and c.relname in ('policies','policy_versions','document_pages','chunks','investigations','requirement_extractions','investigation_assessments','finding_reviews')
                             and (r.rolname=current_user or pg_has_role(current_user,r.oid,'MEMBER') or r.rolsuper or r.rolbypassrls))
                  or exists(select 1 from pg_proc f join pg_roles r on r.oid=f.proowner
                            where f.pronamespace='public'::regnamespace and f.prosecdef
@@ -37,9 +37,9 @@ public class DatabaseSafetyCheck implements ApplicationRunner {
                            and (r.rolsuper or r.rolbypassrls))
                 """, Boolean.class);
         Boolean enforced = jdbc.queryForObject("""
-                select count(*)=7 and bool_and(relrowsecurity and relforcerowsecurity)
+                select count(*)=8 and bool_and(relrowsecurity and relforcerowsecurity)
                 from pg_class where relnamespace='public'::regnamespace
-                  and relname in ('policies','policy_versions','document_pages','chunks','investigations','requirement_extractions','investigation_assessments')
+                  and relname in ('policies','policy_versions','document_pages','chunks','investigations','requirement_extractions','investigation_assessments','finding_reviews')
                 """, Boolean.class);
         if (!Boolean.TRUE.equals(enforced) || !Boolean.FALSE.equals(unsafe))
             throw new IllegalStateException("Database roles do not satisfy the RLS security boundary");

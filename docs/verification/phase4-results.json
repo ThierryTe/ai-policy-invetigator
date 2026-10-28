@@ -1,0 +1,334 @@
+{
+  "recordedAt": "2026-10-27T19:52:14.745868+00:00",
+  "phase": 4,
+  "scope": "Hackathon MVP: persisted graph, append-only reviews, ten synthetic cases, Angular API contracts",
+  "workingFeatures": [
+    "Authorized persisted graph with current citation checks",
+    "Confirm, Dismiss, Add Note with immutable AI output and append-only history",
+    "Current reviewer identity/role/scope enforced in API and forced RLS",
+    "Additive review state in findings and local OpenAPI schemas",
+    "Real Muse evaluation through upload, consent, durable worker and evidence APIs"
+  ],
+  "tests": {
+    "java": {
+      "command": "./mvnw -B -o -Pneural-embeddings,database-tests verify",
+      "result": "PASS",
+      "tests": 57,
+      "postgresqlBacked": 34,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        {
+          "name": "com.tewendelabs.investigator.config.ApplicationEnvironmentTest",
+          "tests": 2
+        },
+        {
+          "name": "com.tewendelabs.investigator.investigation.StructuredValidationTest",
+          "tests": 4
+        },
+        {
+          "name": "com.tewendelabs.investigator.provider.MetaHttpTransportTest",
+          "tests": 2
+        },
+        {
+          "name": "com.tewendelabs.investigator.config.DotenvConfigurationTest",
+          "tests": 7
+        },
+        {
+          "name": "com.tewendelabs.investigator.SecurityDatabaseTest",
+          "tests": 28
+        },
+        {
+          "name": "com.tewendelabs.investigator.documentation.LocalOpenApiTest",
+          "tests": 3
+        },
+        {
+          "name": "com.tewendelabs.investigator.documentation.ProductionOpenApiTest",
+          "tests": 1
+        },
+        {
+          "name": "com.tewendelabs.investigator.PdfAndVectorTest",
+          "tests": 5
+        },
+        {
+          "name": "com.tewendelabs.investigator.documentation.DefaultOpenApiTest",
+          "tests": 1
+        },
+        {
+          "name": "com.tewendelabs.investigator.documentation.ProductionProfileSafetyTest",
+          "tests": 1
+        },
+        {
+          "name": "com.tewendelabs.investigator.security.JwtValidationTest",
+          "tests": 2
+        },
+        {
+          "name": "com.tewendelabs.investigator.security.LoginThrottleTest",
+          "tests": 1
+        }
+      ],
+      "earlierFailures": [
+        "Stale OpenAPI path list after adding two routes; corrected",
+        "Missing explicit 200 OpenAPI response annotations; corrected"
+      ]
+    },
+    "python": {
+      "command": "python3 -B -m unittest discover -s scripts/tests -v",
+      "result": "PASS",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0
+    },
+    "packaging": {
+      "V6MigrationAndGraphServicePresent": true,
+      "dotenvOrCredentialFilesInJar": false
+    }
+  },
+  "securityVerification": {
+    "currentScopeRequiredForGraphAndReviews": true,
+    "crossDepartmentDenied": true,
+    "wrongDepartmentReviewerWithReadGrantDenied": true,
+    "analystAndViewerReviewDenied": true,
+    "forgedFindingRejectedByApiAndSql": true,
+    "roleAndMembershipRevocationEnforced": true,
+    "runtimeReviewUpdateDeleteDenied": true,
+    "originalAiOutputUnchangedAfterReviews": true,
+    "openApiDoesNotInvokeProviders": true,
+    "productionDocsDenied": true,
+    "changedPublicFilesCheckedForConfiguredLongSecretValues": true,
+    "gitAndDockerExclusionRulesUnchanged": true,
+    "historicalEvidenceDeploymentConfigAndMigrationsUnchangedFiles": 27,
+    "allowlistedImportsUnchanged": 4
+  },
+  "realEvaluation": {
+    "provider": "Meta Model API",
+    "model": "muse-spark-1.3",
+    "syntheticOnly": true,
+    "dataset": "evaluation/phase4-golden.json",
+    "initialRun": {
+      "report": "docs/verification/phase4-evaluation.json",
+      "metrics": {
+        "cases": 10,
+        "matched": 6,
+        "errors": 4,
+        "contradictionTruePositives": 2,
+        "contradictionFalsePositives": 0,
+        "contradictionFalseNegatives": 1,
+        "contradictionPrecision": 1.0,
+        "contradictionRecall": 0.6666666666666666,
+        "citationInstances": 65,
+        "verifiedCitationInstances": 65,
+        "citationCorrectness": 1.0,
+        "calls": 21,
+        "metered_calls": 21,
+        "prompt_tokens": 25577,
+        "completion_tokens": 45136,
+        "latency_ms": 199143
+      },
+      "errorDescription": "One four-procedure exception job stopped with INCOMPLETE_PROVIDER_OUTPUT; all four associated cases scored ERROR, no assessments published."
+    },
+    "targetedRetry": {
+      "command": "python3 scripts/evaluate_phase4.py --start-backend --group explicit-exception --max-procedures 2",
+      "report": "docs/verification/phase4-explicit-exception-evaluation.json",
+      "metrics": {
+        "cases": 4,
+        "matched": 3,
+        "errors": 0,
+        "contradictionTruePositives": 1,
+        "contradictionFalsePositives": 1,
+        "contradictionFalseNegatives": 0,
+        "contradictionPrecision": 0.5,
+        "contradictionRecall": 1.0,
+        "citationInstances": 54,
+        "verifiedCitationInstances": 54,
+        "citationCorrectness": 1.0,
+        "calls": 10,
+        "metered_calls": 10,
+        "prompt_tokens": 12782,
+        "completion_tokens": 23005,
+        "latency_ms": 97429
+      },
+      "changes": "Same golden labels/model/provider limits; smaller procedure batches only."
+    },
+    "totalActualUsageIncludingInitialErrors": {
+      "calls": 31,
+      "metered_calls": 31,
+      "prompt_tokens": 38359,
+      "completion_tokens": 68141,
+      "latency_ms": 296572,
+      "citationInstances": 119,
+      "verifiedCitationInstances": 119
+    },
+    "distinctCaseFollowupView": {
+      "cases": 10,
+      "matched": 9,
+      "errorsRemaining": 0,
+      "contradictionTruePositives": 3,
+      "contradictionFalsePositives": 1,
+      "contradictionFalseNegatives": 0,
+      "contradictionPrecision": 0.75,
+      "contradictionRecall": 1.0,
+      "interpretation": "Follow-up view uses targeted retries for four initial errors; not a single-run accuracy claim. Case-level metrics include one expected safe abstention. No general accuracy inference.",
+      "outcomes": [
+        {
+          "id": "day-one-before-training",
+          "category": "contradiction",
+          "expected": "CONTRADICTION",
+          "procedureVersionId": "8c3b4d9c-29d0-4953-8353-a31a5e4c2b6d",
+          "observed": "CONTRADICTION",
+          "classifications": [
+            "CONTRADICTION"
+          ],
+          "matched": true,
+          "errorCode": null,
+          "evidenceReport": "phase4-evaluation.json"
+        },
+        {
+          "id": "access-gated",
+          "category": "non-conflict",
+          "expected": "NO_CONFLICT",
+          "procedureVersionId": "791bcc9c-c21a-4708-9f6d-1d7b3c3b7d9c",
+          "observed": "NO_CONFLICT",
+          "classifications": [
+            "NO_CONFLICT"
+          ],
+          "matched": true,
+          "errorCode": null,
+          "evidenceReport": "phase4-evaluation.json"
+        },
+        {
+          "id": "sandbox-only",
+          "category": "different-scope",
+          "expected": "NO_CONFLICT",
+          "procedureVersionId": "02bb6f67-a89f-4881-bcd4-9892ee7f8d0a",
+          "observed": "NO_CONFLICT",
+          "classifications": [
+            "NO_CONFLICT"
+          ],
+          "matched": true,
+          "errorCode": null,
+          "evidenceReport": "phase4-evaluation.json"
+        },
+        {
+          "id": "grace-period-production",
+          "category": "contradiction",
+          "expected": "CONTRADICTION",
+          "procedureVersionId": "5fe8f799-16a1-4051-ad1b-82a3ede0ba4e",
+          "observed": "CONTRADICTION",
+          "classifications": [
+            "CONTRADICTION"
+          ],
+          "matched": true,
+          "errorCode": null,
+          "evidenceReport": "phase4-evaluation.json"
+        },
+        {
+          "id": "valid-emergency-exception",
+          "category": "exception",
+          "expected": "NO_CONFLICT",
+          "procedureVersionId": "fb7e7986-da5c-4b42-9a6d-1cf9fa7eb4b1",
+          "observed": "NO_CONFLICT",
+          "classifications": [
+            "NO_CONFLICT"
+          ],
+          "matched": true,
+          "errorCode": null,
+          "evidenceReport": "phase4-explicit-exception-evaluation.json",
+          "retriedAfterIncompleteOutput": true
+        },
+        {
+          "id": "exception-outside-incident",
+          "category": "contradiction",
+          "expected": "CONTRADICTION",
+          "procedureVersionId": "c2cd576d-f4a5-455b-999d-55a26d328772",
+          "observed": "CONTRADICTION",
+          "classifications": [
+            "CONTRADICTION",
+            "NO_CONFLICT"
+          ],
+          "matched": true,
+          "errorCode": null,
+          "evidenceReport": "phase4-explicit-exception-evaluation.json",
+          "retriedAfterIncompleteOutput": true
+        },
+        {
+          "id": "stricter-than-exception",
+          "category": "non-conflict",
+          "expected": "NO_CONFLICT",
+          "procedureVersionId": "6a4c9f4d-7f06-4b46-afbc-da4aab84a7c6",
+          "observed": "CONTRADICTION",
+          "classifications": [
+            "CONTRADICTION"
+          ],
+          "matched": false,
+          "errorCode": null,
+          "evidenceReport": "phase4-explicit-exception-evaluation.json",
+          "retriedAfterIncompleteOutput": true
+        },
+        {
+          "id": "complete-scope-missing-gate",
+          "category": "missing-requirement",
+          "expected": "MISSING_REQUIREMENT",
+          "procedureVersionId": "f25cbe4b-5a39-44d4-ac30-86368cef171f",
+          "observed": "MISSING_REQUIREMENT",
+          "classifications": [
+            "MISSING_REQUIREMENT",
+            "NO_CONFLICT"
+          ],
+          "matched": true,
+          "errorCode": null,
+          "evidenceReport": "phase4-explicit-exception-evaluation.json",
+          "retriedAfterIncompleteOutput": true
+        },
+        {
+          "id": "undefined-access",
+          "category": "ambiguity",
+          "expected": "AMBIGUITY",
+          "procedureVersionId": "c59adf07-b6d5-47c9-bf7a-480d2868787b",
+          "observed": "AMBIGUITY",
+          "classifications": [
+            "AMBIGUITY"
+          ],
+          "matched": true,
+          "errorCode": null,
+          "evidenceReport": "phase4-evaluation.json"
+        },
+        {
+          "id": "unavailable-procedure-page",
+          "category": "insufficient-evidence",
+          "expected": "ABSTAIN",
+          "procedureVersionId": "09863e76-4d78-46c9-a7f1-369e78aa3edc",
+          "observed": "ABSTAIN",
+          "matched": true,
+          "errorCode": "INCOMPLETE_EXTRACTION",
+          "evidenceReport": "phase4-evaluation.json"
+        }
+      ]
+    },
+    "knownDisagreement": "stricter-than-exception: golden NO_CONFLICT, model CONTRADICTION. Model treats the allowed emergency exception as access that a stricter procedure must permit. Human adjudication required; golden label unchanged.",
+    "graphReviewRevocationAndAiImmutabilityChecksPassedInBothRealRuns": true
+  },
+  "apiContracts": "docs/api/phase4.md",
+  "remainingRisks": [
+    "Small synthetic dataset; one false positive against golden; human adjudication needed",
+    "Larger comparison outputs can stop incomplete under the existing 4096 completion-token cap; evaluator defaults to two procedures per investigation",
+    "No global investigation history endpoint or enterprise-wide automatic scope discovery in this MVP",
+    "Review POST retries append multiple audit events; concurrent decisions use persisted order"
+  ],
+  "angularBlockers": [],
+  "angularNotes": [
+    "Ready for investigation detail dashboard through existing and two new endpoints",
+    "Use same origin/reverse proxy; honor current canReview and 404 revocation",
+    "Preserve created investigation ID or deep link; no history-list endpoint"
+  ],
+  "gitCommandsRun": false,
+  "newReferenceImports": false,
+  "deploymentFilesChanged": false,
+  "phase5Started": false,
+  "evidenceHashes": {
+    "docs/verification/phase4-evaluation.json": "f71717aff6a571df033a19d066d2a9bb57d9786ca55f418a67239fe4138829b7",
+    "docs/verification/phase4-explicit-exception-evaluation.json": "0b58544b1355da66f070f9d08d3f148436c424aaaaa7eac8cb1704c6482d3aa3",
+    "evaluation/phase4-golden.json": "e4d558dee51e382e1324ffdc56a7aa7f7d1799d2224587a251006e0f1de7419f"
+  }
+}
