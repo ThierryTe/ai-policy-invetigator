@@ -1,0 +1,56 @@
+name: Publish frontend image manually
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: frontend-ghcr-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify locked frontend source
+        run: |
+          npm install --global npm@11.8.0 --no-audit --no-fund
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build -- --configuration production
+      - name: Build full-SHA image version
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          docker build \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag "$image:sha-$GITHUB_SHA" .
+      - name: Isolate registry authentication outside the workspace
+        run: printf 'DOCKER_CONFIG=%s/policy-investigator-ghcr\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - name: Authenticate to GHCR using the job token
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+      - name: Publish image version
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          docker push "$image:sha-$GITHUB_SHA"
+          printf 'Published `%s:sha-%s`. Record its registry digest for deployment.\n' \
+            "$image" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove registry authentication
+        if: always()
+        run: |
+          if [[ "${DOCKER_CONFIG:-}" == "$RUNNER_TEMP/policy-investigator-ghcr" ]]; then
+            docker logout ghcr.io
+          fi

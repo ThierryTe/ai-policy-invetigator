@@ -1,0 +1,283 @@
+{
+  "phase": "6B_CONFIGURATION_ONLY",
+  "recordedAt": "2026-10-28T18:09:11.034541+00:00",
+  "result": "LOCAL_CONFIG_BUILDS_REGRESSIONS_PASS_NOT_DEPLOYED",
+  "confirmedVpsInputs": {
+    "source": "Owner supplied; no VPS access performed",
+    "npmContainer": "nginx-proxy-manager",
+    "existingExternalNetwork": "nginx-proxy-manager_default",
+    "npmPorts": [
+      80,
+      81,
+      443
+    ],
+    "sharedWithUnrelatedServices": true
+  },
+  "scope": {
+    "backendBranch": "ref: refs/heads/develop",
+    "frontendBranch": "ref: refs/heads/develop",
+    "gitCommandsExecuted": false,
+    "sshOrVpsAccess": false,
+    "composeUpExecuted": false,
+    "applicationContainersDeployed": false,
+    "networksCreated": false,
+    "npmOrFirewallChanged": false,
+    "existingServiceRestarted": false,
+    "newMetaCalls": 0,
+    "operatorBootstrapRunAgainstExistingApplicationDatabase": false,
+    "databaseRestoreExecuted": false,
+    "postgresTestsUseDisposableTestcontainers": true,
+    "frontendSourceChanges": [],
+    "allProtectedSourceInvariantsUnchanged": true,
+    "protectedFilesChecked": 53
+  },
+  "topologyVerifier": {
+    "result": "PASS",
+    "publishedPorts": [],
+    "npmHostname": "ai-policy-investigator-web",
+    "npmPort": 8080,
+    "backendServiceHostname": "backend.ai-policy-investigator_application",
+    "sharedProxyNetwork": "nginx-proxy-manager_default",
+    "internalApplicationNetwork": "ai-policy-investigator_application",
+    "databaseNetwork": "ai-policy-investigator_database",
+    "onlyFrontendOnProxyNetwork": true,
+    "backendAndDatabaseHaveNoPublishedPorts": true,
+    "dockerEngineContacted": false,
+    "networksCreated": false,
+    "containersDeployed": false
+  },
+  "tests": {
+    "java": {
+      "command": "./mvnw -B -o -Pneural-embeddings,database-tests verify",
+      "result": "PASS",
+      "totals": {
+        "tests": 62,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "postgresBackedTests": 39,
+      "suites": [
+        {
+          "class": "com.tewendelabs.investigator.InitialAdminDatabaseTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.PdfAndVectorTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.SecurityDatabaseTest",
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.config.ApplicationEnvironmentTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.config.DotenvConfigurationTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.documentation.DefaultOpenApiTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.documentation.LocalOpenApiTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.documentation.ProductionOpenApiTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.documentation.ProductionProfileSafetyTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.investigation.StructuredValidationTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.provider.MetaHttpTransportTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.security.JwtValidationTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.security.LoginThrottleTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "initialAdminChecks": [
+        "BCrypt hash matches Spring PasswordEncoder",
+        "one active owning-department ADMIN",
+        "existing identities/passwords unchanged on repeated attempt",
+        "invalid input rolls back without identities"
+      ]
+    },
+    "python": {
+      "command": "python3 -B -m unittest discover -s scripts/tests -v",
+      "result": "PASS",
+      "tests": 31,
+      "skipped": 0,
+      "configurationNegativeChecks": [
+        "published ports",
+        "wrong proxy or non-internal networks",
+        "missing unique alias/wrong upstream",
+        "frontend secrets",
+        "changed database volume/writable model",
+        "ambiguous unqualified backend hostname"
+      ],
+      "bootstrapChecks": [
+        "disabled before Docker execution",
+        "input and Unicode/password validation",
+        "COPY data secret transport",
+        "redacted subprocess errors and no secret argv/container env"
+      ]
+    },
+    "frontend": {
+      "command": "npm test",
+      "workspace": "temporary copy of current frontend public source and dependencies; original source unchanged",
+      "result": "PASS",
+      "tests": 29,
+      "testFiles": 6,
+      "initialAttempt": {
+        "result": "FAILED_TEST_WORKSPACE_SETUP",
+        "reason": "Started before dependency copy completed; Angular builder package was not yet present",
+        "resolution": "Completed dependency copy, reran unchanged tests successfully"
+      }
+    },
+    "productionBuilds": {
+      "backend": "PASS",
+      "modelInitializer": "PASS",
+      "frontend": "PASS",
+      "backendCommand": "docker compose --env-file .env -p ai-policy-investigator -f compose.yaml -f compose.production.yaml --profile app build",
+      "frontendCommand": "docker compose --project-directory <frontend> --env-file /dev/null -p ai-policy-investigator-ui -f <frontend>/compose.yaml -f <backend>/deploy/frontend/compose.production.yaml build frontend"
+    },
+    "configuration": {
+      "result": "PASS",
+      "command": "python3 -B scripts/verify_production_compose.py --frontend-directory ../ai-policy-investigator-frontend",
+      "usesRealSecrets": false,
+      "requiresExternalNetworksToExistLocally": false,
+      "daemonRequired": false
+    },
+    "documentedShellCommands": {
+      "result": "PASS",
+      "shellBlocks": 7,
+      "method": "bash -n only; none of the deployment/provision/restore commands were executed"
+    },
+    "networkQualifiedServiceName": {
+      "networkQualifiedActualServiceNameHealthProbe": "PASS",
+      "hostHeader": "localhost",
+      "usesExistingLocalContainerOnly": true,
+      "credentialsSent": false,
+      "networksCreated": false,
+      "newProductionTopologyTested": false,
+      "scope": "Existing local network only; correct Host header as already set by frontend Nginx; no new production topology created",
+      "initialProbe": "Direct URL with underscore-containing Docker network in HTTP Host returned 400; preserved browser Host returned 200"
+    }
+  },
+  "localRuntimeObservation": {
+    "existingApplicationContainersUnchanged": true,
+    "networkInventoryUnchanged": true,
+    "dockerContext": "desktop-linux",
+    "localUnixSocket": true,
+    "images": [
+      {
+        "name": "ai-policy-investigator-backend",
+        "id": "sha256:a41b9cfb7f015f5d41a4fc9262cbc5953738d8ce94376db0654321185dab1162",
+        "sizeBytes": 332329050,
+        "architecture": "amd64",
+        "user": "10001:10001"
+      },
+      {
+        "name": "ai-policy-investigator-model-init",
+        "id": "sha256:7cc9d5fb35564b9fbe040c4c22c6ccea9724501c290608087d21bfde63263ac2",
+        "sizeBytes": 45917439,
+        "architecture": "amd64",
+        "user": null
+      },
+      {
+        "name": "ai-policy-investigator-ui-frontend",
+        "id": "sha256:9fcd1d0b9ca57757956665bc72d42f2fcdc7f58bb07be87375e10803f1ad4e94",
+        "sizeBytes": 25722367,
+        "architecture": "amd64",
+        "user": "101"
+      }
+    ]
+  },
+  "secretScan": {
+    "knownPrivateValuesChecked": 6,
+    "candidateFilesChecked": 138,
+    "matchingPaths": [],
+    "valuesLogged": false
+  },
+  "preservedModel": {
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "dimensions": 384,
+    "initializerUnchanged": true,
+    "backendModelsReadOnly": true,
+    "modelVolume": "ai-policy-investigator_embedding_models",
+    "nativeCacheVolume": "ai-policy-investigator_native_cache",
+    "databaseVolume": "ai-policy-investigator_investigator_data"
+  },
+  "runtimeVerificationNotPerformed": [
+    "No new production-topology containers or networks started",
+    "NPM-to-frontend Docker DNS/routing on VPS",
+    "Cross-network connection rejection on VPS",
+    "Meta egress and cold native downloads on new topology",
+    "HTTPS certificate/domain/browser workflow",
+    "Database backup/restore rehearsal or rollback execution"
+  ],
+  "remainingOwnerInputs": [
+    "Real public domain and certificate choice",
+    "Confirm unique alias unused on shared NPM network",
+    "VPS architecture/capacity and dedicated backup location",
+    "Privately populated production env file and first-admin metadata",
+    "Explicit actual-deployment approval"
+  ],
+  "knownPreservedLimitation": "Five login attempts/minute per socket peer are shared behind the frontend; trusted forwarding remains unchanged",
+  "documentation": "docs/PHASE6B.md"
+}

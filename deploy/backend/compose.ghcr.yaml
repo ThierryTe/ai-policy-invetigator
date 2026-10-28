@@ -1,0 +1,7 @@
+# Optional image-only release overlay, applied AFTER compose.production.yaml.
+# Use approved ghcr.io/...@sha256:... references, then pull and up --no-build.
+services:
+  backend:
+    image: ${BACKEND_IMAGE_REF:?Export the approved backend image digest reference}
+  model-init:
+    image: ${MODEL_INIT_IMAGE_REF:?Export the matching model-init image digest reference}

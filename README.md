@@ -11,9 +11,10 @@ There is no generic chat endpoint.
 human reviews and a ten-case synthetic evaluation extend the verified Phase 3 pipeline.
 The approved Phase 5 Angular application is implemented in the separate
 [frontend repository](https://github.com/ThierryTe/ai-policy-investigator-frontend).
-Phase 6A prepares Docker deployment and records local verification; VPS deployment
-has not been performed. Exported report files remain outside the MVP. AI classifications
-and evidence remain immutable; human decisions are separate, and no changes are applied automatically.
+Phase 6B prepares Nginx Proxy Manager integration and locally validated VPS
+configuration. Phase 6C adds CI and optional manual GHCR publication; no VPS
+deployment or hosted workflow execution has been performed. Exported report files remain
+outside the MVP. AI classifications and evidence remain immutable; human decisions are separate, and no changes are applied automatically.
 
 ## Implemented capabilities
 
@@ -167,53 +168,47 @@ the existing completion limit; an incomplete result must remain visibly partial.
 
 ## Docker Compose deployment: local machine or VPS
 
-The hackathon deployment needs Docker Engine with modern Docker Compose/BuildKit,
-this repository and a privately populated `.env`. **It does not need host Java,
-Maven, Python, a prebuilt JAR, or preinstalled ONNX/tokenizer files.** The verified
-runtime is Linux x86_64; other native architectures remain unverified.
+The backend and Angular frontend remain separate repositories. The current production
+runbook is [Phase 6B](docs/PHASE6B.md), which supersedes Phase 6A's proxy/host-port
+instructions. Configuration is prepared and tested locally; **actual deployment needs
+separate approval**. No VPS, NPM setting or existing service was changed.
 
-1. Create `.env` privately using `.env.example` as a reference. Supply real values
-   for `POSTGRES_ADMIN_PASSWORD`, `OWNER_DB_PASSWORD`, `APP_DB_PASSWORD`, `JWT_SECRET`
-   and `MODEL_API_KEY`; never use placeholder credentials. Preserve the credentials
-   originally used by an existing PostgreSQL volume. Host-only `EMBEDDING_*` entries
-   can remain unused for Docker: Compose supplies the pinned values and container paths.
+Production uses the existing `nginx-proxy-manager_default` network. Only the frontend
+joins it, under unique DNS alias **`ai-policy-investigator-web:8080`**. NPM forwards the
+whole chosen HTTPS origin there. Frontend Nginx proxies `/api/` to the actual `backend`
+service, qualified as `backend.ai-policy-investigator_application:8080` to avoid
+shared-network DNS collisions. PostgreSQL has a separate internal database network;
+Spring Boot retains separate outbound connectivity for Meta/native dependencies.
+**No frontend, backend or PostgreSQL host ports are published in production.**
 
-2. Validate configuration without printing secrets, then build and start:
+Apply backend `compose.production.yaml` after its base Compose file. Apply
+`deploy/frontend/compose.production.yaml` after the separate frontend's base file,
+using its actual checkout as the project directory. The runbook pins project names
+to preserve PostgreSQL/model/native-cache volumes and cross-repository DNS names.
+The existing base local workflow and its loopback ports are unchanged.
 
-   ```sh
-   docker compose --env-file .env -f compose.yaml -f compose.production.yaml --profile app config --quiet
-   docker compose --env-file .env -f compose.yaml -f compose.production.yaml --profile app up --build -d --force-recreate --wait
-   ```
+Required private environment variables are `POSTGRES_ADMIN_PASSWORD`,
+`OWNER_DB_PASSWORD`, `APP_DB_PASSWORD`, `JWT_SECRET` and `MODEL_API_KEY`. Keep the
+production env file outside both checkouts; never use placeholders or print resolved
+configuration. Production disables dotenv, Swagger/OpenAPI and documentation access.
+No secrets belong in frontend variables or image build arguments.
 
-   The backend JAR is built inside a Java 21 stage and copied into the nonroot runtime
-   image. Image digests are pinned in `deploy/backend/Dockerfile` and
-   `deploy/embeddings/Dockerfile`. The image build skips tests; run the documented
-   Java/Python verification separately before a release.
+From the backend checkout, validate the complete topology without deploying:
 
-3. Inspect readiness and initializer output:
+```sh
+python3 scripts/verify_production_compose.py --frontend-directory ../ai-policy-investigator-frontend
+```
 
-   ```sh
-   docker compose --env-file .env --profile app ps --all
-   docker compose --env-file .env --profile app logs --tail=40 model-init
-   curl --fail http://127.0.0.1:18080/actuator/health
-   ```
+The [runbook](docs/PHASE6B.md) provides exact per-project config/build/start/health
+commands, NPM Proxy Host settings, first-admin bootstrap, backup, restore and image
+rollback procedures. A real public domain/certificate and owner approval remain
+required. Database restore and the new VPS topology have not been exercised on the VPS.
 
-   `model-init` exiting with code 0 is expected. It is a short-lived initialization
-   job, not an inference server. PostgreSQL must be healthy and model initialization
-   must complete successfully before Spring Boot starts. The backend healthcheck lets
-   `up --wait` wait for HTTP readiness; initial builds and native downloads take longer.
-
-The backend services remain Spring Boot and PostgreSQL 16/pgvector, with a one-shot
-model initializer. The Angular frontend lives in its separate repository. Route the
-whole browser origin through that frontend and its same-origin `/api/` proxy. Base
-Compose retains production mode, dotenv off, documentation denied, and loopback-only
-ports 18080/5546. PostgreSQL now uses a separate project-managed bridge network;
-only Spring Boot joins both networks. The production override removes PostgreSQL
-host publication; base Compose retains port 5546 on loopback for local tools.
-PostgreSQL and Spring Boot restart unless
-explicitly stopped. No database volumes or migration scripts change. See the
-[Phase 6A deployment preparation](docs/PHASE6A.md) for commands, audit findings and
-the pending frontend access-log patch. No VPS deployment has been performed.
+Docker builds need no host Java/Maven/Node, prebuilt JAR or preinstalled model. Operator
+verification/bootstrap helpers use host Python 3, standard library only. Existing
+[Phase 6A runtime evidence](docs/verification/phase6a-results.json) is preserved; current
+[Phase 6B checks](docs/verification/phase6b-results.json) distinguish static topology
+validation/builds/regressions from later live networking verification.
 
 ### Pinned model download and persistence
 
@@ -255,19 +250,20 @@ model directory or host cache permission setup is needed for Docker.
 
 ### Restart, verification and download failures
 
-A normal subsequent startup reuses both volumes:
+After deployment approval, use the `backend_compose` function defined in the
+[Phase 6B runbook](docs/PHASE6B.md). A normal subsequent startup reuses both volumes:
 
 ```sh
-docker compose --env-file .env -f compose.yaml -f compose.production.yaml --profile app up -d --wait
+backend_compose up -d --wait --wait-timeout 300
 ```
 
 To explicitly recheck the model cache without starting dependencies:
 
 ```sh
-docker compose --env-file .env --profile app run --rm --no-deps model-init
+backend_compose run --rm --no-deps model-init
 ```
 
-`docker compose restart backend` reuses the mounts; the application also checks its
+`backend_compose restart backend` reuses the mounts; the application also checks its
 artifact fingerprint on startup. Initializer errors such as
 `INVALID_CACHED_ARTIFACT (model.onnx)`, `DOWNLOADED_ARTIFACT_INTEGRITY_FAILED`, or
 `DOWNLOAD_NETWORK_OR_IO_FAILED` produce a nonzero exit and block backend startup.
@@ -302,6 +298,10 @@ For other synthetic local users after migrations, see `scripts/provision_user.sq
 its environment inputs. It uses a fixed synthetic organization and is not a general
 production account-provisioning tool. Membership/grant administration currently
 requires operator SQL; there is no public signup or administration UI.
+For a fresh production identity store, the explicit operator-only
+`scripts/provision_initial_admin.py` bootstrap creates one department ADMIN using
+existing BCrypt/JWT authorization. It refuses existing identities and never runs
+at application startup; see [secure initial provisioning](docs/PHASE6B.md#secure-first-application-administrator--owner-runs-after-deployment-approval).
 
 ## Environment configuration
 
@@ -411,6 +411,8 @@ in [detail](docs/REPOSITORY_AUDIT.md); their side effects differ.
 | Script | Purpose and side effects |
 |---|---|
 | `scripts/init_local.py` | Generates ignored local-only credentials; refuses overwrite; creates cache directories |
+| `scripts/verify_production_compose.py` | Offline production topology guard using synthetic Compose interpolation; no deployment or network creation |
+| `scripts/provision_initial_admin.py` | Explicit empty-store initial ADMIN bootstrap; secret COPY transport, no default credentials or startup hook |
 | `scripts/setup_demo.py` | Explicit local-only idempotent demo account provisioning and export of existing synthetic PDFs; reads DEMO_PASSWORD from the environment, never prints credentials, makes no model calls |
 | `scripts/fetch_embeddings.py` | Shared integrity-checked model initializer; Docker volume mode or optional host artifact/configuration setup |
 | `scripts/run_local.py` | Starts the packaged Java application with optional local configuration fallbacks |
@@ -462,13 +464,21 @@ embedding fixtures; those results do not establish real model accuracy. The defa
 Maven build omits production embedding dependencies, so package/run with the neural
 profile when starting the real backend.
 
-The existing `.github/workflows/verify.yml` is named **Verify Phase 2**, but its
-`-Pdatabase-tests verify` command discovers the Phase 3 and Phase 4 tests too. It runs on pushes
-and pull requests with Java 21 and read-only repository permission. It does not
-run Python tests, fetch models, call Meta, publish images or deploy. The original audit ran its Maven profile successfully with 45 tests, including
-25 PostgreSQL tests. The follow-up adds documentation/security integration tests;
-see the current follow-up results linked above. No remote GitHub Actions run is claimed. Adding Python checks and an explicit runtime-package check
-is a recommended future CI improvement, not a change made by this audit.
+The [Phase 6C workflows](docs/PHASE6C.md) run on develop pushes and PRs targeting main.
+Backend CI uses Java 21/Maven wrapper 3.9.16, the existing database test profile, all
+Python tests, the production Compose verifier and a production Docker build. No real
+Meta request, production secrets or model-weight download is needed. A reviewed
+frontend Compose snapshot avoids private cross-repository access tokens; local tests
+still verify the actual sibling frontend contract.
+
+Frontend CI and manual publisher files are prepared at `docs/ci/frontend/` for owner
+installation into the separate repository; workspace policy prevented direct writes.
+They use Node 22, npm 11.8.0, npm ci, all 29 tests and production and Docker builds.
+Manual publishers run only on main, use GITHUB_TOKEN packages permission and tag images
+with full commit SHAs; deployments pin actual registry digests. Image-only release
+overlays preserve the Phase 6B topology and volumes. See the runbook for exact commands.
+Local equivalent checks are recorded in [Phase 6C evidence](docs/verification/phase6c-results.json);
+no hosted Actions run, GHCR publication, SSH or VPS deployment is claimed.
 
 Optional **local dedicated-environment** demonstrations:
 
@@ -486,52 +496,20 @@ for the owner; its four destination hashes were checked directly instead.
 
 ## VPS and Docker Compose compatibility
 
-Keep the dedicated PostgreSQL 16 service and Java backend alongside your existing
-VPS Compose stack and reverse proxy. No Kubernetes, broker or separate inference
-service is needed. The Compose file now builds the backend image, initializes its pinned model volume
-and prepares a persistent native cache automatically. An owner-managed production
-override may still configure the existing reverse proxy/network, backups, resource
-limits and lifecycle policy. No VPS deployment itself or registry publication has
-been performed by this local verification.
+Use [Phase 6B](docs/PHASE6B.md) for the confirmed Nginx Proxy Manager deployment.
+It replaces the earlier host-loopback proxy guidance for production. The owner-provided
+NPM container/network and unrelated services remain unchanged. Only the frontend joins
+the shared proxy network; no service publishes a host port. Spring Boot/PostgreSQL are
+kept off that shared network, with internal application/database networks and unchanged
+named volumes, initialization and model hashes. Keep current secure isolation overlays
+when rolling application images back.
 
-For your VPS configuration, preserve this service design and adapt the deployment:
-
-- Use a distinct project/database volume; never point this initializer at the old
-  project's database or reuse its credentials. Preserve and back up persisted PDFs,
-  metadata and jobs; model/native caches are replaceable public dependencies.
-- Use the supplied multi-stage backend image build and automatic model initializer.
-  Keep their pinned digests/model hashes when preparing the hackathon deployment.
-  A release registry/image-publishing workflow is still an owner-managed future step.
-- Retain the named model/native-cache volumes. The initializer prepares model file
-  read permissions and UID/GID 10001 cache ownership; no host model/cache mount is needed.
-- Keep PostgreSQL on its separate `database` bridge; the frontend continues joining
-  the existing backend default network. A host HTTPS reverse proxy should send the
-  whole origin to the frontend at `127.0.0.1:18081`. A containerized proxy needs the
-  owner's actual shared-network configuration; no VPS network or domain is assumed.
-  Do not publish PostgreSQL or Spring Boot on public interfaces.
-- Retain same-origin `/api/` routing. Review the documented shared-peer login limit
-  and proxy upload/time limits against the actual HTTPS proxy before deployment.
-- PostgreSQL, Spring Boot and the frontend use `restart: unless-stopped`.
-  Healthchecks measure readiness; an unhealthy status alone does not trigger a
-  Docker restart. External monitoring and backup/restore remain owner-managed.
-- Inject production secrets through runtime environment configuration outside the
-  checkout. Keep `APP_ENVIRONMENT=production` and `SPRINGDOTENV_ENABLED=false`,
-  as configured by base Compose. Do not include the local override. Compose forwards
-  only listed variables; no Spring profile file is required.
-  The application does not automatically read `MODEL_API_KEY_FILE` or arbitrary
-  Compose secret mounts; that binding would need explicit configuration.
-- The current backend process receives the owner credential for startup Flyway as
-  well as runtime credentials. Preserve non-superuser migration ownership; separating
-  migrations into a short-lived operator step is a future hardening option.
-- Verify VPS architecture, available memory/disk, outbound connectivity, backups and
-  restoration before deployment. Linux x86_64 has been tested; no VPS deployment or
-  ARM/native compatibility test was performed by this audit.
-
-Docker recommends a production-specific Compose override for environment-specific
-mounts, ports and restart settings. See [Docker's production guidance](https://docs.docker.com/compose/how-tos/production).
-The earlier documentation increment did not add a production override. Phase 6A
-adds `compose.production.yaml` solely to remove the database host-port publication
-while preserving the existing local workflow; use it for all VPS lifecycle commands.
+This increment validates configuration, builds and relevant tests without running
+Compose `up`, creating Docker networks, contacting the VPS or changing NPM/firewall
+settings. Domain/certificate selection, live network/egress verification, account
+provisioning, a backup/restore rehearsal and actual deployment require the owner's
+next approval. The existing shared-peer login limiter remains unchanged. Actual VPS
+architecture, capacity, HTTPS and runtime networking are not yet verified.
 
 ## Secrets and commit readiness
 
@@ -575,6 +553,6 @@ are the persisted graph projection, append-only review migration/API, ten synthe
 evaluation cases and frontend API contracts. No reference code was imported in this
 phase. The working deployment and model/provider configuration remain unchanged.
 Phase 5 was subsequently approved and implemented in the separate Angular repository.
-Phase 6A audits Docker deployment and prepares local verification; Phase 6B VPS
-deployment requires explicit approval. The [Phase 6A report](docs/PHASE6A.md) records
+Phase 6A audits Docker deployment and prepares local verification; Phase 6B finalizes the secure NPM configuration; actual VPS deployment still
+requires explicit approval. The [Phase 6A report](docs/PHASE6A.md) records
 what is applied, what remains pending and which checks were actually executed.

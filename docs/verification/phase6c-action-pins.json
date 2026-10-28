@@ -1,0 +1,38 @@
+{
+  "checkedAt": "2026-10-28T18:38:25.942886+00:00",
+  "actionPins": [
+    {
+      "repository": "actions/checkout",
+      "release": "v7.0.1",
+      "sha": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "source": "https://api.github.com/repos/actions/checkout/git/ref/tags/v7.0.1"
+    },
+    {
+      "repository": "actions/setup-java",
+      "release": "v6.1.0",
+      "sha": "b843ebf9b913146b38da2eaa7aeddf76074ae1ad",
+      "source": "https://api.github.com/repos/actions/setup-java/git/ref/tags/v6.1.0"
+    },
+    {
+      "repository": "actions/setup-node",
+      "release": "v7.1.0",
+      "sha": "949feb2413d6458794dcd2491c4babbbce0c15c1",
+      "source": "https://api.github.com/repos/actions/setup-node/git/ref/tags/v7.1.0"
+    },
+    {
+      "repository": "actions/setup-python",
+      "release": "v7.1.0",
+      "sha": "6d4fd22b20465ccc0f7354476588e8df7c9ca0e0",
+      "source": "https://api.github.com/repos/actions/setup-python/git/ref/tags/v7.1.0"
+    }
+  ],
+  "pinnedActionManifestsFetched": true,
+  "manifestRuntime": "node24",
+  "validationTool": {
+    "tool": "rhysd/actionlint",
+    "version": "v1.7.12",
+    "download": "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_darwin_amd64.tar.gz",
+    "archiveSha256": "5b44c3bc2255115c9b69e30efc0fecdf498fdb63c5d58e17084fd5f16324c644",
+    "officialChecksumMatched": true
+  }
+}

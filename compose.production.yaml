@@ -1,5 +1,18 @@
-# Keep the base loopback database port for host-based local development only.
-# Removing publication also blocks cross-bridge access to the published container port.
+# Production only. The base configuration remains usable for host-based development.
+# The frontend has a separate production overlay in deploy/frontend/compose.production.yaml.
 services:
   postgres:
     ports: !reset []
+  backend:
+    ports: !reset []
+    networks: !override
+      application:
+      database:
+      # Outbound Meta API access; never the shared NPM network.
+      default:
+
+networks:
+  application:
+    internal: true
+  database:
+    internal: true

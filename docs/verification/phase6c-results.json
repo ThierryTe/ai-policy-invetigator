@@ -1,0 +1,294 @@
+{
+  "phase": "6C",
+  "recordedAt": "2026-10-28T18:42:14.069780+00:00",
+  "result": "BACKEND_IMPLEMENTED_FRONTEND_DELIVERED_INSTALLATION_PENDING_LOCAL_CHECKS_PASS",
+  "scope": {
+    "branches": [
+      "ref: refs/heads/develop",
+      "ref: refs/heads/develop"
+    ],
+    "gitCommandsExecuted": false,
+    "vpsAccessOrDeployment": false,
+    "hostedActionsExecution": false,
+    "ghcrAuthenticationOrPublication": false,
+    "newRealMetaCalls": 0,
+    "onnxWeightsDownloaded": false,
+    "productionCredentialsRequiredForTests": false,
+    "frontendWorkingCopyChanged": false,
+    "frontendInstallationBlockedBy": "Workspace permission excludes frontend repository; direct write rejected",
+    "frontendDeliveredFiles": {
+      "docs/ci/frontend/verify.yml": ".github/workflows/verify.yml",
+      "docs/ci/frontend/publish-image.yml": ".github/workflows/publish-image.yml"
+    },
+    "protectedExistingCodeAndConfigUnchanged": true,
+    "protectedPathsChecked": 70
+  },
+  "tests": {
+    "workflowValidation": {
+      "workflowFiles": [
+        ".github/workflows/verify.yml",
+        ".github/workflows/publish-images.yml",
+        "docs/ci/frontend/verify.yml",
+        "docs/ci/frontend/publish-image.yml"
+      ],
+      "actionlint": "PASS",
+      "verifiedPinnedReferences": true,
+      "bashSyntaxBlocks": 19,
+      "shellcheck": "NOT_RUN_NOT_INSTALLED",
+      "hostedExecutionPerformed": false
+    },
+    "initialWorkflowLintIssue": {
+      "result": "FIXED",
+      "description": "runner context is not available at job.env; isolated Docker auth is now set at runtime through GITHUB_ENV",
+      "finalActionlint": "PASS"
+    },
+    "java": {
+      "command": "./mvnw -B -o -Pdatabase-tests verify",
+      "ciCommand": "./mvnw -B -Pdatabase-tests verify",
+      "workspace": "Clean temporary public-source copy; no private .env/.local/Git/generated artifacts copied",
+      "result": "PASS",
+      "totals": {
+        "tests": 62,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "postgresBackedTests": 39,
+      "neuralRuntimeProfileUsedForTests": false,
+      "suites": [
+        {
+          "class": "com.tewendelabs.investigator.InitialAdminDatabaseTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.PdfAndVectorTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.SecurityDatabaseTest",
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.config.ApplicationEnvironmentTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.config.DotenvConfigurationTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.documentation.DefaultOpenApiTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.documentation.LocalOpenApiTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.documentation.ProductionOpenApiTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.documentation.ProductionProfileSafetyTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.investigation.StructuredValidationTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.provider.MetaHttpTransportTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.security.JwtValidationTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.tewendelabs.investigator.security.LoginThrottleTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "python": {
+      "command": "python3 -B -m unittest discover -s scripts/tests -v",
+      "result": "PASS",
+      "tests": 31,
+      "skipped": 0,
+      "frontendContract": "POLICY_FRONTEND_DIRECTORY=<clean workspace>/.ci/frontend"
+    },
+    "productionTopology": {
+      "result": "PASS",
+      "publishedPorts": [],
+      "npmHostname": "ai-policy-investigator-web",
+      "npmPort": 8080,
+      "backendServiceHostname": "backend.ai-policy-investigator_application",
+      "sharedProxyNetwork": "nginx-proxy-manager_default",
+      "internalApplicationNetwork": "ai-policy-investigator_application",
+      "databaseNetwork": "ai-policy-investigator_database",
+      "onlyFrontendOnProxyNetwork": true,
+      "backendAndDatabaseHaveNoPublishedPorts": true,
+      "dockerEngineContacted": false,
+      "networksCreated": false,
+      "containersDeployed": false
+    },
+    "releaseImageOverlays": {
+      "result": "PASS",
+      "publishedPorts": [],
+      "npmHostname": "ai-policy-investigator-web",
+      "npmPort": 8080,
+      "backendServiceHostname": "backend.ai-policy-investigator_application",
+      "sharedProxyNetwork": "nginx-proxy-manager_default",
+      "internalApplicationNetwork": "ai-policy-investigator_application",
+      "databaseNetwork": "ai-policy-investigator_database",
+      "onlyFrontendOnProxyNetwork": true,
+      "backendAndDatabaseHaveNoPublishedPorts": true,
+      "dockerEngineContacted": false,
+      "networksCreated": false,
+      "containersDeployed": false,
+      "syntheticDigestsOnly": true,
+      "registryPullOrPublicationPerformed": false,
+      "allImageReferencesApplied": true,
+      "missingImageReferencesFailClosed": [
+        "BACKEND_IMAGE_REF",
+        "MODEL_INIT_IMAGE_REF",
+        "FRONTEND_IMAGE_REF"
+      ]
+    },
+    "frontend": {
+      "result": "PASS",
+      "tests": 29,
+      "testFiles": 6,
+      "commands": [
+        "npm install --global npm@11.8.0 --no-audit --no-fund",
+        "npm ci --no-audit --no-fund",
+        "npm test",
+        "npm run build -- --configuration production"
+      ],
+      "scope": "Temporary Linux Node 22 build stage derived from pinned production Dockerfile; spec files allowed only in that temporary test context; original frontend untouched"
+    },
+    "productionImageBuilds": {
+      "backend": "PASS",
+      "frontend": "PASS",
+      "modelInitializer": "PASS",
+      "registryPushPerformed": false,
+      "frontendUsesOriginalReadonlySourceContext": true
+    },
+    "documentationShellSyntax": {
+      "result": "PASS",
+      "blocks": 2,
+      "commandsExecuted": false
+    }
+  },
+  "localImagesAndToolchains": {
+    "images": [
+      {
+        "name": "policy-investigator-backend:ci",
+        "id": "sha256:4969387540a42fd95778f65c2ec69a9c45850e4ac69b790cac2db7bca29ce664",
+        "sizeBytes": 332328961,
+        "architecture": "amd64",
+        "user": "10001:10001",
+        "secretEnvKeys": []
+      },
+      {
+        "name": "policy-investigator-frontend:ci",
+        "id": "sha256:8e5a7ea1b6de1862a00fca4ac12c15d1b0c03c34bd25977e22a417089da8fcac",
+        "sizeBytes": 25722233,
+        "architecture": "amd64",
+        "user": "101",
+        "secretEnvKeys": []
+      },
+      {
+        "name": "policy-investigator-model-init:ci",
+        "id": "sha256:763c3afe79fa578f98c310dde6dd2a701fb48f96db9861b7edad7ca826582c29",
+        "sizeBytes": 45917295,
+        "architecture": "amd64",
+        "user": null,
+        "secretEnvKeys": []
+      }
+    ],
+    "toolchains": {
+      "python": "Python 3.12.7",
+      "dockerCompose": "5.1.3",
+      "maven": "3.9.16",
+      "java": "21.0.11",
+      "frontendNode": "22 from the exact pinned existing Node Docker build stage",
+      "frontendNpm": "11.8.0 from existing packageManager/Dockerfile"
+    }
+  },
+  "remoteMetadata": {
+    "actionPinsFile": "docs/verification/phase6c-action-pins.json",
+    "backendRepositoryPublic": true,
+    "frontendUnauthenticatedMetadataStatus": 404,
+    "frontendPublicAvailability": "Private or unpublished; not assumed accessible",
+    "crossRepositoryTokenRequired": false
+  },
+  "frontendComposeContract": {
+    "sourceRepository": "https://github.com/ThierryTe/ai-policy-investigator-frontend",
+    "sourcePath": "compose.yaml",
+    "fixture": ".ci/frontend/compose.yaml",
+    "sha256": "e935033c410d85c08198ace352e548995688390cfb2411fc6fdd9b2c47916f23",
+    "matchesActualFrontendWorktree": true,
+    "limitation": "Private independent future frontend changes require reviewed snapshot updates; backend CI does not fetch it"
+  },
+  "secretChecks": {
+    "knownPrivateValuesChecked": 6,
+    "candidateSourceFilesChecked": 149,
+    "matchingFiles": [],
+    "imageSecretEnvironmentKeys": []
+  },
+  "notRun": [
+    "GitHub-hosted workflows",
+    "GHCR login/push and GITHUB_TOKEN package permission checks",
+    "VPS image pulls, startup, HTTPS or cross-network probes",
+    "Real Meta API evaluation or model downloads",
+    "ShellCheck (not installed; actionlint and bash syntax checks ran instead)"
+  ],
+  "remainingBlockers": [
+    "Install the two delivered frontend workflows after adding writable access or owner copy",
+    "Owner must commit/push/review workflow files; manual publishers must reach main before dispatch",
+    "First hosted CI/publication run is required to verify runner/organization/package access",
+    "No image digests exist from this task; owner must select published registry digests before deployment",
+    "Public package visibility or separate private registry read authentication must be chosen for VPS pulls",
+    "All Phase 6B domain/certificate/account/backup/deployment approvals remain outstanding"
+  ]
+}

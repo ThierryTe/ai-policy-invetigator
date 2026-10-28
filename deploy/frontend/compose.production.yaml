@@ -1,0 +1,21 @@
+# Apply AFTER the separate frontend repository's compose.yaml, using its project directory.
+# The backend project must be named ai-policy-investigator and started first after approval.
+services:
+  frontend:
+    ports: !reset []
+    environment:
+      # Qualify the actual service name to avoid another project's "backend" alias on NPM.
+      BACKEND_UPSTREAM: http://backend.ai-policy-investigator_application:8080
+    networks: !override
+      application:
+      proxy:
+        aliases:
+          - ai-policy-investigator-web
+
+networks: !override
+  application:
+    external: true
+    name: ai-policy-investigator_application
+  proxy:
+    external: true
+    name: nginx-proxy-manager_default

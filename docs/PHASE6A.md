@@ -1,5 +1,9 @@
 # Phase 6A — Docker security audit and deployment preparation
 
+Historical Phase 6A report. The confirmed NPM topology and production commands in
+[Phase 6B](PHASE6B.md) supersede the host-port/proxy instructions below. The frontend
+access-log patch described here is now present in the frontend checkout.
+
 Inspected October 28, 2026. Both working copies are on `develop`. No Git command,
 reference-repository modification, new Meta inference or VPS deployment was performed.
 
