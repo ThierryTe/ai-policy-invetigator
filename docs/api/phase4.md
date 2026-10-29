@@ -1,14 +1,14 @@
-# Phase 4 Angular dashboard contract
+# Dashboard, graph and human review API
 
 All `/api/**` routes below require `Authorization: Bearer <JWT>` and current identity.
-Use the same origin via the eventual Angular reverse proxy. No CORS change is needed
+Use the same origin through the Angular Nginx reverse proxy. No CORS change is needed
 for that setup. Resource absence and inaccessible scope both return 404. Never cache
 evidence across logout, membership changes or users. Render excerpts/notes as text,
 not HTML. Production OpenAPI/Swagger remains denied.
 
 Existing upload, version, ingestion and login contracts are unchanged:
-[Phase 2](phase2.md), [Phase 3](phase3.md). The local generated `/v3/api-docs`
-also includes the two new routes. No graph/review request invokes Meta or embeddings.
+[Documents/authentication](phase2.md), [Investigations](phase3.md). The opt-in local
+`/v3/api-docs` specification includes graph and review routes. No graph/review request invokes Meta or embeddings.
 
 ## Dashboard request sequence
 

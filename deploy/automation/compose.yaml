@@ -1,0 +1,4 @@
+# Applied only by the reviewed production controller; local/manual overlays stay intact.
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE_REF:?Select the verified locally transferred PostgreSQL image}

@@ -1,9 +1,0 @@
-path,sha256,attribution
-README.md,9ce5ce084f986fbc2ac61e6e5b9b08ef6319aa73eaaa3849e89ed0141a700faf,New Phase 6A configuration/docs/evidence; existing deployment/authentication/model infrastructure preserved; no external code imported
-compose.production.yaml,4e59874f304d80a5003d8197ad818534920df81f3abf24870baed5cdba4adc6d,New Phase 6A configuration/docs/evidence; existing deployment/authentication/model infrastructure preserved; no external code imported
-compose.yaml,c570731c25ae863695ab8cb2100bbf6783ce23c8f67a671a734dd446d7cb46de,New Phase 6A configuration/docs/evidence; existing deployment/authentication/model infrastructure preserved; no external code imported
-docs/PHASE6A.md,93ac9fd21bb4aa109912048da705649d85de5a6c19b539da51a6416a9703ff44,New Phase 6A configuration/docs/evidence; existing deployment/authentication/model infrastructure preserved; no external code imported
-docs/deployment/phase6a-frontend.patch,0e81c330727b6850366dc84d30dedbd57de9170d1db580fdfe091ea1893c505b,New Phase 6A configuration/docs/evidence; existing deployment/authentication/model infrastructure preserved; no external code imported
-docs/provenance/HACKATHON_CONTRIBUTIONS.md,6ee4e2109c8efef83a9177143a6a61046ccaca5833a42fdc8aeea635f820ddc8,New Phase 6A configuration/docs/evidence; existing deployment/authentication/model infrastructure preserved; no external code imported
-docs/provenance/phase6a-files.csv,SELF-MANIFEST,New Phase 6A configuration/docs/evidence; existing deployment/authentication/model infrastructure preserved; no external code imported
-docs/verification/phase6a-results.json,5f35d5f2a324706a39cf8ea76e809ba3cc96264e7ac28f0e5a1caaa0808d7667,New Phase 6A configuration/docs/evidence; existing deployment/authentication/model infrastructure preserved; no external code imported

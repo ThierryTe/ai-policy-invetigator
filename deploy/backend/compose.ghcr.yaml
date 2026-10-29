@@ -1,7 +1,13 @@
 # Optional image-only release overlay, applied AFTER compose.production.yaml.
-# Use approved ghcr.io/...@sha256:... references, then pull and up --no-build.
+# Accept locally loaded full-SHA tags or digests. Never pull or build on the VPS.
 services:
+  postgres:
+    pull_policy: never
   backend:
-    image: ${BACKEND_IMAGE_REF:?Export the approved backend image digest reference}
+    image: ${BACKEND_IMAGE_REF:?Select the locally loaded backend image reference}
+    pull_policy: never
+    build: !reset null
   model-init:
-    image: ${MODEL_INIT_IMAGE_REF:?Export the matching model-init image digest reference}
+    image: ${MODEL_INIT_IMAGE_REF:?Select the locally loaded model-init image reference}
+    pull_policy: never
+    build: !reset null

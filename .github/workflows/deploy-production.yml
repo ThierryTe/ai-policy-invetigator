@@ -1,0 +1,112 @@
+name: Deploy production after publication
+on:
+  workflow_call:
+    inputs:
+      component:
+        type: string
+        required: true
+      source_sha:
+        type: string
+        required: true
+    secrets:
+      VPS_HOST:
+        required: false
+      VPS_USERNAME:
+        required: false
+      VPS_SSH_KEY:
+        required: false
+      VPS_PORT:
+        required: false
+      VPS_DEPLOY_PATH:
+        required: false
+  workflow_dispatch:
+    inputs:
+      operation:
+        type: choice
+        options: [deploy, rollback]
+        default: deploy
+      backend_sha:
+        description: Full backend source SHA for manual recovery
+        type: string
+      frontend_sha:
+        description: Full frontend source SHA for manual recovery
+        type: string
+      rollback_release:
+        description: Previously validated release ID for rollback
+        type: string
+      allow_migrations:
+        description: Explicit migration approval for manual recovery
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  packages: read
+concurrency:
+  group: ai-policy-investigator-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main' && (github.repository == 'ThierryTe/ai-policy-invetigator' || (github.event_name != 'workflow_dispatch' && github.repository == 'ThierryTe/ai-policy-invetigator-frontend'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    environment:
+      name: prod
+      url: https://ai-policy.tewendelabs.com
+    steps:
+      - name: Check out versioned backend deployment tooling, including frontend calls
+        id: tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ThierryTe/ai-policy-invetigator
+          ref: ${{ github.repository == 'ThierryTe/ai-policy-invetigator' && github.sha || 'main' }}
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Verify deployment tooling and production topology
+        env:
+          POLICY_FRONTEND_DIRECTORY: ${{ github.workspace }}/.ci/frontend
+        run: |
+          python3 -B -m unittest discover -s scripts/tests -v
+          python3 -B scripts/verify_production_compose.py --frontend-directory .ci/frontend
+      - name: Transfer exact images and deploy via existing VPS SSH account
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCKER_CONFIG: ${{ runner.temp }}/policy-registry
+          COMPONENT: ${{ inputs.component }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          CONFIGURATION_SHA: ${{ steps.tooling.outputs.commit }}
+          OPERATION: ${{ inputs.operation || 'deploy' }}
+          BACKEND_SHA: ${{ inputs.backend_sha }}
+          FRONTEND_SHA: ${{ inputs.frontend_sha }}
+          ROLLBACK_RELEASE: ${{ inputs.rollback_release }}
+          MANUAL_ALLOW_MIGRATIONS: ${{ inputs.allow_migrations }}
+          AUTO_APPLY_MIGRATIONS: ${{ vars.AUTO_APPLY_MIGRATIONS }}
+          INITIAL_BACKEND_SHA: ${{ vars.INITIAL_BACKEND_SHA }}
+          INITIAL_FRONTEND_SHA: ${{ vars.INITIAL_FRONTEND_SHA }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USERNAME: ${{ secrets.VPS_USERNAME }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+          VPS_HOST_KEY: ${{ vars.VPS_HOST_KEY }}
+          VPS_ENV_FILE: ${{ vars.VPS_ENV_FILE }}
+        run: |
+          mkdir -m 700 "$DOCKER_CONFIG"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          if [[ "$OPERATION" != rollback ]]; then
+            printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          fi
+          args=(--operation "$OPERATION" --configuration-sha "$CONFIGURATION_SHA" --output "$RUNNER_TEMP/policy-releases")
+          if [[ -n "$COMPONENT" ]]; then
+            args+=(--component "$COMPONENT" --source-sha "$SOURCE_SHA")
+            if [[ "$AUTO_APPLY_MIGRATIONS" == true ]]; then args+=(--allow-migrations); fi
+          else
+            args+=(--backend-sha "$BACKEND_SHA" --frontend-sha "$FRONTEND_SHA" --rollback-release "$ROLLBACK_RELEASE")
+            if [[ "$MANUAL_ALLOW_MIGRATIONS" == true ]]; then args+=(--allow-migrations); fi
+          fi
+          python3 -B scripts/run_production_deploy.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Report verification boundary
+        if: always()
+        run: |
+          printf '%s\n' 'Only a VALIDATED report proves VPS health, migrations and HTTPS routing passed. PostgreSQL is never restored or recreated automatically.' >> "$GITHUB_STEP_SUMMARY"
