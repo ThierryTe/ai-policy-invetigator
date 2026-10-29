@@ -25,13 +25,57 @@ ACCEPT = ', '.join(['application/vnd.oci.image.index.v1+json', 'application/vnd.
                     'application/vnd.docker.distribution.manifest.list.v2+json', 'application/vnd.docker.distribution.manifest.v2+json'])
 
 
+def docker_context(command):
+    """Only public operation names and allowlisted image refs, never arbitrary args."""
+    operations = ['docker pull', 'docker image inspect', 'docker image tag', 'docker image save',
+                  'docker buildx imagetools inspect', 'docker buildx imagetools create', 'docker build', 'docker push']
+    operation = next((value for value in operations if command[:len(value.split())] == value.split()), 'docker')
+    repositories = '|'.join(re.escape(value) for value in
+                            [*REPOSITORIES.values(), 'pgvector/pgvector', 'ai-policy-investigator-postgres'])
+    reference = r'(?:' + repositories + r')(?:@' + DIGEST + r'|:(?:sha-' + SHA + r'|deploy-[0-9a-f]{64}|release-main|0\.8\.0-pg16))'
+    images = [value for value in command if re.fullmatch(reference, value)]
+    return operation + (' images=' + ','.join(images) if images else '')
+
+
+def docker_diagnostic(output):
+    """Classify Docker output without copying credentials, URLs, configs or log commands."""
+    text = output.decode('utf-8', errors='replace') if isinstance(output, bytes) else (output or '')
+    reasons = [
+        (r'unknown flag: --platform', 'PLATFORM_OPTION_UNSUPPORTED: check runner Docker CLI version'),
+        (r'requires API version|client version .*too (?:new|old)|minimum supported API version',
+         'API_VERSION_UNSUPPORTED: check runner Docker client/server API versions'),
+        (r'no matching manifest|no suitable export target|platform .*not found|does not match the specified platform',
+         'PLATFORM_UNAVAILABLE: verify the linux/amd64 manifest and local image variant'),
+        (r'denied|unauthorized|forbidden|authentication required|insufficient.scope',
+         'ACCESS_DENIED: check GHCR package Actions read access or runner Docker socket permissions'),
+        (r'manifest unknown|name unknown|no such image|not found|does not exist',
+         'IMAGE_NOT_FOUND: verify the published SHA tag/digest and local image alias'),
+        (r'no space left on device|disk quota exceeded', 'DISK_FULL: check runner disk space'),
+        (r'cannot connect to the docker daemon|is the docker daemon running|connection refused',
+         'DAEMON_UNAVAILABLE: check runner Docker daemon connectivity'),
+        (r'x509:|tls handshake|certificate verify failed', 'TLS_ERROR: check runner registry TLS connectivity'),
+        (r'toomanyrequests|too many requests|429', 'REGISTRY_RATE_LIMIT: check registry rate limits'),
+        (r'no such host|failed to resolve|network is unreachable|timeout|timed out|connection reset|unexpected EOF',
+         'NETWORK_ERROR: check runner registry network connectivity'),
+    ]
+    return next((message for pattern, message in reasons if re.search(pattern, text, re.IGNORECASE)),
+                'UNCLASSIFIED: raw Docker output withheld; check runner Docker versions and image availability')
+
+
 def run(command, input=None, timeout=600):
+    context = docker_context(command)
     try:
         result = subprocess.run(command, input=input, capture_output=True, timeout=timeout)
-        require(result.returncode == 0, 'RUNNER_DOCKER_OPERATION_FAILED')
+        if result.returncode:
+            raise DeploymentError('RUNNER_DOCKER_OPERATION_FAILED: ' + context
+                                  + ' exit=' + str(result.returncode) + '; '
+                                  + docker_diagnostic(result.stderr or result.stdout))
         return result.stdout
-    except (OSError, subprocess.TimeoutExpired):
-        raise DeploymentError('RUNNER_DOCKER_UNAVAILABLE_OR_TIMEOUT') from None
+    except subprocess.TimeoutExpired:
+        raise DeploymentError('RUNNER_DOCKER_UNAVAILABLE_OR_TIMEOUT: ' + context + ' timeout=' + str(timeout) + 's') from None
+    except OSError:
+        raise DeploymentError('RUNNER_DOCKER_UNAVAILABLE_OR_TIMEOUT: ' + context
+                              + ' START_FAILED: check runner Docker executable and permissions') from None
 
 
 def request(url, headers, allow_absent=False):
