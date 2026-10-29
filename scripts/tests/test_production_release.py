@@ -465,10 +465,12 @@ class PreparationFlowTest(unittest.TestCase):
                     pg = metadata['POSTGRES_IMAGE_REF']
                     return pg['raw'] if '--raw' in command else json.dumps({'digest': pg['manifestDigest']}).encode()
                 if command[:3] == ['docker', 'image', 'inspect']:
+                    self.assertNotIn('--platform', command)
                     pinned = command[-1]
                     key = next((k for k, repo in REPOSITORIES.items() if pinned.startswith(repo + '@')), 'POSTGRES_IMAGE_REF')
                     return json.dumps([{'Os': 'linux', 'Architecture': 'amd64', 'Id': metadata[key]['manifestDigest']}]).encode()
                 if command[:3] == ['docker', 'image', 'save']:
+                    self.assertNotIn('--platform', command)
                     destination = Path(command[command.index('--output') + 1])
                     key = destination.name.removesuffix('.raw')
                     shutil.copyfile(sources[key], destination)
@@ -480,6 +482,16 @@ class PreparationFlowTest(unittest.TestCase):
             proofs = controller.verify_archives(root / 'output', data)
             self.assertEqual(set(proofs), set(artifacts.KEYS))
             self.assertEqual(data['backendSha'], BACK); self.assertEqual(data['frontendSha'], FRONT)
+
+    def test_old_runner_inspect_and_save_without_platform_flags_still_verify_amd64(self):
+        pinned = REPOSITORIES['BACKEND_IMAGE_REF'] + '@sha256:' + 'c' * 64
+        command = ['docker', 'image', 'inspect', pinned]
+        self.assertEqual(prepare.docker_context(command), 'docker image inspect images=' + pinned)
+        # `pull --platform linux/amd64` remains explicit; inspect metadata still fails closed.
+        prepare.verify_runner_platform({'Os': 'linux', 'Architecture': 'amd64'})
+        for image in [{'Os': 'linux', 'Architecture': 'arm64'}, {'Os': 'windows', 'Architecture': 'amd64'}, {}]:
+            with self.subTest(image=image), self.assertRaisesRegex(DeploymentError, 'RUNNER_IMAGE_PLATFORM_MISMATCH'):
+                prepare.verify_runner_platform(image)
 
     def test_gzip_layer_diffid_is_verified_on_uncompressed_content(self):
         import gzip

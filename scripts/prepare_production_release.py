@@ -62,6 +62,10 @@ def docker_diagnostic(output):
                 'UNCLASSIFIED: raw Docker output withheld; check runner Docker versions and image availability')
 
 
+def verify_runner_platform(image):
+    require((image.get('Os'), image.get('Architecture')) == ('linux', 'amd64'), 'RUNNER_IMAGE_PLATFORM_MISMATCH')
+
+
 def run(command, input=None, timeout=600):
     context = docker_context(command)
     try:
@@ -164,8 +168,10 @@ def prepare(output, backend_sha, frontend_sha, configuration_sha, release_id, ro
                         'configDigest': json.loads(matching)['config']['digest']}
         pinned = repository + '@' + metadata['manifestDigest']
         run(['docker', 'pull', '--platform', 'linux/amd64', pinned])
-        image = json.loads(run(['docker', 'image', 'inspect', '--platform', 'linux/amd64', pinned]))[0]
-        require((image.get('Os'), image.get('Architecture')) == ('linux', 'amd64'), 'RUNNER_IMAGE_PLATFORM_MISMATCH')
+        # `pull --platform` pins the selected child manifest before it enters the local store.
+        # Avoid inspect --platform: it requires Docker API 1.49, newer than GitHub's runner.
+        image = json.loads(run(['docker', 'image', 'inspect', pinned]))[0]
+        verify_runner_platform(image)
         # Docker/containerd IDs are store metadata, not a portable content proof.
         # The exported config blob and layer DiffIDs are verified cryptographically below.
         config_digest = metadata['configDigest']
@@ -175,7 +181,9 @@ def prepare(output, backend_sha, frontend_sha, configuration_sha, release_id, ro
         local_ref = local_repo + ':deploy-' + metadata['manifestDigest'][7:]
         run(['docker', 'image', 'tag', pinned, local_ref])
         raw, target = output / (key + '.raw'), output / (key + '.tar')
-        run(['docker', 'image', 'save', '--platform', 'linux/amd64', '--output', str(raw), local_ref])
+        # The alias points to the selected amd64 child digest, so plain save exports that image.
+        # `save --platform` requires API 1.48 and is unnecessary for this digest-pinned alias.
+        run(['docker', 'image', 'save', '--output', str(raw), local_ref])
         normalized_archive(raw, target)
         migrations = archive_image(target, local_ref, config_digest, revision if key in REPOSITORIES else None,
                                    key == 'BACKEND_IMAGE_REF')
