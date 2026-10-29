@@ -5,6 +5,7 @@ import io
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -185,6 +186,98 @@ class RegistryTest(unittest.TestCase):
              patch.object(prepare, 'request', side_effect=[(b'{"token":"synthetic"}', {}), (b'{}', {})]):
             with self.assertRaisesRegex(DeploymentError, 'IMMUTABLE_TAG_ALREADY_EXISTS'):
                 prepare.ghcr_manifest(REPOSITORIES['BACKEND_IMAGE_REF'], 'sha-' + BACK, absent=True)
+
+
+class RunnerDockerDiagnosticsTest(unittest.TestCase):
+    PINNED = REPOSITORIES['BACKEND_IMAGE_REF'] + '@sha256:' + 'c' * 64
+
+    def failure(self, command, stderr, stdout=b''):
+        result = subprocess.CompletedProcess(command, 125, stdout, stderr)
+        with patch.object(prepare.subprocess, 'run', return_value=result):
+            with self.assertRaises(DeploymentError) as caught:
+                prepare.run(command)
+        return str(caught.exception)
+
+    def test_failed_operation_image_and_exit_code_are_reported(self):
+        for operation in [('pull',), ('image', 'inspect'), ('image', 'tag'),
+                          ('image', 'save'), ('buildx', 'imagetools', 'inspect')]:
+            with self.subTest(operation=operation):
+                command = ['docker', *operation, self.PINNED]
+                error = self.failure(command, b'unknown flag: --platform')
+                self.assertIn('RUNNER_DOCKER_OPERATION_FAILED', error)
+                self.assertIn('docker ' + ' '.join(operation), error)
+                self.assertIn(self.PINNED, error)
+                self.assertIn('exit=125', error)
+                self.assertIn('PLATFORM_OPTION_UNSUPPORTED', error)
+
+    def test_docker_reasons_have_actionable_safe_diagnostics(self):
+        cases = [
+            (b'--platform requires API version 1.49, but the Docker daemon API version is 1.47', 'API_VERSION_UNSUPPORTED'),
+            (b'Error response from daemon: denied: permission_denied: read_package', 'ACCESS_DENIED'),
+            (b'Error response from daemon: manifest unknown', 'IMAGE_NOT_FOUND'),
+            (b'no suitable export target found for platform linux/amd64', 'PLATFORM_UNAVAILABLE'),
+            (b'no space left on device', 'DISK_FULL'),
+            (b'Cannot connect to the Docker daemon. Is the docker daemon running?', 'DAEMON_UNAVAILABLE'),
+            (b'x509: certificate signed by unknown authority', 'TLS_ERROR'),
+            (b'lookup ghcr.io: no such host', 'NETWORK_ERROR'),
+            (b'toomanyrequests: retry later', 'REGISTRY_RATE_LIMIT'),
+        ]
+        for stderr, expected in cases:
+            with self.subTest(reason=expected):
+                self.assertIn(expected, self.failure(['docker', 'pull', self.PINNED], stderr))
+
+    def test_raw_streams_arguments_credentials_and_workflow_commands_never_leak(self):
+        private = (b'Authorization: Bearer synthetic-registry-token\n'
+                   b'https://user:synthetic-password@registry.invalid/?token=synthetic-query-token\n'
+                   b'-----BEGIN OPENSSH PRIVATE KEY-----\nsynthetic-key\n'
+                   b'::error::synthetic-workflow-injection\n')
+        for stderr in [private, b'denied: ' + private]:
+            with self.subTest(known_reason=stderr.startswith(b'denied')):
+                error = self.failure(['docker', 'image', 'save', '--output', '/private/synthetic-path',
+                                      self.PINNED, '--password=synthetic-command-secret'], stderr, private)
+                self.assertIn(self.PINNED, error)
+                for secret in ['synthetic-', 'PRIVATE KEY', 'Authorization', '::error::', 'registry.invalid']:
+                    self.assertNotIn(secret, error)
+        self.assertIn('UNCLASSIFIED', self.failure(['docker', 'pull', self.PINNED], private))
+        self.assertIn('ACCESS_DENIED', self.failure(['docker', 'pull', self.PINNED], b'', b'denied: ' + private))
+
+    def test_timeout_and_start_failure_include_context_without_private_exception(self):
+        command = ['docker', 'image', 'inspect', self.PINNED]
+        for exception, expected in [
+            (subprocess.TimeoutExpired(command, 17, output=b'synthetic-private', stderr=b'synthetic-private'), 'timeout=17s'),
+            (OSError('synthetic-private'), 'START_FAILED'),
+        ]:
+            with self.subTest(failure=expected), patch.object(prepare.subprocess, 'run', side_effect=exception):
+                with self.assertRaises(DeploymentError) as caught:
+                    prepare.run(command, timeout=17)
+                error = str(caught.exception)
+                self.assertIn('docker image inspect', error)
+                self.assertIn(self.PINNED, error)
+                self.assertIn(expected, error)
+                self.assertNotIn('synthetic-private', error)
+
+    def test_success_preserves_binary_stdout_and_subprocess_options(self):
+        command = ['docker', 'image', 'inspect', self.PINNED]
+        output = b'[{"Id":"sha256:synthetic"}]\n'
+        with patch.object(prepare.subprocess, 'run', return_value=subprocess.CompletedProcess(command, 0, output, b'')) as run, \
+             contextlib.redirect_stderr(io.StringIO()) as stderr:
+            self.assertEqual(prepare.run(command, input=b'synthetic-input', timeout=17), output)
+        run.assert_called_once_with(command, input=b'synthetic-input', capture_output=True, timeout=17)
+        self.assertEqual(stderr.getvalue(), '')
+
+    def test_deploy_entrypoint_keeps_diagnostic_in_actions_stderr_and_exit_two(self):
+        import run_production_deploy as pipeline
+        command = ['docker', 'image', 'inspect', self.PINNED]
+        argv = ['run_production_deploy.py', '--output', '/unused']
+        result = subprocess.CompletedProcess(command, 125, b'', b'unknown flag: --platform')
+        with patch.object(sys, 'argv', argv), patch.object(pipeline, 'validate_manual'), \
+             patch.object(pipeline, 'deploy', side_effect=lambda args: prepare.run(command)), \
+             patch.object(prepare.subprocess, 'run', return_value=result), \
+             contextlib.redirect_stderr(io.StringIO()) as stderr, contextlib.redirect_stdout(io.StringIO()) as stdout:
+            self.assertEqual(pipeline.main(), 2)
+        self.assertEqual(stdout.getvalue(), '')
+        self.assertIn('docker image inspect', stderr.getvalue())
+        self.assertIn('PLATFORM_OPTION_UNSUPPORTED', stderr.getvalue())
 
 
 class TransportTest(unittest.TestCase):
