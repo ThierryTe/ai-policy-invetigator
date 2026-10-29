@@ -2,16 +2,13 @@
 
 The suggested login is **demo@policy-investigator.local**. Its password is the value
 of **DEMO_PASSWORD** in your private local environment. There is no default password.
-On the verified development machine it was generated privately in `.local/demo.env`
-(mode 0600); open that ignored file locally to use the value. Never commit or share it.
+Keep its value in an ignored private file or process environment; never commit or share it.
 
-## What changed
+## Authentication and scope
 
-Only the backend repository needs a change. Authentication remains the existing
-`POST /api/auth/login` BCrypt check and short-lived JWT, followed by `/api/auth/me`.
-Angular already uses those endpoints, stores tokens in memory and handles session
-expiry. No frontend code, registration endpoint, security filter, JWT setting,
-application property, migration or deployment file changed.
+The demo uses the existing POST /api/auth/login BCrypt check and short-lived JWT,
+followed by /api/auth/me. Angular stores the token in memory and handles session expiry.
+No authentication bypass or automatic startup seed is involved.
 
 `scripts/setup_demo.py` reuses the existing operator psql/pgcrypto provisioning
 approach from `scripts/provision_user.sql`. This is an explicit operator command,

@@ -1,4 +1,6 @@
 # Optional image-only release overlay, applied AFTER the frontend production overlay.
 services:
   frontend:
-    image: ${FRONTEND_IMAGE_REF:?Export the approved frontend image digest reference}
+    image: ${FRONTEND_IMAGE_REF:?Select the locally loaded frontend image reference}
+    pull_policy: never
+    build: !reset null

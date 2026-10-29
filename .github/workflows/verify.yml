@@ -1,14 +1,14 @@
 name: Backend CI
 on:
   push:
-    branches: [develop]
+    branches: [develop, main]
   pull_request:
     branches: [main]
 permissions:
   contents: read
 concurrency:
   group: backend-ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   verify:
     runs-on: ubuntu-24.04
@@ -40,3 +40,24 @@ jobs:
           python3 -B scripts/verify_production_compose.py --frontend-directory "$POLICY_FRONTEND_DIRECTORY"
       - name: Build production backend image without running it
         run: docker build --file deploy/backend/Dockerfile --tag policy-investigator-backend:ci .
+
+  publish:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'ThierryTe/ai-policy-invetigator'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/publish-images.yml
+    with:
+      component: backend
+
+  deploy:
+    needs: publish
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/deploy-production.yml
+    with:
+      component: backend
+      source_sha: ${{ github.sha }}
+    secrets: inherit

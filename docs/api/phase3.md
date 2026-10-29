@@ -1,6 +1,6 @@
-# Phase 3 API contracts
+# Consent and investigation API
 
-All routes require the Phase 2 bearer JWT. Permissions come from current database
+All routes require the bearer JWT documented in [authentication](phase2.md). Permissions come from current database
 memberships/grants, not token role claims. An inaccessible investigation or source
 returns 404. Failure bodies use the existing safe problem-details contract.
 
@@ -59,7 +59,6 @@ INCOMPLETE_ASSESSMENT, PROVIDER_TIMEOUT, PROVIDER_AUTHENTICATION_FAILED,
 INVESTIGATION_BUDGET_OR_LEASE_EXHAUSTED and SOURCE_COVERAGE_BUDGET_EXCEEDED.
 See source for the exhaustive set; clients should handle unknown safe codes generically.
 
-The future dashboard can map requirements/version IDs to graph nodes and assessments
-to edges while resolving evidence on selection. There is no graph aggregate, review
-submission, single-finding route, export or Angular dashboard in this phase. Pending
-review is a mandatory state, not a completed human approval.
+The implemented graph and append-only human review APIs are documented in the
+[dashboard contract](phase4.md). The initial PENDING_REVIEW value is not a completed
+human approval. No single-finding route or exported-report endpoint is provided.

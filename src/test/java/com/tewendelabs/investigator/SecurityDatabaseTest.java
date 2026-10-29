@@ -144,6 +144,27 @@ class SecurityDatabaseTest {
     }
 
     @Test
+    void deploymentChecksumsMatchActualFlywayHistory() throws Exception {
+        var process = new ProcessBuilder("python3", "-B", "-c", """
+                import pathlib,sys
+                sys.path.insert(0,'scripts')
+                from release_artifacts import flyway_checksum
+                for p in sorted(pathlib.Path('src/main/resources/db/migration').glob('V*.sql')):
+                    print(p.name + '\\t' + str(flyway_checksum(p.read_bytes())))
+                """).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+        assertThat(process.waitFor(20, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        assertThat(process.exitValue()).isZero();
+        var computed = process.inputReader().lines().map(line -> line.split("\\t"))
+                .collect(java.util.stream.Collectors.toMap(parts -> parts[0], parts -> Integer.parseInt(parts[1])));
+        var applied = admin.queryForList("select script,checksum,success from flyway_schema_history");
+        assertThat(computed).hasSize(applied.size()).isNotEmpty();
+        for (var row : applied) {
+            assertThat(row.get("success")).isEqualTo(true);
+            assertThat(computed.get(row.get("script"))).isEqualTo(row.get("checksum"));
+        }
+    }
+
+    @Test
     void jdbcJpaAndConnectionReuseDenyOtherDepartment() throws Exception {
         var result = upload();
         assertThat(scope.as(analyst, () -> repository.findById(result.policyId()))).isPresent();

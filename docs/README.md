@@ -1,0 +1,20 @@
+# Project documentation
+
+Start with the [project overview](../README.md), then choose a guide:
+
+| Guide | Contents |
+|---|---|
+| [Architecture](ARCHITECTURE.md) | Components, data model, AI pipeline, authorization and reliability |
+| [Local installation and configuration](SETUP.md) | Prerequisites, environment variables, Docker and host development |
+| [Synthetic demonstration](DEMO.md) | Private demo login, PDF fixtures and the complete browser workflow |
+| [API: documents and authentication](api/phase2.md) | Login, upload, immutable versions, ingestion and evidence |
+| [API: investigations](api/phase3.md) | Consent, asynchronous jobs, structured requirements and findings |
+| [API: dashboard and human review](api/phase4.md) | Status, graph, verified citations and append-only review actions |
+| [Evaluation and reproducibility](EVALUATION.md) | Golden datasets, recorded real inference, errors and limitations |
+| [Production CI/CD](PRODUCTION_PIPELINE.md) | Main-branch publication, SSH image delivery, GitHub configuration and rollback |
+| [Production operations](DEPLOYMENT.md) | Network topology, initial account, backup and restore |
+| [Reuse and contributions](provenance/HACKATHON_CONTRIBUTIONS.md) | Pre-existing work, exact imports and Investigator-specific development |
+
+The API filenames retain their original names to preserve existing links; they are
+current contracts, not development plans. Selected machine-readable evidence remains
+under `verification/`. See [evaluation](EVALUATION.md) for its purpose and limitations.

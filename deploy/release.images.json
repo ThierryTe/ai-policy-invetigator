@@ -1,0 +1,5 @@
+{
+  "BACKEND_IMAGE_REF": "ghcr.io/thierryte/ai-policy-invetigator:sha-b97c0d7146677019ec22c68c3ad0fdc6df504b92",
+  "MODEL_INIT_IMAGE_REF": "ghcr.io/thierryte/ai-policy-invetigator-model-init:sha-b97c0d7146677019ec22c68c3ad0fdc6df504b92",
+  "FRONTEND_IMAGE_REF": "ghcr.io/thierryte/ai-policy-invetigator-frontend:sha-0208045e285c05b387b4d5e30fc0ae2b9d7ccd5e"
+}

@@ -1,4 +1,4 @@
-# Phase 2 contracts
+# Authentication, document and evidence API
 
 All routes except login and minimal health require a bearer JWT. Content responses
 are scoped to current authorization. Inaccessible IDs return 404. Invalid/disabled
@@ -40,16 +40,9 @@ Errors handled by the API use application/problem+json with `status`, `title`, a
 `code`. Authentication failures can have an empty 401 response; the login throttle
 returns 429 and Retry-After. Clients must branch on HTTP status before parsing a body.
 
-## Future dashboard contracts (not implemented routes)
+## Related APIs
 
-Phase 3/4 investigation requests will name baseline/new version IDs, procedure
-version IDs and the analysis date. Responses will freeze this scope and return a job
-ID with stage and completeness. Graph nodes reference policy/version IDs; edges
-reference changed requirements and findings. Findings reference verified source IDs,
-classification, severity, concise rationale, suggested action and review status.
-Reviews contain decision/comment/expected revision. Reports and graph data require
-current access to every contributing source. No placeholder findings or success
-responses are served in Phase 2. Field casing of the new investigation DTOs will be
-camelCase; the Angular API mapper can normalize the explicitly documented SQL views.
+See [investigations and consent](phase3.md) and [dashboard/review contracts](phase4.md)
+for the implemented policy-change workflow. Exported report files are outside the MVP.
 
 Search returns 409 EMBEDDING_REVISION_MISMATCH when a version was indexed with a different model revision; an empty result must not hide incompatible vectors.
