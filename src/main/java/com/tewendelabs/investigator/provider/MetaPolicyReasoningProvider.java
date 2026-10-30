@@ -6,30 +6,39 @@ import java.util.concurrent.*;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.tewendelabs.investigator.api.ApiFailure;
 import com.tewendelabs.investigator.investigation.*;
 import tools.jackson.databind.JsonNode;
 
 @Component
 public class MetaPolicyReasoningProvider implements PolicyReasoningProvider {
+    private static final Logger LOG = LoggerFactory.getLogger(MetaPolicyReasoningProvider.class);
     private final MetaTransport transport;
     private final ProviderGate gate;
     private final String key, model;
     private final Duration callTimeout;
     private final int retries;
+    private final int maxCompletionTokens;
     private final Semaphore slots;
 
     public MetaPolicyReasoningProvider(MetaTransport transport, ProviderGate gate, @Value("${meta.api.key:}") String key,
                                        @Value("${meta.model:muse-spark-1.3}") String model, @Value("${meta.timeout-seconds:30}") int seconds,
-                                       @Value("${meta.max-retries:2}") int retries, @Value("${meta.concurrency:2}") int concurrency) {
+                                       @Value("${meta.max-retries:2}") int retries, @Value("${meta.concurrency:2}") int concurrency,
+                                       @Value("${meta.max-completion-tokens:4096}") int maxCompletionTokens) {
         if (seconds < 1 || seconds > 60 || retries < 0 || retries > 2 || concurrency < 1 || concurrency > 4)
             throw new IllegalArgumentException("Invalid provider limits");
+        // Application guardrail, not a claim about the model's maximum output length.
+        if (maxCompletionTokens < 4096 || maxCompletionTokens > 8192)
+            throw new IllegalArgumentException("meta.max-completion-tokens must be between 4096 and 8192");
         this.transport = transport;
         this.gate = gate;
         this.key = key;
         this.model = model;
         this.callTimeout = Duration.ofSeconds(seconds);
         this.retries = retries;
+        this.maxCompletionTokens = maxCompletionTokens;
         this.slots = new Semaphore(concurrency, true);
     }
 
@@ -52,7 +61,7 @@ public class MetaPolicyReasoningProvider implements PolicyReasoningProvider {
                 gate.beforeAttempt(request); // AFTER semaphore/backoff; every retry rechecks current permissions and consent.
                 String input = JsonContract.encode(Map.of("task", request.task(), "sources", request.sources()));
                 if (input.length() > 32000) throw new ApiFailure(422, "CONTEXT_BUDGET_EXCEEDED");
-                var payload = Map.of("model", model, "reasoning_effort", "low", "max_completion_tokens", 4096,
+                var payload = Map.of("model", model, "reasoning_effort", "low", "max_completion_tokens", maxCompletionTokens,
                         "messages", List.of(Map.of("role", "system", "content", SYSTEM), Map.of("role", "user", "content", input)),
                         "response_format", Map.of("type", "json_schema", "json_schema", Map.of("name", request.schemaVersion().replace('-', '_'), "strict", true, "schema", InvestigationSchemas.schema(request.schemaVersion()))));
                 long started = System.nanoTime();
@@ -72,10 +81,17 @@ public class MetaPolicyReasoningProvider implements PolicyReasoningProvider {
                         throw new ApiFailure(502, "PROVIDER_USAGE_INVALID");
                     long latency = (System.nanoTime() - started) / 1_000_000;
                     gate.usage(request, prompt, completion, latency);
+                    var choice = envelope.path("choices").path(0);
+                    String finishReason = normalizedFinishReason(choice.path("finish_reason"));
+                    var refusal = choice.path("message").path("refusal");
+                    boolean refused = !refusal.isMissingNode() && !refusal.isNull();
+                    // Only fixed vocabulary, UUIDs and counters; never log provider text or credentials.
+                    LOG.info("meta_provider_event job_id={} attempt={} finish_reason={} refusal={} prompt_tokens={} completion_tokens={} total_tokens={} max_completion_tokens={} latency_ms={}",
+                            request.investigationId(), attempt + 1, finishReason,
+                            refused, prompt, completion, prompt + completion, maxCompletionTokens, latency);
                     if (!model.equals(envelope.path("model").asString()))
                         throw new ApiFailure(502, "PROVIDER_MODEL_MISMATCH");
-                    var choice = envelope.path("choices").path(0);
-                    if (!"stop".equals(choice.path("finish_reason").asString()) || !choice.path("message").path("refusal").isMissingNode() && !choice.path("message").path("refusal").isNull())
+                    if (!"stop".equals(finishReason) || refused)
                         throw new ApiFailure(502, "INCOMPLETE_PROVIDER_OUTPUT");
                     JsonNode content = JsonContract.parse(choice.path("message").path("content").asString());
                     JsonContract.validate(content, InvestigationSchemas.schema(request.schemaVersion()));
@@ -95,6 +111,15 @@ public class MetaPolicyReasoningProvider implements PolicyReasoningProvider {
         } finally {
             if (acquired) slots.release();
         }
+    }
+
+    private static String normalizedFinishReason(JsonNode value) {
+        if (value.isMissingNode() || value.isNull()) return "missing";
+        if (!value.isString()) return "other";
+        return switch (value.asString()) {
+            case "stop", "length", "content_filter", "tool_calls", "function_call" -> value.asString();
+            default -> "other";
+        };
     }
 
     private int positive(JsonNode value) {
