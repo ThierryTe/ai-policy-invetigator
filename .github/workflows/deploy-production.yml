@@ -1,5 +1,6 @@
-name: Deploy production after publication
+name: Reviewed V8 production release
 on:
+  # Compatibility for existing callers; the deployment job refuses workflow_call.
   workflow_call:
     inputs:
       component:
@@ -35,7 +36,53 @@ on:
         description: Previously validated release ID for rollback
         type: string
       allow_migrations:
-        description: Explicit migration approval for manual recovery
+        description: Permit migration only in migrate-v8 phase
+        type: boolean
+        default: false
+      phase:
+        description: Separate migration and worker-reactivation approvals
+        type: choice
+        options: [migrate-v8, activate-v8]
+        default: migrate-v8
+      expected_previous:
+        description: Actual approved last-successful release ID
+        type: string
+      approved_backend_digest:
+        description: Reviewed linux/amd64 backend child manifest digest
+        type: string
+      evidence_ref:
+        description: Non-secret change-record ID (uppercase letters, digits, dot, dash, underscore)
+        type: string
+      confirm_github_protection:
+        description: I attest prod required reviewers/main-only protection is configured (not verified here)
+        type: boolean
+        default: false
+      confirm_v7_preflight:
+        description: I attest target-specific V7 preflight passed; reference held in change record
+        type: boolean
+        default: false
+      confirm_v7_backup:
+        description: I attest a checksum-verified V7 backup is retained privately
+        type: boolean
+        default: false
+      confirm_isolated_restore:
+        description: I attest this exact backup restored and verified on an isolated target
+        type: boolean
+        default: false
+      confirm_write_freeze:
+        description: I attest a probe-compatible writer/delivery freeze is active
+        type: boolean
+        default: false
+      confirm_image_qualification:
+        description: I attest the approved image/build profile is qualified; SQL matching is not binary identity
+        type: boolean
+        default: false
+      confirm_v8_acceptance:
+        description: Activation only - I attest V8 data/access/quota verification passed
+        type: boolean
+        default: false
+      confirm_worker_reactivation:
+        description: Activation only - I approve queued work resuming and consuming Meta attempts
         type: boolean
         default: false
 permissions:
@@ -46,12 +93,31 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main' && (github.repository == 'ThierryTe/ai-policy-invetigator' || (github.event_name != 'workflow_dispatch' && github.repository == 'ThierryTe/ai-policy-invetigator-frontend'))
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'ThierryTe/ai-policy-invetigator'
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     environment:
       name: prod
       url: https://ai-policy.tewendelabs.com
+    env:
+      OPERATION: ${{ inputs.operation }}
+      BACKEND_SHA: ${{ inputs.backend_sha }}
+      FRONTEND_SHA: ${{ inputs.frontend_sha }}
+      ROLLBACK_RELEASE: ${{ inputs.rollback_release }}
+      ALLOW_MIGRATIONS: ${{ inputs.allow_migrations }}
+      RELEASE_PHASE: ${{ inputs.phase }}
+      EXPECTED_PREVIOUS: ${{ inputs.expected_previous }}
+      APPROVED_BACKEND_DIGEST: ${{ inputs.approved_backend_digest }}
+      EVIDENCE_REF: ${{ inputs.evidence_ref }}
+      RELEASE_OPERATOR: ${{ github.actor }}
+      CONFIRM_GITHUB_PROTECTION: ${{ inputs.confirm_github_protection }}
+      CONFIRM_V7_PREFLIGHT: ${{ inputs.confirm_v7_preflight }}
+      CONFIRM_V7_BACKUP: ${{ inputs.confirm_v7_backup }}
+      CONFIRM_ISOLATED_RESTORE: ${{ inputs.confirm_isolated_restore }}
+      CONFIRM_WRITE_FREEZE: ${{ inputs.confirm_write_freeze }}
+      CONFIRM_IMAGE_QUALIFICATION: ${{ inputs.confirm_image_qualification }}
+      CONFIRM_V8_ACCEPTANCE: ${{ inputs.confirm_v8_acceptance }}
+      CONFIRM_WORKER_REACTIVATION: ${{ inputs.confirm_worker_reactivation }}
     steps:
       - name: Check out versioned backend deployment tooling, including frontend calls
         id: tooling
@@ -63,6 +129,8 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
+      - name: Validate explicit inputs before registry or SSH access
+        run: python3 -B scripts/validate_release_dispatch.py
       - name: Verify deployment tooling and production topology
         env:
           POLICY_FRONTEND_DIRECTORY: ${{ github.workspace }}/.ci/frontend
@@ -73,17 +141,7 @@ jobs:
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCKER_CONFIG: ${{ runner.temp }}/policy-registry
-          COMPONENT: ${{ inputs.component }}
-          SOURCE_SHA: ${{ inputs.source_sha }}
           CONFIGURATION_SHA: ${{ steps.tooling.outputs.commit }}
-          OPERATION: ${{ inputs.operation || 'deploy' }}
-          BACKEND_SHA: ${{ inputs.backend_sha }}
-          FRONTEND_SHA: ${{ inputs.frontend_sha }}
-          ROLLBACK_RELEASE: ${{ inputs.rollback_release }}
-          MANUAL_ALLOW_MIGRATIONS: ${{ inputs.allow_migrations }}
-          AUTO_APPLY_MIGRATIONS: ${{ vars.AUTO_APPLY_MIGRATIONS }}
-          INITIAL_BACKEND_SHA: ${{ vars.INITIAL_BACKEND_SHA }}
-          INITIAL_FRONTEND_SHA: ${{ vars.INITIAL_FRONTEND_SHA }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USERNAME: ${{ secrets.VPS_USERNAME }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
@@ -97,16 +155,11 @@ jobs:
           if [[ "$OPERATION" != rollback ]]; then
             printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           fi
-          args=(--operation "$OPERATION" --configuration-sha "$CONFIGURATION_SHA" --output "$RUNNER_TEMP/policy-releases")
-          if [[ -n "$COMPONENT" ]]; then
-            args+=(--component "$COMPONENT" --source-sha "$SOURCE_SHA")
-            if [[ "$AUTO_APPLY_MIGRATIONS" == true ]]; then args+=(--allow-migrations); fi
-          else
-            args+=(--backend-sha "$BACKEND_SHA" --frontend-sha "$FRONTEND_SHA" --rollback-release "$ROLLBACK_RELEASE")
-            if [[ "$MANUAL_ALLOW_MIGRATIONS" == true ]]; then args+=(--allow-migrations); fi
-          fi
+          args=(--operation "$OPERATION" --configuration-sha "$CONFIGURATION_SHA" --output "$RUNNER_TEMP/policy-releases"
+                --backend-sha "$BACKEND_SHA" --frontend-sha "$FRONTEND_SHA" --rollback-release "$ROLLBACK_RELEASE")
+          if [[ "$ALLOW_MIGRATIONS" == true ]]; then args+=(--allow-migrations); fi
           python3 -B scripts/run_production_deploy.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
       - name: Report verification boundary
         if: always()
         run: |
-          printf '%s\n' 'Only a VALIDATED report proves VPS health, migrations and HTTPS routing passed. PostgreSQL is never restored or recreated automatically.' >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' 'VALIDATED means automated release checks passed. Backup, isolated restore, write freeze, GitHub protection and image qualification are OPERATOR ATTESTATIONS, not independently verified by this workflow. Embedded SQL matching does not establish JAR binary identity. Worker reactivation requires a separate activate-v8 dispatch. No automatic database rollback is performed.' >> "$GITHUB_STEP_SUMMARY"

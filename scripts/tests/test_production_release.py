@@ -314,7 +314,9 @@ class TransportTest(unittest.TestCase):
             with self.assertRaisesRegex(DeploymentError, '^SSH_NETWORK_FAILED$'): transport.execute(['ssh'], 'SSH_NETWORK_FAILED')
 
     def test_dispatch_validates_explicit_pair_and_exclusive_rollback(self):
-        dispatch.validate({'OPERATION': 'deploy', 'BACKEND_SHA': BACK, 'FRONTEND_SHA': FRONT})
+        from test_release_safety import attestations
+        dispatch.validate({**attestations(), 'OPERATION': 'deploy', 'BACKEND_SHA': BACK,
+                           'FRONTEND_SHA': FRONT, 'ALLOW_MIGRATIONS': 'true'})
         dispatch.validate({'OPERATION': 'rollback', 'ROLLBACK_RELEASE': 'r123-1', 'ALLOW_MIGRATIONS': 'false'})
         for env in [{'OPERATION': 'deploy', 'BACKEND_SHA': 'main', 'FRONTEND_SHA': FRONT},
                     {'OPERATION': 'rollback', 'ROLLBACK_RELEASE': '../x', 'ALLOW_MIGRATIONS': 'false'},
@@ -347,7 +349,9 @@ class ControllerTest(unittest.TestCase):
             if command[:2] == ['docker', 'wait']: return '0'
             if fail and fail in command: raise DeploymentError('SIMULATED_' + fail.upper() + '_FAILED')
             return ''
-        with patch.object(controller, 'reviewed_configuration'), patch.object(controller, 'commands', return_value=(['back'], ['front'], {}, {})), \
+        # Generic health/rollback fixtures; real V8 gates have dedicated integration tests.
+        with patch.object(controller, 'validate_release', return_value=None), \
+             patch.object(controller, 'reviewed_configuration'), patch.object(controller, 'commands', return_value=(['back'], ['front'], {}, {})), \
              patch.object(controller, 'verify_archives', return_value={k: {'diffIds': [], 'imageConfig': {}} for k in artifacts.KEYS}), patch.object(controller, 'execute', side_effect=execute) as run, \
              patch.object(controller, 'inspect_image', return_value={'platform': 'linux/amd64'}), \
              patch.object(controller, 'json_command', return_value=[{'Id': 'sha256:' + 'd' * 64, 'RootFS': {'Layers': []}, 'Os': 'linux', 'Architecture': 'amd64', 'Config': {}}]), \
@@ -437,7 +441,8 @@ class AdditionalSafetyTest(unittest.TestCase):
                 target = root / name; target.parent.mkdir(parents=True, exist_ok=True); target.write_bytes(source.read_bytes())
             env_file = root / 'private.env'
             env_file.write_text('\n'.join(k + '=synthetic-configuration-test-at-least-32-bytes' for k in
-                                         ['MODEL_API_KEY', 'JWT_SECRET', 'APP_DB_PASSWORD', 'OWNER_DB_PASSWORD', 'POSTGRES_ADMIN_PASSWORD']))
+                                         ['MODEL_API_KEY', 'JWT_SECRET', 'APP_DB_PASSWORD', 'OWNER_DB_PASSWORD', 'POSTGRES_ADMIN_PASSWORD'])
+                                + '\nAPP_WORKER_ENABLED=false\nAPP_INVESTIGATION_WORKER_ENABLED=false\n')
             env_file.chmod(0o600)
             # Docker Desktop's CLI plugin lives in the test user's home; the VPS controller uses /root.
             real_execute = controller.execute

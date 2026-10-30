@@ -68,7 +68,7 @@ class ProductionComposeTest(unittest.TestCase):
         # Exercise that path with an isolated non-secret fixture and all backend overlays.
         with tempfile.TemporaryDirectory() as directory:
             env_file = Path(directory) / 'runtime.env'
-            env_file.write_text('META_MAX_COMPLETION_TOKENS=8192\n')
+            env_file.write_text('META_MAX_COMPLETION_TOKENS=8192\nAPP_WORKER_ENABLED=false\nAPP_INVESTIGATION_WORKER_ENABLED=false\n')
             env_file.chmod(0o600)
             env = {'PATH': os.environ['PATH'],
                    **{key: 'synthetic-configuration-validation-only' for key in

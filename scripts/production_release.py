@@ -26,6 +26,7 @@ from deploy_local_images import (DeploymentError, ROOT, PROJECT, UI_PROJECT, req
                                  check_runtime, inspect_image)
 from release_artifacts import (RELEASE_ID, CONFIG_FILES, RUNTIME_FILES, archive_image, file_sha,
                                sha, validate_manifest, migration_gate)
+from release_safety import validate_release, validate_workers, validate_target, explicit_worker_inputs
 
 BASE = Path('/opt/ai-policy-investigator')
 
@@ -41,9 +42,12 @@ def commands(data, env_file, root=ROOT):
     require(env_file.is_file() and not env_file.is_symlink()
             and env_file.stat().st_uid == os.geteuid()
             and stat.S_IMODE(env_file.stat().st_mode) & 0o077 == 0, 'PRIVATE_ENV_FILE_PERMISSIONS_REQUIRE_600')
+    worker_inputs = explicit_worker_inputs(env_file)
     # Do not inherit stale image/secret variables from SSH or sudo.
     env = {'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'HOME': pwd.getpwuid(os.geteuid()).pw_dir}
     env.update({key: value['localRef'] for key, value in data['images'].items()})
+    # Pin validated literals across later Compose calls even if the private file changes.
+    env.update(worker_inputs)
     back, front = compose_commands(root, root / 'frontend', env_file)
     # Compose global options must precede the command (and may follow --profile app).
     back += ['-f', str(root / 'deploy/automation/compose.yaml')]
@@ -151,6 +155,16 @@ def healthy_service(command, service, env):
             and row['State'].get('Health', {}).get('Status') == 'healthy', 'CONTAINER_NOT_HEALTHY')
 
 
+def target_preflight(back, env, version):
+    # Stream the reviewed read-only psql script; never put credentials or SQL in a shell.
+    sql = (Path(__file__).resolve().parent / 'qualification_v8_preflight.sql').read_text()
+    output = execute(back + ['exec', '-T', '--user', 'postgres', 'postgres', 'psql', '-X', '-U',
+                            'postgres', '-d', 'investigator', '-v', 'ON_ERROR_STOP=1',
+                            '-v', 'expected_database=investigator', '-v', 'target_version=' + str(version)],
+                     env, 'TARGET_V8_PREFLIGHT_FAILED', input=sql)
+    require('V8_QUALIFICATION_PREFLIGHT_PASS' in output, 'TARGET_V8_PREFLIGHT_FAILED')
+
+
 def routing(front, env, public_url):
     execute(front + ['exec', '-T', 'frontend', 'wget', '-q', '--spider', 'http://127.0.0.1:8080/healthz'],
             env, 'FRONTEND_INTERNAL_HEALTH_FAILED')
@@ -164,8 +178,11 @@ def routing(front, env, public_url):
 
 
 def activate(directory, data, settings, rollback=False, allow_migrations=False, base=BASE, root=ROOT):
+    phase = validate_release(data, allow_migrations) if not rollback else None
     reviewed_configuration(data, root)
     back, front, env, config = commands(data, Path(settings['envFile']), root)
+    if phase is not None:
+        validate_workers(config, phase)
     proofs = verify_archives(directory, data)
     state_file = base / 'last-successful.json'
     previous = json.loads(state_file.read_text()) if state_file.exists() else None
@@ -185,6 +202,12 @@ def activate(directory, data, settings, rollback=False, allow_migrations=False, 
     check_runtime(config)  # Existing NPM, topology and explicit local platform checks; no Meta inference.
     postgres = data['images']['POSTGRES_IMAGE_REF']
     existing_database = verify_existing_postgres([postgres['configDigest'], postgres['manifestDigest']], proofs['POSTGRES_IMAGE_REF'])
+    if phase is not None:
+        require(existing_database, 'V8_EXISTING_DATABASE_REQUIRED')
+        applied = history(back, env)
+        validate_target(data, previous, applied, phase)
+        migration_gate(applied, data['migrations'], previous.get('migrations'), False, allow_migrations)
+        target_preflight(back, env, 7 if phase == 'migrate-v8' else 8)
     require(existing_database or allow_migrations, 'FIRST_INSTALL_MIGRATIONS_REQUIRE_APPROVAL')
     execute(back + ['up', '-d', '--no-recreate', '--no-build', '--pull', 'never', '--wait', '--wait-timeout', '90', 'postgres'],
             env, 'DATABASE_HEALTH_FAILED', timeout=120)
@@ -202,6 +225,13 @@ def activate(directory, data, settings, rollback=False, allow_migrations=False, 
     execute(back + ['up', '-d', '--no-deps', '--force-recreate', '--no-build', '--pull', 'never', '--wait', '--wait-timeout', '360', 'backend'],
             env, 'BACKEND_HEALTH_FAILED', timeout=390)
     healthy_service(back, 'backend', env)
+    if phase is not None:
+        value = 'false' if phase == 'migrate-v8' else 'true'
+        execute(back + ['exec', '-T', 'backend', 'sh', '-c',
+                        'test "$APP_WORKER_ENABLED" = ' + value +
+                        ' && test "$APP_INVESTIGATION_WORKER_ENABLED" = ' + value],
+                env, 'RUNNING_WORKER_PHASE_MISMATCH')
+        target_preflight(back, env, 8)
     execute(front + ['up', '-d', '--no-deps', '--force-recreate', '--no-build', '--pull', 'never', '--wait', '--wait-timeout', '120', 'frontend'],
             env, 'FRONTEND_HEALTH_FAILED', timeout=150)
     healthy_service(front, 'frontend', env)
@@ -212,6 +242,11 @@ def activate(directory, data, settings, rollback=False, allow_migrations=False, 
               'migrations': data['migrations'], 'previous': previous['id'] if previous else None,
               'configurationSha': data['configurationSha'], 'images': data['images'],
               'validatedAt': datetime.now(timezone.utc).isoformat(), 'result': 'VALIDATED', 'rollback': rollback}
+    if phase is not None:
+        result.update(releaseSafety=data['releaseSafety'], configuration=data['configuration'], runtime=data['runtime'],
+                      validationScope='Automated release checks passed; external checks remain operator attestations.',
+                      targetPreflightVerified=True, qualifiedMigrationInventoryVerified=True,
+                      binaryIdentityVerified=False)
     (directory / 'validated.json').write_text(json.dumps(result, indent=2) + '\n')
     temporary = base / 'last-successful.tmp'
     temporary.write_text(json.dumps(result, indent=2) + '\n')

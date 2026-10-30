@@ -3,6 +3,7 @@ package com.tewendelabs.investigator;
 import java.util.*;
 import java.time.LocalDate;
 import java.sql.Connection;
+import com.tewendelabs.investigator.investigation.InvestigationService.Create;
 
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -804,12 +805,300 @@ class SecurityDatabaseTest {
     }
 
     private void sqlInvestigation(Connection c, UUID actor, InvestigationFixture fixture) throws Exception {
-        UUID id = UUID.randomUUID();
-        try (var p = c.prepareStatement("insert into investigations(id,requested_by,request_key,payload_digest,baseline_id,replacement_id,procedure_ids,analysis_date) values(?,?,?,'test-digest',?,?,?,date '2026-10-27')")) {
-            p.setObject(1, id); p.setObject(2, actor); p.setObject(3, UUID.randomUUID()); p.setObject(4, fixture.baseline()); p.setObject(5, fixture.replacement());
-            p.setArray(6, c.createArrayOf("uuid", new UUID[]{fixture.procedure()})); p.executeUpdate();
-        }
+        sqlInvestigation(c, actor, scopeOf(fixture));
+    }
+
+    private UUID sqlInvestigation(Connection c, UUID actor, Create request) throws Exception {
+        UUID id = sqlInvestigationRow(c, actor, request);
         try (var p = c.prepareStatement("select schedule_investigation(?)")) { p.setObject(1, id); p.execute(); }
+        return id;
+    }
+
+    private UUID sqlInvestigationRow(Connection c, UUID actor, Create request) throws Exception {
+        UUID id = UUID.randomUUID();
+        try (var p = c.prepareStatement("insert into investigations(id,requested_by,request_key,payload_digest,baseline_id,replacement_id,procedure_ids,analysis_date) values(?,?,?,'test-digest',?,?,?,?)")) {
+            p.setObject(1, id); p.setObject(2, actor); p.setObject(3, UUID.randomUUID()); p.setObject(4, request.baselineVersionId()); p.setObject(5, request.replacementVersionId());
+            p.setArray(6, c.createArrayOf("uuid", request.procedureVersionIds().toArray())); p.setObject(7, request.analysisDate()); p.executeUpdate();
+        }
+        return id;
+    }
+
+    private void shareWithJudge(InvestigationFixture fixture) {
+        demoProfile(outsider, hr);
+        admin.update("insert into policy_grants(policy_id,department_id,permission) select policy_id,?,'READ' from policy_versions where id in (?,?)",
+                hr, fixture.replacement(), fixture.procedure());
+    }
+
+    private boolean runtimeBoolean(UUID actor, String sql, Object... parameters) throws Exception {
+        try (var c = runtimeConnection(actor); var p = c.prepareStatement(sql)) {
+            for (int n = 0; n < parameters.length; n++) p.setObject(n + 1, parameters[n]);
+            try (var r = p.executeQuery()) { assertThat(r.next()).isTrue(); return r.getBoolean(1); }
+        }
+    }
+
+    @Test
+    void judgeReadonlySharedScopeRunsWithAdmissionAndMetaReservationsButWithoutContentWrite() throws Exception {
+        var fixture = investigationFixture();
+        shareWithJudge(fixture);
+        admin.update("update demo_access set max_investigations=1,max_pending=1,max_meta_attempts=4 where user_id=?", outsider);
+        UUID key = UUID.randomUUID();
+        UUID own = investigationService.create(outsider, key, scopeOf(fixture));
+        assertThat(investigationService.create(outsider, key, scopeOf(fixture))).isEqualTo(own);
+        assertThatThrownBy(() -> investigationService.create(outsider, UUID.randomUUID(), scopeOf(fixture))).hasMessage("DEMO_PENDING_LIMIT");
+        assertThat(runtimeBoolean(outsider, "select investigation_runnable(?)", own)).isTrue();
+        // Read access to another requester's investigation never grants execution.
+        assertThat(runtimeBoolean(outsider, "select investigation_runnable(?)", fixture.id())).isFalse();
+        assertThat(runtimeBoolean(analyst, "select investigation_runnable(?)", own)).isFalse();
+        assertThatThrownBy(() -> runtimeBoolean(analyst, "select schedule_investigation(?)", own))
+                .isInstanceOf(java.sql.SQLException.class).extracting(e -> ((java.sql.SQLException) e).getSQLState()).isEqualTo("42501");
+        for (UUID version : List.of(fixture.baseline(), fixture.replacement(), fixture.procedure())) {
+            UUID policy = admin.queryForObject("select policy_id from policy_versions where id=?", UUID.class, version);
+            assertThat(runtimeBoolean(outsider, "select can_analyze_policy(?)", policy)).isTrue();
+            assertThat(runtimeBoolean(outsider, "select can_write_policy(?)", policy)).isFalse();
+            assertThat(scope.as(outsider, () -> jdbc.update("update policies set title='forged' where id=?", policy))).isZero();
+            assertThat(scope.as(outsider, () -> jdbc.update("update policy_versions set status=status where id=?", version))).isZero();
+            assertThatThrownBy(() -> scope.as(outsider, () -> jdbc.update("insert into document_pages values(?,999,'forged')", version)))
+                    .hasRootCauseInstanceOf(java.sql.SQLException.class);
+            assertThatThrownBy(() -> service.upload(outsider, UUID.randomUUID(), policy, null, null, null, version,
+                    LocalDate.now(), "forged.pdf", PdfAndVectorTest.pdf("Forged synthetic document."))).hasMessage("NOT_FOUND");
+            assertThatThrownBy(() -> scope.as(outsider, () -> jdbc.queryForObject("select enqueue_ingestion(?,?,?,?)", Object.class,
+                    UUID.randomUUID(), version, UUID.randomUUID(), "test-digest"))).hasRootCauseInstanceOf(java.sql.SQLException.class);
+        }
+        assertThat(jdbc.queryForObject("select investigation_runnable(?)", Boolean.class, own)).isFalse(); // actor cleared
+        successfulTransport(fixture);
+        var lease = investigationLease(own);
+        assertThat(runtimeBoolean(analyst, "select checkpoint_investigation(?,?,'EXTRACTING')", own, lease.token())).isFalse();
+        assertThat(runtimeBoolean(outsider, "select checkpoint_investigation(?,?,'EXTRACTING')", own, UUID.randomUUID())).isFalse();
+        assertThat(runtimeBoolean(outsider, "select reserve_investigation_call(?,?)", own, UUID.randomUUID())).isFalse();
+        assertThatThrownBy(() -> runtimeBoolean(analyst, "select reserve_investigation_call(?,?)", own, lease.token()))
+                .isInstanceOf(java.sql.SQLException.class).extracting(e -> ((java.sql.SQLException) e).getSQLState()).isEqualTo("42501");
+        investigationWorker.process(lease);
+        assertThat(investigationService.progress(outsider, own)).containsEntry("state", "COMPLETED").containsEntry("calls", 4);
+        assertThat(investigationService.extractions(outsider, own)).hasSize(3);
+        assertThat(admin.queryForMap("select investigations,meta_attempts from demo_access where user_id=?", outsider))
+                .containsEntry("investigations", 1).containsEntry("meta_attempts", 4L);
+        assertThat(admin.queryForObject("select attempts from demo_meta_budget", Long.class)).isEqualTo(4);
+        assertThatThrownBy(() -> investigationService.create(outsider, UUID.randomUUID(), scopeOf(fixture))).hasMessage("DEMO_INVESTIGATION_LIMIT");
+        try (var c = runtimeConnection(outsider)) {
+            assertThatThrownBy(() -> sqlInvestigation(c, outsider, fixture)).isInstanceOf(java.sql.SQLException.class)
+                    .extracting(e -> ((java.sql.SQLException) e).getSQLState()).isEqualTo("P7503");
+            c.rollback();
+        }
+        assertThat(admin.queryForObject("select count(*) from investigations where requested_by=?", Integer.class, outsider)).isEqualTo(1);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"NONE", "POLICY_ONLY", "PROCEDURE_ONLY", "EXPIRED", "INACTIVE", "CROSS_ORG", "NO_MEMBERSHIP"})
+    void judgeReadonlyRejectsHiddenScopesEvenThroughDefinerScheduling(String reason) throws Exception {
+        var fixture = investigationFixture();
+        shareWithJudge(fixture);
+        switch (reason) {
+            case "NONE" -> admin.update("delete from policy_grants where department_id=?", hr);
+            case "POLICY_ONLY" -> admin.update("delete from policy_grants where department_id=? and policy_id=(select policy_id from policy_versions where id=?)", hr, fixture.procedure());
+            case "PROCEDURE_ONLY" -> admin.update("delete from policy_grants where department_id=? and policy_id=(select policy_id from policy_versions where id=?)", hr, fixture.replacement());
+            case "EXPIRED" -> admin.update("update demo_access set expires_at=now()-interval '1 second' where user_id=?", outsider);
+            case "INACTIVE" -> admin.update("update app_users set active=false where id=?", outsider);
+            case "CROSS_ORG" -> {
+                UUID otherOrg = UUID.randomUUID();
+                admin.update("insert into organizations values(?,'Other synthetic organization')", otherOrg);
+                admin.update("update app_users set organization_id=? where id=?", otherOrg, outsider);
+                admin.update("update departments set organization_id=? where id=?", otherOrg, hr);
+            }
+            case "NO_MEMBERSHIP" -> admin.update("delete from memberships where user_id=?", outsider);
+            default -> throw new AssertionError(reason);
+        }
+        assertThatThrownBy(() -> investigationService.create(outsider, UUID.randomUUID(), scopeOf(fixture)))
+                .hasMessage(List.of("EXPIRED", "INACTIVE").contains(reason) ? "UNAUTHENTICATED" : "NOT_FOUND");
+        try (var c = runtimeConnection(outsider)) {
+            assertThatThrownBy(() -> sqlInvestigation(c, outsider, fixture)).isInstanceOf(java.sql.SQLException.class)
+                    .extracting(e -> ((java.sql.SQLException) e).getSQLState()).isEqualTo("42501");
+        }
+        // Simulate an older/privileged row: knowing its UUID must not bypass source visibility.
+        UUID forged;
+        try (var c = admin.getDataSource().getConnection()) { forged = sqlInvestigationRow(c, outsider, scopeOf(fixture)); }
+        assertThat(runtimeBoolean(outsider, "select investigation_runnable(?)", forged)).isFalse();
+        try (var c = runtimeConnection(outsider); var p = c.prepareStatement("select schedule_investigation(?)")) {
+            p.setObject(1, forged);
+            assertThatThrownBy(p::execute).isInstanceOf(java.sql.SQLException.class)
+                    .extracting(e -> ((java.sql.SQLException) e).getSQLState()).isEqualTo("42501");
+        }
+        assertThat(admin.queryForObject("select count(*) from investigation_jobs where requested_by=?", Integer.class, outsider)).isZero();
+        assertThat(admin.queryForObject("select investigations from demo_access where user_id=?", Integer.class, outsider)).isZero();
+        verifyNoInteractions(metaTransport);
+    }
+
+    @Test
+    void ordinaryReadersStillNeedWritePermissionToAnalyze() throws Exception {
+        var fixture = investigationFixture();
+        admin.update("insert into policy_grants select policy_id,?,'READ' from policy_versions where id in (?,?)", hr, fixture.replacement(), fixture.procedure());
+        UUID policy = admin.queryForObject("select policy_id from policy_versions where id=?", UUID.class, fixture.replacement());
+        assertThat(runtimeBoolean(outsider, "select can_analyze_policy(?)", policy)).isFalse();
+        assertThatThrownBy(() -> investigationService.create(outsider, UUID.randomUUID(), scopeOf(fixture))).hasMessage("NOT_FOUND");
+        assertThatThrownBy(() -> investigationService.create(viewer, UUID.randomUUID(), scopeOf(fixture))).hasMessage("NOT_FOUND");
+        try (var c = runtimeConnection(outsider)) {
+            assertThatThrownBy(() -> sqlInvestigation(c, outsider, fixture)).isInstanceOf(java.sql.SQLException.class);
+        }
+        admin.update("update policy_grants set permission='WRITE' where department_id=? and policy_id=?", hr, policy);
+        assertThat(runtimeBoolean(outsider, "select can_analyze_policy(?)", policy)).isTrue();
+        UUID own = investigationService.create(outsider, UUID.randomUUID(), scopeOf(fixture));
+        assertThat(runtimeBoolean(outsider, "select investigation_runnable(?)", own)).isTrue();
+        assertThat(runtimeBoolean(analyst, "select investigation_runnable(?)", fixture.id())).isTrue();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"INVESTIGATION,P7503", "PENDING,P7504"})
+    void judgeReadonlyConcurrentSqlAdmissionsKeepQuotaReservations(String limit, String denied) throws Exception {
+        var fixture = investigationFixture();
+        shareWithJudge(fixture);
+        admin.update("update demo_access set max_investigations=?,max_pending=? where user_id=?",
+                limit.equals("INVESTIGATION") ? 2 : 10, limit.equals("PENDING") ? 2 : 10, outsider);
+        assertThat(race(6, n -> outsider, (c, n) -> sqlInvestigation(c, outsider, fixture)))
+                .containsOnly("OK", denied).containsExactlyInAnyOrder("OK", "OK", denied, denied, denied, denied);
+        assertThat(admin.queryForObject("select investigations from demo_access where user_id=?", Integer.class, outsider)).isEqualTo(2);
+        assertThat(admin.queryForObject("select count(*) from investigations where requested_by=?", Integer.class, outsider)).isEqualTo(2);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"INDIVIDUAL,DEMO_META_LIMIT", "COLLECTIVE,DEMO_COLLECTIVE_META_LIMIT"})
+    void judgeReadonlyMetaExhaustionStopsBeforeAnotherTransportCall(String limit, String code) throws Exception {
+        var fixture = investigationFixture();
+        shareWithJudge(fixture);
+        UUID own = investigationService.create(outsider, UUID.randomUUID(), scopeOf(fixture));
+        if (limit.equals("INDIVIDUAL")) admin.update("update demo_access set max_meta_attempts=1 where user_id=?", outsider);
+        else admin.update("update demo_meta_budget set max_attempts=1 where singleton");
+        successfulTransport(fixture);
+        investigationWorker.process(investigationLease(own));
+        verify(metaTransport, times(1)).send(anyString(), anyString(), any());
+        assertThat(investigationService.progress(outsider, own)).containsEntry("state", "PARTIAL").containsEntry("calls", 1).containsEntry("error_code", code);
+        assertThat(admin.queryForObject("select meta_attempts from demo_access where user_id=?", Long.class, outsider)).isEqualTo(1);
+        assertThat(admin.queryForObject("select attempts from demo_meta_budget", Long.class)).isEqualTo(1);
+    }
+
+    @Test
+    void judgeReadonlyScopeFailsClosedForNullUnknownAndDuplicateVersionIds() throws Exception {
+        var fixture = investigationFixture();
+        shareWithJudge(fixture);
+        try (var c = runtimeConnection(outsider); var p = c.prepareStatement("select investigation_scope_analyzable(?,?,?,?)")) {
+            for (UUID[] procedures : List.of(new UUID[]{fixture.procedure(), null}, new UUID[]{UUID.randomUUID()},
+                    new UUID[]{fixture.procedure(), fixture.procedure()}, new UUID[]{},
+                    new UUID[]{fixture.procedure(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()})) {
+                p.setObject(1, fixture.baseline()); p.setObject(2, fixture.replacement());
+                p.setArray(3, c.createArrayOf("uuid", procedures)); p.setObject(4, scopeOf(fixture).analysisDate());
+                try (var r = p.executeQuery()) { assertThat(r.next()).isTrue(); assertThat(r.getObject(1)).isEqualTo(false); }
+            }
+            p.setArray(3, c.createArrayOf("uuid", new UUID[]{fixture.procedure()}));
+            p.setNull(1, java.sql.Types.OTHER);
+            try (var r = p.executeQuery()) { assertThat(r.next()).isTrue(); assertThat(r.getObject(1)).isEqualTo(false); }
+            p.setObject(1, fixture.baseline()); p.setNull(4, java.sql.Types.DATE);
+            try (var r = p.executeQuery()) { assertThat(r.next()).isTrue(); assertThat(r.getObject(1)).isEqualTo(false); }
+        }
+    }
+
+    @Test
+    void judgeAnalysisDefinerIsRestrictedAndUnsafeOwnershipBlocksStartup() {
+        assertThat(jdbc.queryForObject("""
+                select prosecdef and proconfig @> array['search_path=pg_catalog, public, pg_temp']
+                 and not exists(select 1 from aclexplode(proacl) where grantee=0 and privilege_type='EXECUTE')
+                from pg_proc where oid='can_analyze_policy(uuid)'::regprocedure
+                """, Boolean.class)).isTrue();
+        assertThat(jdbc.queryForObject("select not prosecdef from pg_proc where oid='investigation_scope_analyzable(uuid,uuid,uuid[],date)'::regprocedure", Boolean.class)).isTrue();
+        assertThat(jdbc.queryForObject("select not prosecdef from pg_proc where oid='investigation_runnable(uuid)'::regprocedure", Boolean.class)).isTrue();
+        var safety = new com.tewendelabs.investigator.security.DatabaseSafetyCheck(jdbc);
+        safety.run(null);
+        try {
+            admin.execute("alter function can_analyze_policy(uuid) owner to postgres");
+            assertThatThrownBy(() -> safety.run(null)).isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Database roles do not satisfy the RLS security boundary");
+        } finally {
+            admin.execute("alter function can_analyze_policy(uuid) owner to investigator_owner");
+        }
+        safety.run(null);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"LINEAGE,INVALID_POLICY_LINEAGE", "DUPLICATE,DUPLICATE_SCOPE_VERSION", "UNKNOWN,NOT_FOUND",
+            "POLICY_AS_PROCEDURE,INVALID_PROCEDURE_SCOPE", "CONSENT,EXTERNAL_PROCESSING_DENIED",
+            "FUTURE,VERSION_NOT_EFFECTIVE", "NOT_INDEXED,VERSION_NOT_INDEXED"})
+    void judgeReadonlyScopeValidationAppliesToJavaRlsAndDefinerScheduling(String problem, String code) throws Exception {
+        var fixture = investigationFixture();
+        shareWithJudge(fixture);
+        Create request = scopeOf(fixture);
+        switch (problem) {
+            case "LINEAGE" -> request = new Create(fixture.replacement(), fixture.baseline(), List.of(fixture.procedure()), request.analysisDate());
+            case "DUPLICATE" -> request = new Create(fixture.baseline(), fixture.replacement(), List.of(fixture.procedure(), fixture.procedure()), request.analysisDate());
+            case "UNKNOWN" -> request = new Create(fixture.baseline(), fixture.replacement(), List.of(UUID.randomUUID()), request.analysisDate());
+            case "POLICY_AS_PROCEDURE", "NOT_INDEXED" -> {
+                var invalid = service.upload(analyst, UUID.randomUUID(), null, finance, "Synthetic invalid scope",
+                        problem.equals("POLICY_AS_PROCEDURE") ? "POLICY" : "PROCEDURE", null,
+                        LocalDate.of(2026, 10, 26), "scope.pdf", PdfAndVectorTest.pdf("Synthetic requirement."));
+                if (problem.equals("POLICY_AS_PROCEDURE")) ingest(invalid);
+                admin.update("update policies set external_processing_allowed=true where id=?", invalid.policyId());
+                admin.update("insert into policy_grants values(?,?,'READ')", invalid.policyId(), hr);
+                request = new Create(fixture.baseline(), fixture.replacement(), List.of(invalid.versionId()), request.analysisDate());
+            }
+            case "CONSENT" -> admin.update("update policies set external_processing_allowed=false where id=(select policy_id from policy_versions where id=?)", fixture.procedure());
+            case "FUTURE" -> request = new Create(fixture.baseline(), fixture.replacement(), List.of(fixture.procedure()), LocalDate.of(2026, 10, 26));
+            default -> throw new AssertionError(problem);
+        }
+        final Create invalidRequest = request;
+        assertThatThrownBy(() -> investigationService.create(outsider, UUID.randomUUID(), invalidRequest)).hasMessage(code);
+        try (var c = runtimeConnection(outsider)) {
+            assertThatThrownBy(() -> sqlInvestigation(c, outsider, invalidRequest)).isInstanceOf(java.sql.SQLException.class)
+                    .extracting(e -> ((java.sql.SQLException) e).getSQLState()).isEqualTo("42501");
+        }
+        UUID older;
+        try (var c = admin.getDataSource().getConnection()) { older = sqlInvestigationRow(c, outsider, invalidRequest); }
+        assertThat(runtimeBoolean(outsider, "select investigation_runnable(?)", older)).isFalse();
+        try (var c = runtimeConnection(outsider); var p = c.prepareStatement("select schedule_investigation(?)")) {
+            p.setObject(1, older);
+            assertThatThrownBy(p::execute).isInstanceOf(java.sql.SQLException.class)
+                    .extracting(e -> ((java.sql.SQLException) e).getSQLState()).isEqualTo("42501");
+        }
+        assertThat(admin.queryForObject("select investigations from demo_access where user_id=?", Integer.class, outsider)).isZero();
+        verifyNoInteractions(metaTransport);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"POLICY,false", "PROCEDURE,false", "EXPIRED,false", "CONSENT,false",
+            "POLICY,true", "PROCEDURE,true", "EXPIRED,true", "CONSENT,true"})
+    void judgeReadonlyRevocationStopsReservationsAndAsyncPersistence(String revoked, boolean duringCall) throws Exception {
+        var fixture = investigationFixture();
+        shareWithJudge(fixture);
+        UUID own = investigationService.create(outsider, UUID.randomUUID(), scopeOf(fixture));
+        var lease = investigationLease(own);
+        Runnable revoke = () -> {
+            switch (revoked) {
+                case "POLICY", "PROCEDURE" -> admin.update("delete from policy_grants where department_id=? and policy_id=(select policy_id from policy_versions where id=?)",
+                        hr, revoked.equals("POLICY") ? fixture.replacement() : fixture.procedure());
+                case "EXPIRED" -> admin.update("update demo_access set expires_at=now()-interval '1 second' where user_id=?", outsider);
+                case "CONSENT" -> admin.update("update policies set external_processing_allowed=false where id=(select policy_id from policy_versions where id=?)", fixture.procedure());
+                default -> throw new AssertionError(revoked);
+            }
+        };
+        if (duringCall) {
+            when(metaTransport.send(anyString(), anyString(), any())).thenAnswer(inv -> {
+                revoke.run();
+                return fixtureReply(inv.getArgument(1), fixture, true, false);
+            });
+        } else {
+            revoke.run();
+            assertThat(runtimeBoolean(outsider, "select investigation_runnable(?)", own)).isFalse();
+            assertThat(runtimeBoolean(outsider, "select checkpoint_investigation(?,?,'EXTRACTING')", own, lease.token())).isFalse();
+            try (var c = runtimeConnection(outsider); var p = c.prepareStatement("select reserve_investigation_call(?,?)")) {
+                p.setObject(1, own); p.setObject(2, lease.token());
+                assertThatThrownBy(p::execute).isInstanceOf(java.sql.SQLException.class)
+                        .extracting(e -> ((java.sql.SQLException) e).getSQLState()).isEqualTo(revoked.equals("EXPIRED") ? "P7507" : "42501");
+            }
+        }
+        investigationWorker.process(lease);
+        if (duringCall) verify(metaTransport, times(1)).send(anyString(), anyString(), any());
+        else verifyNoInteractions(metaTransport);
+        assertThat(admin.queryForObject("select count(*) from requirement_extractions where investigation_id=?", Integer.class, own)).isZero();
+        assertThat(admin.queryForObject("select count(*) from investigation_assessments where investigation_id=?", Integer.class, own)).isZero();
+        assertThat(admin.queryForObject("select state from investigation_jobs where id=?", String.class, own)).isEqualTo("FAILED");
+        assertThat(admin.queryForObject("select investigations from demo_access where user_id=?", Integer.class, outsider)).isEqualTo(1);
+        assertThat(admin.queryForObject("select meta_attempts from demo_access where user_id=?", Long.class, outsider)).isEqualTo(duringCall ? 1L : 0L);
+        assertThat(admin.queryForObject("select attempts from demo_meta_budget", Long.class)).isEqualTo(duringCall ? 1L : 0L);
     }
 
     @FunctionalInterface
@@ -1105,7 +1394,9 @@ class SecurityDatabaseTest {
         assertThat(service.content(judge, policy, fixture.baseline())).isNotEmpty();
         assertThatThrownBy(() -> investigationService.consent(judge, policy, false)).hasMessage("NOT_FOUND");
         assertThatThrownBy(() -> service.upload(judge, UUID.randomUUID(), policy, null, null, null, fixture.replacement(), LocalDate.now(), "new.pdf", PdfAndVectorTest.pdf("Changed."))).hasMessage("NOT_FOUND");
-        assertThatThrownBy(() -> investigationService.create(judge, UUID.randomUUID(), scopeOf(fixture))).hasMessage("NOT_FOUND");
+        UUID sharedAnalysis = investigationService.create(judge, UUID.randomUUID(), scopeOf(fixture));
+        assertThat(runtimeBoolean(judge, "select investigation_runnable(?)", sharedAnalysis)).isTrue();
+        assertThat(admin.queryForObject("select investigations from demo_access where user_id=?", Integer.class, judge)).isEqualTo(1);
         UUID finding = UUID.fromString(((tools.jackson.databind.JsonNode) investigationService.findings(judge, fixture.id()).get("payload")).path("assessments").get(0).path("id").asString());
         assertThatThrownBy(() -> dashboard.review(judge, fixture.id(), finding, new com.tewendelabs.investigator.investigation.InvestigationDashboardService.ReviewRequest(
                 com.tewendelabs.investigator.investigation.InvestigationDashboardService.ReviewAction.CONFIRM, null))).hasMessage("REVIEW_PERMISSION_REQUIRED");

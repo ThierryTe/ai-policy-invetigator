@@ -66,7 +66,7 @@ public class InvestigationService {
                 if (request.procedureVersionIds().contains(id) && !"PROCEDURE".equals(row.get("kind")))
                     throw new ApiFailure(400, "INVALID_PROCEDURE_SCOPE");
             }
-            if (!Boolean.TRUE.equals(jdbc.queryForObject("select can_write_policy(?)", Boolean.class, replacement.get("policy_id"))))
+            if (!Boolean.TRUE.equals(jdbc.queryForObject("select can_analyze_policy(?)", Boolean.class, replacement.get("policy_id"))))
                 throw ApiFailure.missing();
             validateContext(ids);
             UUID id = UUID.randomUUID();

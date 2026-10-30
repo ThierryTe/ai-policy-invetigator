@@ -38,7 +38,7 @@ public class DatabaseSafetyCheck implements ApplicationRunner {
                  or has_function_privilege(current_user,'reserve_demo_work(text,bigint)','EXECUTE')
                  or exists(select 1 from pg_proc f join pg_roles r on r.oid=f.proowner
                            where f.pronamespace='public'::regnamespace and f.prosecdef
-                           and f.proname in ('can_access_policy','active_identity','login_identity','actor_memberships',
+                           and f.proname in ('can_access_policy','can_analyze_policy','active_identity','login_identity','actor_memberships',
                              'reserve_demo_work','enqueue_ingestion','visible_job','previous_submission','claim_ingestion','finish_ingestion','heartbeat_ingestion','version_job','schedule_investigation','claim_investigation','reserve_investigation_call','record_investigation_usage','finish_investigation','investigation_progress','checkpoint_investigation')
                            and (r.rolsuper or r.rolbypassrls))
                 """, Boolean.class);

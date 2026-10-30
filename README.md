@@ -2,6 +2,12 @@
 
 Built for the Meta Global AI Developer Hackathon 2026.
 
+**Judges: [start with the two-minute walkthrough](docs/JUDGE_QUICKSTART.md).**
+A policy now requires training **before access**, but an HR procedure still grants
+access on day one. See the potential conflict, the exact PDF evidence and the action
+an analyst can review. The walkthrough starts with an existing result and needs no
+new AI request.
+
 AI Policy Investigator helps compliance analysts assess a policy change against
 related enterprise procedures. It extracts requirements, compares the old and new
 policy, detects potential conflicts and presents exact source evidence for human
@@ -149,15 +155,17 @@ production database.
 
 ## Production deployment and CI/CD
 
-On main, the configured workflow chains successful CI, immutable image publication
-and SSH/Compose deployment.
-Develop and PR runs validate only. Shared backend workflows serve both repositories,
-using GitHub Environment **prod** in the caller. Images are downloaded/verified on the
+On main, CI and immutable image publication remain automatic; production deployment
+requires an explicit reviewed backend workflow dispatch. Develop and PR runs validate
+only. Follow the [two-phase V8 runbook](docs/V8_DEPLOYMENT_RUNBOOK.md) for attestations,
+mandatory worker flags, target preflights and remaining external approval duties.
+The backend **prod** environment must have required reviewers configured separately.
+Images are downloaded/verified on the
 runner and transferred through the configured SSH account, avoiding a GHCR pull
 dependency on the VPS. Local images deploy with no build/pull and preserve PostgreSQL/ONNX volumes.
 
 The workflow keeps the existing VPS_HOST, VPS_USERNAME, VPS_SSH_KEY, VPS_PORT and
-VPS_DEPLOY_PATH secrets. Set the public prod variable VPS_HOST_KEY in both repositories
+VPS_DEPLOY_PATH secrets. Set the public backend prod variable VPS_HOST_KEY
 to the independently verified Ed25519 public host key of the VPS. The runner builds an
 isolated known_hosts file and enforces StrictHostKeyChecking=yes for SSH/SCP; no additional
 SSH secret or unverified key scan is needed. Missing or malformed pins fail before connecting.
@@ -191,3 +199,7 @@ Keep .env/.local files, credentials, SSH keys, model weights, database dumps and
 logs outside commits/build contexts. Public examples use variable names and placeholders,
 not credentials. The [documentation index](docs/README.md) links the maintained guides;
 development plans and intermediate audit trails are not part of the public manual.
+
+For submission preparation, use the [English submission draft and demo script](docs/HACKATHON_SUBMISSION.md).
+The [English-language and judge-readiness audit](docs/audits/ENGLISH_JUDGE_READINESS.md)
+separates verified capabilities from recommendations and remaining release checks.

@@ -1,10 +1,10 @@
 # Production CI/CD
 
-The backend and frontend use the same pipeline: **tests → Docker build/publication →
-SSH/Compose deployment**. Main pushes are configured to trigger this chain after
-successful validation; develop pushes and pull requests only run CI. Manual dispatch
-remains for recovery/rollback. Configure the [SSH host identity pin](#current-ssh-configuration)
-before delivery. This guide does not certify a live VPS run.
+Main pushes run **tests → Docker build/publication**, without automatic deployment.
+Production delivery is an explicit backend `workflow_dispatch`, using the
+[two-phase V8 runbook](V8_DEPLOYMENT_RUNBOOK.md). Develop pushes and pull requests run
+CI only. Configure the [SSH host identity pin](#current-ssh-configuration) before delivery.
+This guide does not certify a live VPS run or independently verify operator attestations.
 
 ## Repositories and workflows
 
@@ -20,15 +20,16 @@ use **invetigator**. The backend owns the reusable workflows:
 - `.github/workflows/publish-images.yml`: publication after the caller's CI succeeds.
 - `.github/workflows/deploy-production.yml`: runner-side image preparation and deployment.
 
-The frontend's own verify.yml runs npm ci, Angular tests and production/Docker builds,
-then calls those reusable backend workflows on main. The shared deployment job selects
-GitHub Environment **prod in the calling repository**. Ordinary CI does not receive
+The frontend's own verify.yml can continue calling the reusable publication workflow.
+Legacy reusable deployment calls cannot run the deployment job. Deployment selects
+GitHub Environment **prod in the backend repository** on a manual main dispatch.
+Ordinary CI does not receive
 VPS secrets. Spring Boot's APP_ENVIRONMENT=production is a separate runtime setting.
 
-Protect main and require the appropriate CI checks. For fully automatic delivery,
-do not require an additional Environment reviewer for each prod deployment. Reusable
-workflow access must be allowed between the repositories. The frontend uses the stable
-backend main for deployment tooling; the actual checkout commit is recorded per release.
+Protect main and require the appropriate CI checks. Configure required environment
+reviewers, prevent self-review, restrict prod to main and disable bypass where supported.
+These settings are not established by the YAML or by ticking a confirmation input.
+Reusable publication access must remain allowed between the repositories.
 Third-party Actions retain immutable SHA pins.
 
 ## Image selection and delivery
@@ -44,8 +45,8 @@ ghcr.io/thierryte/ai-policy-invetigator-frontend
 Each publication uses `sha-<full source SHA>`. Existing SHA tags are verified/reused,
 never overwritten. Backend and model-init use the same source SHA. Publication advances
 the release-main discovery channel only after the component's immutable images pass
-verification. A deployment keeps its newly validated component SHA and discovers the
-companion component, checking its OCI revision against the immutable tag/digest.
+verification. A deployment requires explicit approved backend/frontend SHAs and the
+approved backend linux/amd64 child manifest digest, plus the phase's operator attestations.
 **release-main is never used as a Compose production image reference.**
 
 The GitHub runner downloads exact linux/amd64 image manifests and verifies config
@@ -69,8 +70,9 @@ remain distinct failures. Unknown platforms are never accepted.
 
 ## One-time GitHub configuration
 
-Create or verify Environment **prod in both repositories**, restricted to main.
-Environments/secrets are not implicitly shared between repositories. Use the existing
+Create or verify the protected backend Environment **prod**, restricted to main,
+with independent required review. Environments/secrets are not implicitly shared.
+Use the existing
 VPS secret conventions, supplying values privately through GitHub:
 
 | Secret | Purpose |
@@ -119,20 +121,16 @@ secret conventions while pinning the server identity explicitly here. Local test
 parsing and effective SSH options without contacting the VPS; they do not prove a live
 server handshake or successful delivery.
 
-Set these prod variables in both repositories:
+Set these variables in the backend prod environment:
 
 | Variable | Purpose |
 |---|---|
 | VPS_HOST_KEY | Independently verified single Ed25519 public host-key line; required for SSH/SCP |
 | VPS_ENV_FILE | Actual absolute private production env-file path under the deployment directory |
-| INITIAL_BACKEND_SHA | Existing published backend/model-init source SHA for first-channel bootstrap |
-| INITIAL_FRONTEND_SHA | Existing published frontend source SHA for first-channel bootstrap |
-| AUTO_APPLY_MIGRATIONS | true only under the project's reviewed migration policy; absent/false blocks pending SQL |
 
-The initial SHA variables are used only when a discovery channel is absent (404),
-not on authentication, network or integrity failure. They need no per-release update.
-The initial locally loaded image selection is recorded in `deploy/release.images.json`;
-choose bootstrap SHAs from real published artefacts rather than inventing tags.
+`AUTO_APPLY_MIGRATIONS` and initial counterpart discovery variables no longer control
+production deployment. Use the explicit phase, SHAs, base, digest and confirmations
+documented in the V8 runbook. Publication may still maintain discovery channels.
 
 GITHUB_TOKEN is supplied by Actions: packages:write for publication and packages:read
 for delivery. Grant both caller repositories read access to all three GHCR packages
@@ -245,27 +243,31 @@ was changed. The local frontend checkout is not proof of the exact deployed sour
 
 ## Concurrency, release records and recovery
 
-GitHub concurrency groups are repository-scoped. A shared project file lock on the VPS
-serializes both callers. If the other repository deployed while archives were being
-prepared, the stale base is rejected before image loading/startup and the runner resolves
-the updated pair again, at most three times. Provider/network/health errors are not
-blindly retried as successful deployments.
+GitHub concurrency and the existing project file lock serialize reviewed deliveries.
+A stale approved base is rejected; there is no automatic re-selection or retry.
+A changed base or failed activation needs diagnosis and a new explicit approval.
 
-Releases are stored in releases/r<NAMESPACE><RUN_ID>-<RUN_ATTEMPT*10+attempt>, where
-namespace 1 denotes backend, 2 frontend and 0 manual recovery. release.json records source
+New reviewed releases use releases/r0<RUN_ID>-<RUN_ATTEMPT*10+1>; older release IDs remain
+valid for retention/recovery. release.json records source
 SHAs, registry/archive hashes, runtime/configuration hashes and migrations extracted
-from the selected JAR. A safe failure.json records failures. last-successful.json changes
+from the selected JAR and the operator's `releaseSafety` record. External attestations
+are labeled unverified by automation; SQL identity is not whole-JAR binary identity.
+A safe failure.json records failures. last-successful.json changes
 only after every health, migration and routing check passes. Monitor disk usage; nothing
 is pruned automatically. Retain releases still referenced by container bind mounts.
 
-For exceptional rollback, dispatch **Deploy production after publication** on backend
+For exceptional rollback, dispatch **Reviewed V8 production release** on backend
 main with operation=rollback, a previously validated rollback_release ID, empty SHA
 fields and allow_migrations=false. Retained local archives are reverified. Applied SQL
 versions/scripts/checksums must match the target exactly. An incompatible newer schema
 blocks rollback; PostgreSQL is never automatically restored, cleaned or rewound.
 Identical schema history is necessary but does not prove semantic data compatibility.
 
-Before a migration-bearing release, follow the [backup procedure](DEPLOYMENT.md).
+Before a migration-bearing release, follow the [V8 runbook](V8_DEPLOYMENT_RUNBOOK.md),
+including actual backup/isolated restore proof, writer freeze and explicit disabled-worker
+flags. The controller repeats target SQL preflights, compares embedded migrations with
+the pinned qualification and verifies the worker phase; it does not create a backup
+or independently verify the operator's external evidence.
 Review production results in Actions and the restricted release records. A green local
 unit/configuration test does not prove hosted token access, SSH reachability, public
 routing or successful production deployment.
