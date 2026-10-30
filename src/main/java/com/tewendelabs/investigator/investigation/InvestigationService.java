@@ -68,6 +68,7 @@ public class InvestigationService {
             }
             if (!Boolean.TRUE.equals(jdbc.queryForObject("select can_write_policy(?)", Boolean.class, replacement.get("policy_id"))))
                 throw ApiFailure.missing();
+            validateContext(ids);
             UUID id = UUID.randomUUID();
             jdbc.update("insert into investigations(id,requested_by,request_key,payload_digest,baseline_id,replacement_id,procedure_ids,analysis_date) values(?,?,?,?,?,?,?,?)", ps -> {
                 ps.setObject(1, id);
@@ -86,6 +87,28 @@ public class InvestigationService {
 
     private Map<String, Object> version(UUID version) {
         return jdbc.queryForList("select v.id,v.policy_id,v.previous_id,v.effective_date,v.status,p.kind,p.external_processing_allowed from policy_versions v join policies p on p.id=v.policy_id where v.id=?", version).stream().findFirst().orElseThrow(ApiFailure::missing);
+    }
+
+    /** Check the entire source scope before admission and again before processing older queued jobs. */
+    public void preflight(UUID actor, UUID id) {
+        var snapshot = snapshot(actor, id);
+        scope.as(actor, () -> {
+            validateContext(snapshot.versions());
+            return null;
+        });
+    }
+
+    private void validateContext(List<UUID> versions) {
+        long total = 0;
+        for (UUID id : versions) {
+            // Use Java UTF-16 lengths, exactly as the existing worker/provider limits do.
+            var lengths = jdbc.query("select content from chunks where version_id=?", (r, n) -> r.getString(1).length(), id);
+            long size = lengths.stream().mapToLong(Integer::longValue).sum();
+            if (lengths.isEmpty() || lengths.size() > 20 || size > 16000)
+                throw new ApiFailure(422, "SOURCE_COVERAGE_BUDGET_EXCEEDED");
+            total += size;
+        }
+        if (total > 20000) throw new ApiFailure(422, "ASSESSMENT_CONTEXT_BUDGET_EXCEEDED");
     }
 
     public Snapshot snapshot(UUID actor, UUID id) {

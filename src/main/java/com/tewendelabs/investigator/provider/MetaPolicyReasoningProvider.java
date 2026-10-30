@@ -58,9 +58,9 @@ public class MetaPolicyReasoningProvider implements PolicyReasoningProvider {
             for (int attempt = 0; ; attempt++) {
                 long remaining = deadline - System.nanoTime();
                 if (remaining <= 0) throw new ApiFailure(504, "PROVIDER_TIMEOUT");
-                gate.beforeAttempt(request); // AFTER semaphore/backoff; every retry rechecks current permissions and consent.
                 String input = JsonContract.encode(Map.of("task", request.task(), "sources", request.sources()));
                 if (input.length() > 32000) throw new ApiFailure(422, "CONTEXT_BUDGET_EXCEEDED");
+                gate.beforeAttempt(request); // AFTER semaphore/backoff and context validation; every retry rechecks access and consent.
                 var payload = Map.of("model", model, "reasoning_effort", "low", "max_completion_tokens", maxCompletionTokens,
                         "messages", List.of(Map.of("role", "system", "content", SYSTEM), Map.of("role", "user", "content", input)),
                         "response_format", Map.of("type", "json_schema", "json_schema", Map.of("name", request.schemaVersion().replace('-', '_'), "strict", true, "schema", InvestigationSchemas.schema(request.schemaVersion()))));

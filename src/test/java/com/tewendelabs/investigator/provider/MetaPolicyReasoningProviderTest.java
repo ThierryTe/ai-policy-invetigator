@@ -115,6 +115,16 @@ class MetaPolicyReasoningProviderTest {
     }
 
     @Test
+    void rejectsOversizedSerializedContextBeforeReservingAnAttempt() {
+        var oversized = new Request(request.actorId(), request.investigationId(), request.leaseToken(),
+                request.schemaVersion(), "x".repeat(32001), request.sources(), request.timeout());
+        assertThatThrownBy(() -> provider(4096).reason(oversized)).hasMessage("CONTEXT_BUDGET_EXCEEDED");
+        assertThat(gate.reservations).isZero();
+        assertThat(transport.calls).isZero();
+        assertThat(logs.list).isEmpty();
+    }
+
+    @Test
     void lengthIsMeteredAndLoggedWithoutRetryingOrParsingTruncatedContent() {
         reply(envelope("length", PRIVATE_TEXT + "{"));
         assertThatThrownBy(() -> provider(8192).reason(request)).hasMessage("INCOMPLETE_PROVIDER_OUTPUT");
