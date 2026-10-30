@@ -23,7 +23,7 @@ release, release manifests, application images, migrations or environment file.
   rather than a symlink, and have no group/other permissions (normally mode 600).
   Python checks file metadata; only Compose reads the file for interpolation.
   Never print, source, copy or regenerate its contents for this procedure.
-- Applied SQL migrations must exactly match this package: versions V1–V6, filenames,
+- Applied SQL migrations must exactly match this package: versions V1–V7, filenames,
   checksums and successful status, with no missing, extra, failed or duplicate entries.
   Extensions `pgcrypto` and `vector` must exist. Do not deploy or migrate concurrently.
 - Both `app_users` and `organizations` must be empty. If either is nonempty, stop.
@@ -108,7 +108,7 @@ sudo python3 -B "$TOOLS/scripts/provision_initial_admin.py" --env-file /opt/ai-p
 Required result before proceeding:
 
 ```text
-Preflight passed: database=investigator; users=0; organizations=0; migrations=6. No account created.
+Preflight passed: database=investigator; users=0; organizations=0; migrations=7. No account created.
 ```
 
 This is a read-only SQL transaction. It reads counts and public migration metadata,

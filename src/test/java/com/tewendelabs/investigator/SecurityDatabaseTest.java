@@ -15,6 +15,8 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -111,6 +113,7 @@ class SecurityDatabaseTest {
 
     @BeforeEach
     void setup() {
+        admin.update("update demo_meta_budget set attempts=0,max_attempts=1000 where singleton");
         org = UUID.randomUUID();
         finance = UUID.randomUUID();
         hr = UUID.randomUUID();
@@ -134,16 +137,24 @@ class SecurityDatabaseTest {
     }
 
     private PolicyService.Upload upload() throws Exception {
-        return service.upload(analyst, UUID.randomUUID(), null, finance, "Incident policy", "POLICY", null, LocalDate.of(2026, 10, 26), "policy.pdf", PdfAndVectorTest.pdf("Report incidents in 24 hours."));
+        return upload(analyst, finance);
+    }
+
+    private PolicyService.Upload upload(UUID actor, UUID department) throws Exception {
+        return service.upload(actor, UUID.randomUUID(), null, department, "Incident policy", "POLICY", null, LocalDate.of(2026, 10, 26), "policy.pdf", PdfAndVectorTest.pdf("Report incidents in 24 hours."));
     }
 
     private void ingest(PolicyService.Upload result) {
+        ingest(result, analyst);
+    }
+
+    private void ingest(PolicyService.Upload result, UUID actor) {
         // Claim this exact task without consuming tasks left by other tests.
         admin.update("update ingestion_tasks set created_at=now()-interval '1 year' where id=?", result.jobId());
         IngestionWorker.Lease lease = worker.claim();
         assertThat(lease.id()).isEqualTo(result.jobId());
         worker.process(lease);
-        assertThat(service.job(analyst, result.jobId()).get("status")).isEqualTo("COMPLETED");
+        assertThat(service.job(actor, result.jobId()).get("status")).isEqualTo("COMPLETED");
     }
 
     @Test
@@ -392,14 +403,18 @@ class SecurityDatabaseTest {
     }
 
     private InvestigationFixture investigationFixture() throws Exception {
-        var baseline = upload();
-        ingest(baseline);
-        var replacement = service.upload(analyst, UUID.randomUUID(), baseline.policyId(), null, null, null, baseline.versionId(), LocalDate.of(2026, 10, 27), "new.pdf", PdfAndVectorTest.pdf("Training is mandatory before sensitive-system access."));
-        ingest(replacement);
-        var procedure = service.upload(analyst, UUID.randomUUID(), null, finance, "HR access", "PROCEDURE", null, LocalDate.of(2026, 10, 26), "hr.pdf", PdfAndVectorTest.pdf("Access on day one; training within 30 days."));
-        ingest(procedure);
+        return investigationFixture(analyst, finance);
+    }
+
+    private InvestigationFixture investigationFixture(UUID actor, UUID department) throws Exception {
+        var baseline = upload(actor, department);
+        ingest(baseline, actor);
+        var replacement = service.upload(actor, UUID.randomUUID(), baseline.policyId(), null, null, null, baseline.versionId(), LocalDate.of(2026, 10, 27), "new.pdf", PdfAndVectorTest.pdf("Training is mandatory before sensitive-system access."));
+        ingest(replacement, actor);
+        var procedure = service.upload(actor, UUID.randomUUID(), null, department, "HR access", "PROCEDURE", null, LocalDate.of(2026, 10, 26), "hr.pdf", PdfAndVectorTest.pdf("Access on day one; training within 30 days."));
+        ingest(procedure, actor);
         admin.update("update policies set external_processing_allowed=true where id in (?,?)", baseline.policyId(), procedure.policyId());
-        UUID id = investigationService.create(analyst, UUID.randomUUID(), new com.tewendelabs.investigator.investigation.InvestigationService.Create(baseline.versionId(), replacement.versionId(), List.of(procedure.versionId()), LocalDate.of(2026, 10, 27)));
+        UUID id = investigationService.create(actor, UUID.randomUUID(), new com.tewendelabs.investigator.investigation.InvestigationService.Create(baseline.versionId(), replacement.versionId(), List.of(procedure.versionId()), LocalDate.of(2026, 10, 27)));
         return new InvestigationFixture(id, baseline.versionId(), replacement.versionId(), procedure.versionId());
     }
 
@@ -632,6 +647,7 @@ class SecurityDatabaseTest {
     @Test
     void restartRecoveryReusesExtractionCheckpointAndFencesStaleLease() throws Exception {
         var fixture = investigationFixture();
+        demoProfile(analyst, finance);
         java.util.concurrent.atomic.AtomicInteger sent = new java.util.concurrent.atomic.AtomicInteger();
         when(metaTransport.send(anyString(), anyString(), any())).thenAnswer(inv -> {
             if (sent.incrementAndGet() == 2) throw new AssertionError("simulated process crash");
@@ -647,6 +663,8 @@ class SecurityDatabaseTest {
         assertThat(investigationService.progress(analyst, fixture.id()).get("state")).isEqualTo("COMPLETED");
         assertThat(jdbc.queryForObject("select finish_investigation(?,?,'FAILED','STALE')", Boolean.class, stale.id(), stale.token())).isFalse();
         assertThat(investigationService.progress(analyst, fixture.id()).get("calls")).isEqualTo(5);
+        assertThat(admin.queryForObject("select meta_attempts from demo_access where user_id=?", Long.class, analyst)).isEqualTo(5);
+        assertThat(admin.queryForObject("select attempts from demo_meta_budget", Long.class)).isEqualTo(5);
     }
 
     private String token(UUID actor) {
@@ -748,6 +766,415 @@ class SecurityDatabaseTest {
                 .content("{\"action\":\"INVALID\"}")).andExpect(status().isBadRequest());
         admin.update("update investigation_assessments set payload=jsonb_set(payload,'{assessments,0,sourceReferences,0,quote}','\"fabricated\"'::jsonb) where investigation_id=?", fixture.id());
         assertThatThrownBy(() -> dashboard.graph(analyst, fixture.id())).hasMessage("UNVERIFIED_GRAPH_DATA");
+    }
+
+    private void demoProfile(UUID actor, UUID department) {
+        admin.update("""
+                insert into demo_access(user_id,department_id,expires_at,max_imports,max_bytes,max_investigations,max_pending,max_meta_attempts)
+                values(?,?,now()+interval '1 day',12,67108864,3,10,30)
+                """, actor, department);
+    }
+
+    private com.tewendelabs.investigator.investigation.InvestigationService.Create scopeOf(InvestigationFixture fixture) {
+        return new com.tewendelabs.investigator.investigation.InvestigationService.Create(
+                fixture.baseline(), fixture.replacement(), List.of(fixture.procedure()), LocalDate.of(2026, 10, 27));
+    }
+
+    private Connection runtimeConnection(UUID actor) throws Exception {
+        var connection = java.sql.DriverManager.getConnection(POSTGRES.getJdbcUrl(), "investigator_app", APP_PASSWORD);
+        connection.setAutoCommit(false);
+        try (var p = connection.prepareStatement("select set_config('app.user_id',?,true)")) {
+            p.setString(1, actor.toString());
+            p.execute();
+        }
+        return connection;
+    }
+
+    private void sqlImport(Connection c, UUID actor, UUID department) throws Exception {
+        UUID policy = UUID.randomUUID(), version = UUID.randomUUID();
+        try (var p = c.prepareStatement("insert into policies(id,organization_id,department_id,title,kind) values(?,?,?,'Synthetic concurrent policy','POLICY')")) {
+            p.setObject(1, policy); p.setObject(2, org); p.setObject(3, department); p.executeUpdate();
+        }
+        try (var p = c.prepareStatement("insert into policy_versions(id,policy_id,sequence,effective_date,filename,sha256,original_pdf) values(?,?,1,current_date,'test.pdf',? ,?)")) {
+            p.setObject(1, version); p.setObject(2, policy); p.setString(3, "0".repeat(64)); p.setBytes(4, "%PDF-test!".getBytes(java.nio.charset.StandardCharsets.US_ASCII)); p.executeUpdate();
+        }
+        try (var p = c.prepareStatement("select enqueue_ingestion(?,?,?,?)")) {
+            p.setObject(1, UUID.randomUUID()); p.setObject(2, version); p.setObject(3, UUID.randomUUID()); p.setString(4, "test-digest"); p.execute();
+        }
+    }
+
+    private void sqlInvestigation(Connection c, UUID actor, InvestigationFixture fixture) throws Exception {
+        UUID id = UUID.randomUUID();
+        try (var p = c.prepareStatement("insert into investigations(id,requested_by,request_key,payload_digest,baseline_id,replacement_id,procedure_ids,analysis_date) values(?,?,?,'test-digest',?,?,?,date '2026-10-27')")) {
+            p.setObject(1, id); p.setObject(2, actor); p.setObject(3, UUID.randomUUID()); p.setObject(4, fixture.baseline()); p.setObject(5, fixture.replacement());
+            p.setArray(6, c.createArrayOf("uuid", new UUID[]{fixture.procedure()})); p.executeUpdate();
+        }
+        try (var p = c.prepareStatement("select schedule_investigation(?)")) { p.setObject(1, id); p.execute(); }
+    }
+
+    @FunctionalInterface
+    interface SqlRace { void run(Connection c, int index) throws Exception; }
+
+    private List<String> race(int count, java.util.function.IntFunction<UUID> actors, SqlRace operation) throws Exception {
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(count);
+        var ready = new java.util.concurrent.CountDownLatch(count);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var futures = new ArrayList<java.util.concurrent.Future<String>>();
+        try {
+            for (int n = 0; n < count; n++) {
+                final int index = n;
+                futures.add(executor.submit(() -> {
+                    try (var c = runtimeConnection(actors.apply(index))) {
+                        ready.countDown();
+                        if (!start.await(10, java.util.concurrent.TimeUnit.SECONDS)) throw new AssertionError("Race start timed out");
+                        try { operation.run(c, index); c.commit(); return "OK"; }
+                        catch (java.sql.SQLException rejected) { c.rollback(); return rejected.getSQLState(); }
+                    }
+                }));
+            }
+            assertThat(ready.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            var result = new ArrayList<String>();
+            for (var f : futures) result.add(f.get(20, java.util.concurrent.TimeUnit.SECONDS));
+            return result;
+        } finally { start.countDown(); executor.shutdownNow(); }
+    }
+
+    @Test
+    void demoImportsAndBytesArePersistentAndIdempotentAndRejectedTransactionsRollBack() throws Exception {
+        demoProfile(analyst, finance);
+        byte[] bytes = PdfAndVectorTest.pdf("Synthetic policy.");
+        admin.update("update demo_access set max_imports=1,max_bytes=? where user_id=?", bytes.length, analyst);
+        UUID key = UUID.randomUUID();
+        var accepted = service.upload(analyst, key, null, finance, "Synthetic", "POLICY", null, LocalDate.now(), "test.pdf", bytes);
+        var replay = service.upload(analyst, key, null, finance, "Synthetic", "POLICY", null, LocalDate.now(), "test.pdf", bytes);
+        assertThat(replay.policyId()).isEqualTo(accepted.policyId());
+        assertThat(replay.versionId()).isEqualTo(accepted.versionId());
+        assertThat(replay.jobId()).isEqualTo(accepted.jobId());
+        assertThatThrownBy(() -> service.upload(analyst, key, null, finance, "Different", "POLICY", null, LocalDate.now(), "test.pdf", bytes)).hasMessage("IDEMPOTENCY_CONFLICT");
+        assertThatThrownBy(this::upload).hasMessage("DEMO_IMPORT_LIMIT");
+        mvc.perform(multipart("/api/policies").file(new MockMultipartFile("file", "test.pdf", "application/pdf", bytes))
+                .param("departmentId", finance.toString()).param("title", "Another").param("kind", "POLICY").param("effectiveDate", LocalDate.now().toString())
+                .header("Idempotency-Key", UUID.randomUUID()).header("Authorization", "Bearer " + token(analyst)))
+                .andExpect(status().isTooManyRequests()).andExpect(jsonPath("$.code").value("DEMO_IMPORT_LIMIT"));
+        assertThat(admin.queryForMap("select imports,bytes from demo_access where user_id=?", analyst))
+                .containsEntry("imports", 1).containsEntry("bytes", (long) bytes.length);
+        assertThat(service.list(analyst, 0)).hasSize(1);
+        demoProfile(outsider, hr);
+        admin.update("update demo_access set max_bytes=1 where user_id=?", outsider);
+        assertThatThrownBy(() -> upload(outsider, hr)).hasMessage("DEMO_BYTE_LIMIT");
+        assertThat(service.list(outsider, 0)).isEmpty();
+        assertThat(admin.queryForObject("select imports from demo_access where user_id=?", Integer.class, outsider)).isZero();
+    }
+
+    @Test
+    void demoInvestigationReplayDoesNotConsumeAgainAndPendingCoversBothKindsOfWork() throws Exception {
+        var fixture = investigationFixture();
+        demoProfile(analyst, finance);
+        admin.update("update demo_access set max_pending=1,max_investigations=1 where user_id=?", analyst);
+        assertThatThrownBy(this::upload).hasMessage("DEMO_PENDING_LIMIT");
+        assertThatThrownBy(() -> investigationService.create(analyst, UUID.randomUUID(), scopeOf(fixture))).hasMessage("DEMO_PENDING_LIMIT");
+        admin.update("update investigation_jobs set state='FAILED' where id=?", fixture.id());
+        UUID key = UUID.randomUUID();
+        UUID accepted = investigationService.create(analyst, key, scopeOf(fixture));
+        assertThat(investigationService.create(analyst, key, scopeOf(fixture))).isEqualTo(accepted);
+        admin.update("update investigation_jobs set state='FAILED' where id=?", accepted);
+        assertThatThrownBy(() -> investigationService.create(analyst, UUID.randomUUID(), scopeOf(fixture))).hasMessage("DEMO_INVESTIGATION_LIMIT");
+        assertThat(admin.queryForObject("select investigations from demo_access where user_id=?", Integer.class, analyst)).isEqualTo(1);
+        // A failed terminal job frees a pending slot, but never refunds the lifetime counter.
+        assertThat(upload()).isNotNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"IMPORT,P7501", "BYTES,P7502", "INVESTIGATION,P7503", "PENDING,P7504"})
+    void demoConcurrentAdmissionsCannotExceedPersistentLimits(String kind, String deniedState) throws Exception {
+        var fixture = investigationFixture();
+        admin.update("update investigation_jobs set state='FAILED' where id=?", fixture.id());
+        demoProfile(analyst, finance);
+        switch (kind) {
+            case "IMPORT" -> admin.update("update demo_access set max_imports=2 where user_id=?", analyst);
+            case "BYTES" -> admin.update("update demo_access set max_bytes=20 where user_id=?", analyst);
+            case "INVESTIGATION" -> admin.update("update demo_access set max_investigations=2 where user_id=?", analyst);
+            case "PENDING" -> admin.update("update demo_access set max_pending=2 where user_id=?", analyst);
+        }
+        var result = race(6, n -> analyst, (c, n) -> {
+            if (kind.equals("INVESTIGATION") || kind.equals("PENDING") && n % 2 == 0) sqlInvestigation(c, analyst, fixture);
+            else sqlImport(c, analyst, finance);
+        });
+        assertThat(result).containsOnly("OK", deniedState).filteredOn("OK"::equals).hasSize(2);
+        var counters = admin.queryForMap("select imports,bytes,investigations from demo_access where user_id=?", analyst);
+        assertThat(((Number) counters.get("imports")).intValue() + ((Number) counters.get("investigations")).intValue()).isEqualTo(2);
+        assertThat(((Number) counters.get("bytes")).longValue()).isEqualTo(((Number) counters.get("imports")).longValue() * 10);
+    }
+
+    @Test
+    void demoReservationRollsBackWithItsWorkAndRuntimeCannotAlterLimits() throws Exception {
+        demoProfile(analyst, finance);
+        try (var c = runtimeConnection(analyst)) { sqlImport(c, analyst, finance); c.rollback(); }
+        assertThat(service.list(analyst, 0)).isEmpty();
+        assertThat(admin.queryForObject("select imports from demo_access where user_id=?", Integer.class, analyst)).isZero();
+        for (String sql : List.of("select * from demo_access", "update demo_access set max_imports=1000", "delete from demo_access",
+                "select * from demo_meta_budget", "update demo_meta_budget set attempts=0", "select reserve_demo_work('IMPORT',1)")) {
+            assertThatThrownBy(() -> scope.as(analyst, () -> { jdbc.execute(sql); return null; })).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        }
+    }
+
+    private void sqlMetaAttempt(Connection c, UUID id, UUID lease) throws Exception {
+        try (var p = c.prepareStatement("select reserve_investigation_call(?,?)")) {
+            p.setObject(1, id); p.setObject(2, lease);
+            try (var r = p.executeQuery()) { assertThat(r.next()).isTrue(); assertThat(r.getBoolean(1)).isTrue(); }
+        }
+    }
+
+    @Test
+    void demoMetaIndividualBudgetIsAtomicAndInvalidLeaseDoesNotDebit() throws Exception {
+        var fixture = investigationFixture();
+        var lease = investigationLease(fixture.id());
+        demoProfile(analyst, finance);
+        admin.update("update demo_access set max_meta_attempts=2 where user_id=?", analyst);
+        assertThat(scope.as(analyst, () -> jdbc.queryForObject("select reserve_investigation_call(?,?)", Boolean.class, fixture.id(), UUID.randomUUID()))).isFalse();
+        assertThat(admin.queryForObject("select attempts from demo_meta_budget", Long.class)).isZero();
+        var result = race(6, n -> analyst, (c, n) -> sqlMetaAttempt(c, fixture.id(), lease.token()));
+        assertThat(result).containsOnly("OK", "P7505").filteredOn("OK"::equals).hasSize(2);
+        assertThat(admin.queryForObject("select meta_attempts from demo_access where user_id=?", Long.class, analyst)).isEqualTo(2);
+        assertThat(investigationService.progress(analyst, fixture.id()).get("calls")).isEqualTo(2);
+        assertThat(admin.queryForObject("select attempts from demo_meta_budget", Long.class)).isEqualTo(2);
+        verifyNoInteractions(metaTransport);
+        admin.update("update investigation_jobs set state='FAILED' where id=?", fixture.id());
+    }
+
+    @Test
+    void demoCollectiveMetaBudgetIsAtomicAcrossDifferentJudges() throws Exception {
+        var first = investigationFixture();
+        var firstLease = investigationLease(first.id());
+        var second = investigationFixture(outsider, hr);
+        var secondLease = investigationLease(second.id());
+        demoProfile(analyst, finance); demoProfile(outsider, hr);
+        admin.update("update demo_meta_budget set max_attempts=1 where singleton");
+        var result = race(6, n -> n % 2 == 0 ? analyst : outsider, (c, n) ->
+                sqlMetaAttempt(c, n % 2 == 0 ? first.id() : second.id(), n % 2 == 0 ? firstLease.token() : secondLease.token()));
+        assertThat(result).containsOnly("OK", "P7506").filteredOn("OK"::equals).hasSize(1);
+        assertThat(admin.queryForObject("select sum(meta_attempts) from demo_access where user_id in (?,?)", Long.class, analyst, outsider)).isEqualTo(1);
+        assertThat(admin.queryForObject("select attempts from demo_meta_budget", Long.class)).isEqualTo(1);
+        assertThat(((Number) investigationService.progress(analyst, first.id()).get("calls")).intValue()
+                + ((Number) investigationService.progress(outsider, second.id()).get("calls")).intValue()).isEqualTo(1);
+        verifyNoInteractions(metaTransport);
+        admin.update("update investigation_jobs set state='FAILED' where id in (?,?)", first.id(), second.id());
+    }
+
+    @Test
+    void demoRetriesConsumeAttemptsAndStopBeforeTheNextTransportCall() throws Exception {
+        var fixture = investigationFixture();
+        demoProfile(analyst, finance);
+        admin.update("update demo_access set max_meta_attempts=2 where user_id=?", analyst);
+        when(metaTransport.send(anyString(), anyString(), any())).thenThrow(new ApiFailure(504, "PROVIDER_TIMEOUT"));
+        investigationWorker.process(investigationLease(fixture.id()));
+        verify(metaTransport, times(2)).send(anyString(), anyString(), any());
+        assertThat(investigationService.progress(analyst, fixture.id())).containsEntry("calls", 2).containsEntry("error_code", "DEMO_META_LIMIT");
+        assertThat(admin.queryForObject("select meta_attempts from demo_access where user_id=?", Long.class, analyst)).isEqualTo(2);
+        assertThat(admin.queryForObject("select attempts from demo_meta_budget", Long.class)).isEqualTo(2);
+    }
+
+    @Test
+    void demoExpiryRejectsLoginExistingJwtSqlContentAndQueuedProcessing() throws Exception {
+        var fixture = investigationFixture();
+        String jwt = token(analyst);
+        demoProfile(analyst, finance);
+        admin.update("update demo_access set expires_at=now()-interval '1 second' where user_id=?", analyst);
+        assertThatThrownBy(() -> auth.login(new AuthController.Login(analyst + "@test.invalid", loginPassword))).hasMessage("INVALID_CREDENTIALS");
+        mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + jwt)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/policies").header("Authorization", "Bearer " + jwt)).andExpect(status().isUnauthorized());
+        assertThatThrownBy(() -> service.list(analyst, 0)).hasMessage("UNAUTHENTICATED");
+        try (var c = runtimeConnection(analyst)) {
+            for (String table : List.of("policies", "policy_versions", "document_pages", "chunks", "investigations", "requirement_extractions", "investigation_assessments", "finding_reviews")) {
+                try (var r = c.createStatement().executeQuery("select count(*) from " + table)) { r.next(); assertThat(r.getInt(1)).isZero(); }
+            }
+        }
+        investigationWorker.process(investigationLease(fixture.id()));
+        assertThat(admin.queryForObject("select error_code from investigation_jobs where id=?", String.class, fixture.id())).isEqualTo("ACCESS_OR_CONSENT_REVOKED");
+        assertThat(admin.queryForObject("select attempts from demo_meta_budget", Long.class)).isZero();
+        verifyNoInteractions(metaTransport);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"true", "false"})
+    void demoExpiryDuringCallPreventsRetryOrCheckpointPersistence(boolean retry) throws Exception {
+        var fixture = investigationFixture();
+        demoProfile(analyst, finance);
+        when(metaTransport.send(anyString(), anyString(), any())).thenAnswer(inv -> {
+            admin.update("update demo_access set expires_at=now()-interval '1 second' where user_id=?", analyst);
+            if (retry) throw new ApiFailure(504, "PROVIDER_TIMEOUT");
+            return fixtureReply(inv.getArgument(1), fixture, true, false);
+        });
+        investigationWorker.process(investigationLease(fixture.id()));
+        verify(metaTransport, times(1)).send(anyString(), anyString(), any());
+        assertThat(admin.queryForObject("select count(*) from requirement_extractions where investigation_id=?", Integer.class, fixture.id())).isZero();
+        assertThat(admin.queryForObject("select meta_attempts from demo_access where user_id=?", Long.class, analyst)).isEqualTo(1);
+    }
+
+    @Test
+    void demoExpiryWhileWaitingForQuotaLockIsRecheckedAfterTheWait() throws Exception {
+        demoProfile(analyst, finance);
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var started = new java.util.concurrent.CountDownLatch(1);
+        try (var lock = admin.getDataSource().getConnection()) {
+            lock.setAutoCommit(false);
+            try (var p = lock.prepareStatement("select * from demo_access where user_id=? for update")) { p.setObject(1, analyst); p.execute(); }
+            var waiting = executor.submit(() -> {
+                try (var c = runtimeConnection(analyst)) {
+                    started.countDown();
+                    try { sqlImport(c, analyst, finance); c.commit(); return "OK"; }
+                    catch (java.sql.SQLException e) { c.rollback(); return e.getSQLState(); }
+                }
+            });
+            assertThat(started.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> waiting.get(200, java.util.concurrent.TimeUnit.MILLISECONDS)).isInstanceOf(java.util.concurrent.TimeoutException.class);
+            try (var p = lock.prepareStatement("update demo_access set expires_at=clock_timestamp()-interval '1 second' where user_id=?")) { p.setObject(1, analyst); p.executeUpdate(); }
+            lock.commit();
+            assertThat(waiting.get(10, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo("P7507");
+        } finally { executor.shutdownNow(); }
+        assertThat(admin.queryForObject("select imports from demo_access where user_id=?", Integer.class, analyst)).isZero();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"VERSION", "AGGREGATE", "LATER_PROCEDURE"})
+    void entireContextIsCheckedBeforeAdmissionAndBeforeAnyMetaCall(String oversized) throws Exception {
+        var fixture = investigationFixture();
+        if (oversized.equals("AGGREGATE")) {
+            admin.update("update chunks set content=repeat('x',7100) where version_id in (?,?,?)", fixture.baseline(), fixture.replacement(), fixture.procedure());
+        } else {
+            admin.update("update chunks set content=repeat('x',16001) where version_id=?", oversized.equals("VERSION") ? fixture.baseline() : fixture.procedure());
+        }
+        demoProfile(analyst, finance);
+        String code = oversized.equals("AGGREGATE") ? "ASSESSMENT_CONTEXT_BUDGET_EXCEEDED" : "SOURCE_COVERAGE_BUDGET_EXCEEDED";
+        assertThatThrownBy(() -> investigationService.create(analyst, UUID.randomUUID(), scopeOf(fixture))).hasMessage(code);
+        assertThat(admin.queryForObject("select investigations from demo_access where user_id=?", Integer.class, analyst)).isZero();
+        // Simulate a job admitted before this release: the worker must also preflight the whole scope.
+        investigationWorker.process(investigationLease(fixture.id()));
+        assertThat(investigationService.progress(analyst, fixture.id())).containsEntry("calls", 0).containsEntry("error_code", code);
+        verifyNoInteractions(metaTransport);
+    }
+
+    private Map<String, Object> judgeManifest(InvestigationFixture fixture) {
+        return new HashMap<>(Map.ofEntries(
+                Map.entry("organization_id", org.toString()), Map.entry("operator_user_id", analyst.toString()),
+                Map.entry("investigation_id", fixture.id().toString()), Map.entry("email", UUID.randomUUID() + "@test.invalid"),
+                Map.entry("department", "Judge " + UUID.randomUUID()), Map.entry("password", UUID.randomUUID().toString()),
+                Map.entry("expires_at", java.time.Instant.now().plusSeconds(3600).toString()), Map.entry("synthetic_data_confirmed", true),
+                Map.entry("read_policy_ids", admin.queryForList("select distinct policy_id::text from policy_versions where id in (?,?,?) order by policy_id::text", String.class, fixture.baseline(), fixture.replacement(), fixture.procedure())),
+                Map.entry("max_imports", 12), Map.entry("max_bytes", 67108864), Map.entry("max_investigations", 3),
+                Map.entry("max_pending", 2), Map.entry("max_meta_attempts", 30), Map.entry("shared_meta_attempts", 1000)));
+    }
+
+    private UUID provisionJudge(Map<String, Object> data) throws Exception {
+        var parts = java.nio.file.Files.readString(java.nio.file.Path.of("scripts/provision_judge.sql")).split("-- JUDGE_INPUT --", -1);
+        assertThat(parts).hasSize(2);
+        try (var c = admin.getDataSource().getConnection()) {
+            c.createStatement().execute(parts[0]);
+            c.unwrap(org.postgresql.PGConnection.class).getCopyAPI().copyIn("COPY pg_temp.judge_input FROM STDIN",
+                    new java.io.StringReader(Base64.getEncoder().encodeToString(com.tewendelabs.investigator.investigation.JsonContract.encode(data).getBytes(java.nio.charset.StandardCharsets.UTF_8)) + "\n"));
+            c.createStatement().execute(parts[1]);
+        }
+        return admin.queryForObject("select id from app_users where email=?", UUID.class, data.get("email"));
+    }
+
+    @Test
+    void judgeProvisioningPreservesCompletedScenarioAndProvidesOnlyPrivateWriteAndTargetedRead() throws Exception {
+        var fixture = investigationFixture();
+        successfulTransport(fixture);
+        investigationWorker.process(investigationLease(fixture.id()));
+        admin.update("update memberships set role='ADMIN' where user_id=?", analyst);
+        var manifest = judgeManifest(fixture);
+        UUID judge = provisionJudge(manifest);
+        var secondManifest = judgeManifest(fixture);
+        UUID second = provisionJudge(secondManifest);
+        UUID department = admin.queryForObject("select department_id from demo_access where user_id=?", UUID.class, judge);
+        assertThat(passwords.matches((String) manifest.get("password"), admin.queryForObject("select password_hash from app_users where id=?", String.class, judge))).isTrue();
+        assertThat(admin.queryForList("select role,department_id from memberships where user_id=?", judge))
+                .containsExactly(Map.of("role", "ADMIN", "department_id", department));
+        assertThat(admin.queryForList("select policy_id::text from policy_grants where department_id=? and permission='READ' order by policy_id::text", String.class, department))
+                .containsExactlyElementsOf((List<String>) manifest.get("read_policy_ids"));
+        clearInvocations(metaTransport);
+        assertThat(investigationService.progress(judge, fixture.id()).get("state")).isEqualTo("COMPLETED");
+        assertThat(investigationService.findings(judge, fixture.id()).get("canReview")).isEqualTo(false);
+        assertThat(investigationService.extractions(judge, fixture.id())).hasSize(3);
+        assertThat(dashboard.graph(judge, fixture.id()).complete()).isTrue();
+        UUID source = admin.queryForObject("select id from chunks where version_id=? limit 1", UUID.class, fixture.baseline());
+        assertThat(service.evidence(judge, source)).containsKey("excerpt");
+        UUID policy = admin.queryForObject("select policy_id from policy_versions where id=?", UUID.class, fixture.baseline());
+        assertThat(service.content(judge, policy, fixture.baseline())).isNotEmpty();
+        assertThatThrownBy(() -> investigationService.consent(judge, policy, false)).hasMessage("NOT_FOUND");
+        assertThatThrownBy(() -> service.upload(judge, UUID.randomUUID(), policy, null, null, null, fixture.replacement(), LocalDate.now(), "new.pdf", PdfAndVectorTest.pdf("Changed."))).hasMessage("NOT_FOUND");
+        assertThatThrownBy(() -> investigationService.create(judge, UUID.randomUUID(), scopeOf(fixture))).hasMessage("NOT_FOUND");
+        UUID finding = UUID.fromString(((tools.jackson.databind.JsonNode) investigationService.findings(judge, fixture.id()).get("payload")).path("assessments").get(0).path("id").asString());
+        assertThatThrownBy(() -> dashboard.review(judge, fixture.id(), finding, new com.tewendelabs.investigator.investigation.InvestigationDashboardService.ReviewRequest(
+                com.tewendelabs.investigator.investigation.InvestigationDashboardService.ReviewAction.CONFIRM, null))).hasMessage("REVIEW_PERMISSION_REQUIRED");
+        var privateUpload = upload(judge, department);
+        ingest(privateUpload, judge);
+        investigationService.consent(judge, privateUpload.policyId(), true);
+        assertThatThrownBy(() -> service.get(second, privateUpload.policyId())).hasMessage("NOT_FOUND");
+        UUID privateSource = admin.queryForObject("select id from chunks where version_id=? limit 1", UUID.class, privateUpload.versionId());
+        assertThatThrownBy(() -> service.evidence(second, privateSource)).hasMessage("NOT_FOUND");
+        assertThatThrownBy(() -> service.content(second, privateUpload.policyId(), privateUpload.versionId())).hasMessage("NOT_FOUND");
+        assertThatThrownBy(() -> service.job(second, privateUpload.jobId())).hasMessage("NOT_FOUND");
+        verifyNoInteractions(metaTransport);
+        assertThat(admin.queryForObject("select meta_attempts from demo_access where user_id=?", Long.class, judge)).isZero();
+        var ownReplacement = service.upload(judge, UUID.randomUUID(), privateUpload.policyId(), null, null, null, privateUpload.versionId(),
+                LocalDate.now(), "v2.pdf", PdfAndVectorTest.pdf("Report incidents in 12 hours."));
+        ingest(ownReplacement, judge);
+        UUID ownId = investigationService.create(judge, UUID.randomUUID(), new com.tewendelabs.investigator.investigation.InvestigationService.Create(
+                privateUpload.versionId(), ownReplacement.versionId(), List.of(fixture.procedure()), LocalDate.now()));
+        var own = new InvestigationFixture(ownId, privateUpload.versionId(), ownReplacement.versionId(), fixture.procedure());
+        successfulTransport(own);
+        investigationWorker.process(investigationLease(ownId));
+        assertThat(investigationService.progress(judge, ownId).get("state")).isEqualTo("COMPLETED");
+        assertThatThrownBy(() -> investigationService.progress(second, ownId)).hasMessage("NOT_FOUND");
+        assertThatThrownBy(() -> investigationService.extractions(second, ownId)).hasMessage("NOT_FOUND");
+        assertThatThrownBy(() -> investigationService.findings(second, ownId)).hasMessage("NOT_FOUND");
+        assertThatThrownBy(() -> dashboard.graph(second, ownId)).hasMessage("NOT_FOUND");
+        assertThat(admin.queryForObject("select meta_attempts from demo_access where user_id=?", Long.class, judge)).isEqualTo(4);
+        // Even an accidental extra ADMIN membership / WRITE grant cannot expand demo write scope.
+        admin.update("insert into memberships values(?,?,'ADMIN')", judge, finance);
+        admin.update("update policy_grants set permission='WRITE' where department_id=?", department);
+        assertThatThrownBy(() -> investigationService.consent(judge, policy, true)).hasMessage("NOT_FOUND");
+        assertThat(scope.as(judge, () -> jdbc.queryForObject("select can_write_policy(?)", Boolean.class, policy))).isFalse();
+        assertThat(scope.as(judge, () -> jdbc.queryForList("select * from actor_memberships(?)", judge))).hasSize(1);
+        // Removing one source grant hides the whole result and its checkpoints immediately.
+        admin.update("delete from policy_grants where department_id=? and policy_id=?", department, policy);
+        assertThatThrownBy(() -> investigationService.progress(judge, fixture.id())).hasMessage("NOT_FOUND");
+        assertThatThrownBy(() -> investigationService.extractions(judge, fixture.id())).hasMessage("NOT_FOUND");
+        assertThatThrownBy(() -> investigationService.findings(judge, fixture.id())).hasMessage("NOT_FOUND");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"UNCONFIRMED", "EXPIRED", "WRONG_ALLOWLIST", "INCOMPLETE", "EXISTING_EMAIL", "SHARED_BUDGET", "WRONG_ORG", "INVALID_LIMIT"})
+    void judgeProvisioningRefusesUnsafeInputsWithoutPartialChanges(String problem) throws Exception {
+        var fixture = investigationFixture();
+        successfulTransport(fixture);
+        investigationWorker.process(investigationLease(fixture.id()));
+        admin.update("update memberships set role='ADMIN' where user_id=?", analyst);
+        var data = judgeManifest(fixture);
+        switch (problem) {
+            case "UNCONFIRMED" -> data.put("synthetic_data_confirmed", false);
+            case "EXPIRED" -> data.put("expires_at", java.time.Instant.now().minusSeconds(1).toString());
+            case "WRONG_ALLOWLIST" -> data.put("read_policy_ids", List.of(UUID.randomUUID().toString()));
+            case "INCOMPLETE" -> admin.update("update investigation_jobs set state='PARTIAL' where id=?", fixture.id());
+            case "EXISTING_EMAIL" -> data.put("email", analyst + "@test.invalid");
+            case "SHARED_BUDGET" -> data.put("shared_meta_attempts", 1001);
+            case "WRONG_ORG" -> data.put("organization_id", UUID.randomUUID().toString());
+            case "INVALID_LIMIT" -> {
+                admin.update("update demo_meta_budget set max_attempts=0 where singleton");
+                data.put("max_pending", 0);
+            }
+        }
+        long users = admin.queryForObject("select count(*) from app_users", Long.class);
+        long profiles = admin.queryForObject("select count(*) from demo_access", Long.class);
+        long departments = admin.queryForObject("select count(*) from departments", Long.class);
+        assertThatThrownBy(() -> provisionJudge(data)).hasMessageContaining("JUDGE_PROVISIONING_REFUSED");
+        assertThat(admin.queryForObject("select count(*) from app_users", Long.class)).isEqualTo(users);
+        assertThat(admin.queryForObject("select count(*) from demo_access", Long.class)).isEqualTo(profiles);
+        assertThat(admin.queryForObject("select count(*) from departments", Long.class)).isEqualTo(departments);
+        assertThat(admin.queryForObject("select max_attempts from demo_meta_budget", Long.class)).isEqualTo(problem.equals("INVALID_LIMIT") ? 0 : 1000);
     }
 
     private static final UUID DEMO_USER = UUID.fromString("d3000000-0000-4000-8000-000000000004");

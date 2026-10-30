@@ -7,6 +7,7 @@ Start with the [project overview](../README.md), then choose a guide:
 | [Architecture](ARCHITECTURE.md) | Components, data model, AI pipeline, authorization and reliability |
 | [Local installation and configuration](SETUP.md) | Prerequisites, environment variables, Docker and host development |
 | [Synthetic demonstration](DEMO.md) | Private demo login, PDF fixtures and the complete browser workflow |
+| [Interactive judge access](JUDGE_DEMO.md) | Individual test departments, targeted scenario sharing, persistent quotas, expiration and local provisioning |
 | [API: documents and authentication](api/phase2.md) | Login, upload, immutable versions, ingestion and evidence |
 | [API: investigations](api/phase3.md) | Consent, asynchronous jobs, structured requirements and findings |
 | [API: dashboard and human review](api/phase4.md) | Status, graph, verified citations and append-only review actions |

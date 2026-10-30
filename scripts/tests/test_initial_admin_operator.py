@@ -45,7 +45,7 @@ class OperatorTest(unittest.TestCase):
 
     def test_preflight_is_read_only_and_targets_only_local_existing_service(self):
         with patch.object(bootstrap.subprocess, 'run', return_value=self.reply()) as run:
-            self.assertEqual(bootstrap.preflight(self.env_file, self.env), 6)
+            self.assertEqual(bootstrap.preflight(self.env_file, self.env), len(bootstrap.expected_migrations()))
         args = run.call_args.args[0]
         self.assertEqual(args[:4], ['docker', '--host', 'unix:///var/run/docker.sock', 'compose'])
         self.assertEqual(args[args.index('-p') + 1], 'ai-policy-investigator')

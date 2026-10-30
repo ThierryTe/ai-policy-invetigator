@@ -30,10 +30,16 @@ public class DatabaseSafetyCheck implements ApplicationRunner {
                  or exists(select 1 from pg_class c join pg_roles r on r.oid=c.relowner
                            where c.relnamespace='public'::regnamespace and c.relname in ('policies','policy_versions','document_pages','chunks','investigations','requirement_extractions','investigation_assessments','finding_reviews')
                             and (r.rolname=current_user or pg_has_role(current_user,r.oid,'MEMBER') or r.rolsuper or r.rolbypassrls))
+                 or exists(select 1 from pg_class c join pg_roles r on r.oid=c.relowner
+                           where c.relnamespace='public'::regnamespace and c.relname in ('demo_access','demo_meta_budget')
+                            and (r.rolname=current_user or pg_has_role(current_user,r.oid,'MEMBER') or r.rolsuper or r.rolbypassrls))
+                 or has_table_privilege(current_user,'demo_access','SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+                 or has_table_privilege(current_user,'demo_meta_budget','SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+                 or has_function_privilege(current_user,'reserve_demo_work(text,bigint)','EXECUTE')
                  or exists(select 1 from pg_proc f join pg_roles r on r.oid=f.proowner
                            where f.pronamespace='public'::regnamespace and f.prosecdef
                            and f.proname in ('can_access_policy','active_identity','login_identity','actor_memberships',
-                             'enqueue_ingestion','visible_job','previous_submission','claim_ingestion','finish_ingestion','heartbeat_ingestion','version_job','schedule_investigation','claim_investigation','reserve_investigation_call','record_investigation_usage','finish_investigation','investigation_progress','checkpoint_investigation')
+                             'reserve_demo_work','enqueue_ingestion','visible_job','previous_submission','claim_ingestion','finish_ingestion','heartbeat_ingestion','version_job','schedule_investigation','claim_investigation','reserve_investigation_call','record_investigation_usage','finish_investigation','investigation_progress','checkpoint_investigation')
                            and (r.rolsuper or r.rolbypassrls))
                 """, Boolean.class);
         Boolean enforced = jdbc.queryForObject("""

@@ -74,6 +74,7 @@ public class InvestigationWorker {
         String diagnosticStage = "EXTRACTING";
         try {
             var snapshot = service.snapshot(lease.actor(), lease.id());
+            service.preflight(lease.actor(), lease.id());
             Map<UUID, JsonNode> extracted = new LinkedHashMap<>();
             List<Source> allSources = new ArrayList<>();
             for (UUID version : snapshot.versions()) {
