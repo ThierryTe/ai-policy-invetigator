@@ -3,10 +3,13 @@ package com.tewendelabs.investigator.investigation;
 import java.util.*;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import static org.assertj.core.api.Assertions.*;
 
 import com.tewendelabs.investigator.provider.PolicyReasoningProvider.Source;
+import com.tewendelabs.investigator.api.ApiFailure;
 
 public class StructuredValidationTest {
     public static Map<String, Object> requirement(String id, String quote) {
@@ -52,5 +55,66 @@ public class StructuredValidationTest {
         UUID version = UUID.randomUUID(), source = UUID.randomUUID();
         var output = JsonContract.tree(Map.of("requirements", List.of(), "processedSourceIds", List.of(), "complete", true, "limitations", List.of()));
         assertThatThrownBy(() -> EvidenceValidator.extraction(output, List.of(new Source(source, version, "Training")), UUID.randomUUID(), version)).hasMessage("INCOMPLETE_SOURCE_COVERAGE");
+    }
+
+    @ParameterizedTest
+    @EnumSource(EvidenceValidator.ReferenceRejectionReason.class)
+    void citationDiagnosticPreservesPublicFailureAndContainsNoEvidence(EvidenceValidator.ReferenceRejectionReason reason) {
+        UUID version = UUID.randomUUID(), source = UUID.randomUUID();
+        String privateSourceId = "synthetic-private-source-id\nforged=true";
+        String privateQuote = "synthetic-private-quote\nforged=true";
+        String id = reason == EvidenceValidator.ReferenceRejectionReason.UNKNOWN_SOURCE_ID ? privateSourceId : source.toString();
+        String quote = reason == EvidenceValidator.ReferenceRejectionReason.BLANK_QUOTE ? " \t\n" : privateQuote;
+        var sources = List.of(new Source(source, version, "Training before access."));
+        var output = JsonContract.tree(Map.of("requirements", List.of(requirement(id, quote)),
+                "processedSourceIds", List.of(source.toString()), "complete", true, "limitations", List.of()));
+
+        assertThatThrownBy(() -> EvidenceValidator.extraction(output, sources, UUID.randomUUID(), version))
+                .isInstanceOf(EvidenceValidator.UnverifiableReference.class)
+                .hasMessage("UNVERIFIABLE_SOURCE_REFERENCE")
+                .hasNoCause()
+                .satisfies(error -> {
+                    var rejection = (EvidenceValidator.UnverifiableReference) error;
+                    assertThat(rejection.reason()).isEqualTo(reason);
+                    assertThat(rejection.status).isEqualTo(502);
+                    assertThat(rejection.code).isEqualTo("UNVERIFIABLE_SOURCE_REFERENCE");
+                    assertThat(rejection.toString()).doesNotContain(privateSourceId, privateQuote, source.toString());
+                });
+    }
+
+    @Test
+    void unknownSourceStillTakesPrecedenceOverBlankQuote() {
+        var references = JsonContract.tree(List.of(Map.of("sourceId", "unknown", "quote", " ")));
+        assertThatThrownBy(() -> EvidenceValidator.references(references, List.of(), Set.of()))
+                .isInstanceOf(EvidenceValidator.UnverifiableReference.class)
+                .satisfies(error -> assertThat(((EvidenceValidator.UnverifiableReference) error).reason())
+                        .isEqualTo(EvidenceValidator.ReferenceRejectionReason.UNKNOWN_SOURCE_ID));
+    }
+
+    @Test
+    void blankQuoteStillFailsEvenWhenItIsALiteralSubstring() {
+        UUID version = UUID.randomUUID(), source = UUID.randomUUID();
+        var references = JsonContract.tree(List.of(Map.of("sourceId", source.toString(), "quote", " ")));
+        assertThatThrownBy(() -> EvidenceValidator.references(references,
+                List.of(new Source(source, version, "Training before access.")), Set.of(version)))
+                .isInstanceOf(EvidenceValidator.UnverifiableReference.class)
+                .satisfies(error -> assertThat(((EvidenceValidator.UnverifiableReference) error).reason())
+                        .isEqualTo(EvidenceValidator.ReferenceRejectionReason.BLANK_QUOTE));
+    }
+
+    @Test
+    void schemaAndCoverageFailuresRetainTheirOwnCodes() {
+        UUID version = UUID.randomUUID(), source = UUID.randomUUID();
+        var sources = List.of(new Source(source, version, "Training before access."));
+        assertThatThrownBy(() -> EvidenceValidator.extraction(JsonContract.tree(Map.of()), sources, UUID.randomUUID(), version))
+                .isExactlyInstanceOf(ApiFailure.class).hasMessage("INVALID_MODEL_SCHEMA");
+        var output = JsonContract.tree(Map.of("requirements", List.of(requirement("unknown", " ")),
+                "processedSourceIds", List.of(), "complete", true, "limitations", List.of()));
+        assertThatThrownBy(() -> EvidenceValidator.extraction(output, sources, UUID.randomUUID(), version))
+                .isExactlyInstanceOf(ApiFailure.class).hasMessage("INCOMPLETE_SOURCE_COVERAGE");
+        assertThatThrownBy(() -> EvidenceValidator.references(
+                JsonContract.tree(List.of(Map.of("sourceId", source.toString(), "quote", "Training"))),
+                sources, Set.of(UUID.randomUUID())))
+                .isExactlyInstanceOf(ApiFailure.class).hasMessage("INSUFFICIENT_CITATION_COVERAGE");
     }
 }

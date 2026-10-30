@@ -5,6 +5,9 @@ import java.time.LocalDate;
 import java.sql.Connection;
 
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.slf4j.LoggerFactory;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -463,6 +466,75 @@ class SecurityDatabaseTest {
         assertThat(investigationService.progress(analyst, fixture.id()).get("error_code")).isEqualTo("UNVERIFIABLE_SOURCE_REFERENCE");
         assertThat(investigationService.extractions(analyst, fixture.id())).isEmpty();
         assertThat(investigationService.findings(analyst, fixture.id()).get("complete")).isEqualTo(false);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"UNKNOWN_SOURCE_ID,false", "BLANK_QUOTE,false", "NONLITERAL_QUOTE,false",
+            "UNKNOWN_SOURCE_ID,true", "BLANK_QUOTE,true", "NONLITERAL_QUOTE,true"})
+    void citationDiagnosticsPreserveStatesAndCheckpointsWithoutLoggingEvidence(String reason, boolean afterCheckpoint) throws Exception {
+        var fixture = investigationFixture();
+        var lease = investigationLease(fixture.id());
+        var sent = new java.util.concurrent.atomic.AtomicInteger();
+        when(metaTransport.send(anyString(), anyString(), any())).thenAnswer(inv -> {
+            var reply = fixtureReply(inv.getArgument(1), fixture, true, false);
+            if (sent.incrementAndGet() != (afterCheckpoint ? 2 : 1)) return reply;
+            var envelope = com.tewendelabs.investigator.investigation.JsonContract.parse(reply.body());
+            var message = (tools.jackson.databind.node.ObjectNode) envelope.path("choices").path(0).path("message");
+            var content = com.tewendelabs.investigator.investigation.JsonContract.parse(message.path("content").asString());
+            var reference = (tools.jackson.databind.node.ObjectNode) content.path("requirements").path(0).path("sourceReferences").path(0);
+            switch (reason) {
+                case "UNKNOWN_SOURCE_ID" -> reference.put("sourceId", "synthetic-private-source-id\nforged=true");
+                case "BLANK_QUOTE" -> reference.put("quote", " \t\n");
+                case "NONLITERAL_QUOTE" -> reference.put("quote", "synthetic-private-quote\nforged=true");
+                default -> throw new AssertionError("Unknown synthetic rejection reason");
+            }
+            message.put("content", com.tewendelabs.investigator.investigation.JsonContract.encode(content));
+            return new com.tewendelabs.investigator.provider.MetaTransport.Reply(200,
+                    com.tewendelabs.investigator.investigation.JsonContract.encode(envelope));
+        });
+        var logger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(
+                com.tewendelabs.investigator.investigation.InvestigationWorker.class);
+        var previousLevel = logger.getLevel();
+        var logs = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        logs.start();
+        logger.setLevel(ch.qos.logback.classic.Level.INFO);
+        logger.addAppender(logs);
+        try {
+            investigationWorker.process(lease);
+            var progress = investigationService.progress(analyst, fixture.id());
+            assertThat(progress.get("state")).isEqualTo(afterCheckpoint ? "PARTIAL" : "FAILED");
+            assertThat(progress.get("stage")).isEqualTo("STOPPED");
+            assertThat(progress.get("error_code")).isEqualTo("UNVERIFIABLE_SOURCE_REFERENCE");
+            assertThat(progress.get("calls")).isEqualTo(afterCheckpoint ? 2 : 1);
+            assertThat(progress.get("metered_calls")).isEqualTo(afterCheckpoint ? 2 : 1);
+            assertThat(sent.get()).isEqualTo(afterCheckpoint ? 2 : 1);
+            var extractions = investigationService.extractions(analyst, fixture.id());
+            assertThat(extractions).hasSize(afterCheckpoint ? 1 : 0);
+            if (afterCheckpoint) {
+                assertThat(extractions.getFirst().get("version_id")).isEqualTo(fixture.baseline());
+                var saved = (tools.jackson.databind.JsonNode) extractions.getFirst().get("payload");
+                assertThat(saved.path("complete").asBoolean()).isTrue();
+                assertThat(saved.path("requirements").size()).isEqualTo(1);
+            }
+            assertThat(admin.queryForObject("select count(*) from investigation_assessments where investigation_id=?", Integer.class, fixture.id())).isZero();
+            assertThat(investigationService.findings(analyst, fixture.id()).get("complete")).isEqualTo(false);
+            var events = logs.list.stream().filter(event -> event.getFormattedMessage().startsWith("citation_validation_rejected ")).toList();
+            assertThat(events).hasSize(1);
+            assertThat(events.getFirst().getFormattedMessage()).isEqualTo("citation_validation_rejected reason=" + reason
+                    + " stage=" + (afterCheckpoint ? "EXTRACTING_REPLACEMENT" : "EXTRACTING_BASELINE")
+                    + " investigation_id=" + fixture.id());
+            assertThat(events.getFirst().getThrowableProxy()).isNull();
+            for (var event : logs.list) {
+                assertThat(event.getFormattedMessage()).doesNotContain("synthetic-private-source-id", "synthetic-private-quote",
+                        "forged=true", lease.token().toString(), lease.actor().toString(),
+                        fixture.baseline().toString(), fixture.replacement().toString(), fixture.procedure().toString(),
+                        "Report incidents", "Training is mandatory", "Access on day one");
+            }
+        } finally {
+            logger.detachAppender(logs);
+            logs.stop();
+            logger.setLevel(previousLevel);
+        }
     }
 
     @Test
