@@ -18,6 +18,7 @@ from contextlib import contextmanager
 import sys
 import tarfile
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from deploy_local_images import (DeploymentError, ROOT, PROJECT, UI_PROJECT, require, execute,
@@ -119,18 +120,25 @@ def verify_existing_postgres(allowed_ids, proof=None):
 
 
 def check_url(url, expected):
+    probe = {'/healthz': 'HEALTHZ', '/': 'ROOT', '/api/auth/me': 'AUTH_ME'}.get(
+        urllib.parse.urlsplit(url).path, 'OTHER')
     try:
         # Default TLS certificate verification; redirects rejected to avoid accepting a login redirect.
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self, *args, **kwargs):
                 return None
         opener = urllib.request.build_opener(NoRedirect)
+        # Identify the probe explicitly: the generic Python user agent can be
+        # blocked at the public edge even while browser requests are served.
+        request = urllib.request.Request(url, method='GET', headers={
+            'User-Agent': 'AI-Policy-Investigator-Deployment/1.0'})
         try:
-            with opener.open(url, timeout=20) as response:
+            with opener.open(request, timeout=20) as response:
                 status = response.status
         except urllib.error.HTTPError as error:
             status = error.code
-        require(status == expected, 'PUBLIC_ROUTING_STATUS_FAILED')
+        require(status == expected,
+                f'PUBLIC_ROUTING_STATUS_FAILED_GET_{probe}_EXPECTED_{expected}_GOT_{status}')
     except (urllib.error.URLError, TimeoutError, OSError):
         raise DeploymentError('PUBLIC_ROUTING_NETWORK_OR_TLS_FAILED') from None
 

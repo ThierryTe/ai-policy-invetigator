@@ -338,7 +338,7 @@ class ControllerTest(unittest.TestCase):
             build.return_value.open.side_effect = urllib.error.HTTPError('url', 502, '', {}, None)
             with self.assertRaisesRegex(DeploymentError, 'STATUS_FAILED'): controller.check_url('https://example.invalid/', 200)
 
-    def _activation(self, directory, fail=None, rollback=False, expected_previous='UNSET'):
+    def _activation(self, directory, fail=None, rollback=False, expected_previous='UNSET', routing_error=None):
         data = manifest()
         if expected_previous != 'UNSET': data['expectedPrevious'] = expected_previous
         applied = [{**migration(), 'success': True, 'type': 'SQL'}]
@@ -352,7 +352,7 @@ class ControllerTest(unittest.TestCase):
              patch.object(controller, 'inspect_image', return_value={'platform': 'linux/amd64'}), \
              patch.object(controller, 'json_command', return_value=[{'Id': 'sha256:' + 'd' * 64, 'RootFS': {'Layers': []}, 'Os': 'linux', 'Architecture': 'amd64', 'Config': {}}]), \
              patch.object(controller, 'check_runtime'), patch.object(controller, 'verify_existing_postgres'), \
-             patch.object(controller, 'history', return_value=applied), patch.object(controller, 'routing'), \
+             patch.object(controller, 'history', return_value=applied), patch.object(controller, 'routing', side_effect=routing_error), \
              patch.object(controller, 'healthy_service'):
             result = controller.activate(directory, data, {'envFile': 'unused', 'publicUrl': 'https://example.invalid'}, rollback, base=directory)
             return result, run.call_args_list
@@ -376,6 +376,17 @@ class ControllerTest(unittest.TestCase):
                 with self.assertRaises(DeploymentError): self._activation(directory, fail)
                 self.assertFalse((directory / 'last-successful.json').exists())
                 self.assertFalse((directory / 'validated.json').exists())
+
+    def test_public_routing_failure_preserves_previous_release_and_never_validates(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            old = {'id': 'r122-1', 'migrations': [migration()]}
+            (directory / 'last-successful.json').write_text(json.dumps(old))
+            error = DeploymentError('PUBLIC_ROUTING_STATUS_FAILED_GET_HEALTHZ_EXPECTED_200_GOT_403')
+            with self.assertRaisesRegex(DeploymentError, str(error)):
+                self._activation(directory, routing_error=error)
+            self.assertEqual(json.loads((directory / 'last-successful.json').read_text()), old)
+            self.assertFalse((directory / 'validated.json').exists())
 
     def test_never_validated_rollback_is_rejected_before_loading_images(self):
         with tempfile.TemporaryDirectory() as temporary:

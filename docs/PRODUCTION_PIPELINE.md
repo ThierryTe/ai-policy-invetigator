@@ -164,6 +164,85 @@ then HTTPS `/healthz` and `/` returning 200 and `/api/auth/me` returning 401 thr
 with valid TLS and no redirects. These verify routing/authentication boundaries, not an
 authenticated investigation or live Meta inference. No real Meta call runs in normal CI.
 
+### Public routing probe contract and false failures
+
+The check lives in `scripts/production_release.py` (`routing` and `check_url`),
+called after container health and migration validation. Its public base URL is
+`https://ai-policy.tewendelabs.com`.
+
+| Layer | Request | Required result | Timeout |
+| --- | --- | --- | --- |
+| Internal frontend | `wget --spider http://127.0.0.1:8080/healthz` inside the frontend | Exit zero | 45 s command timeout |
+| Internal API proxy | `wget -S -O /dev/null http://127.0.0.1:8080/api/auth/me` inside the frontend | HTTP 401 without credentials | 45 s command timeout |
+| Public frontend health | `GET /healthz` over HTTPS | Exactly 200 | 20 s socket timeout |
+| Public application shell | `GET /` over HTTPS | Exactly 200 | 20 s socket timeout |
+| Public API protection | `GET /api/auth/me` over HTTPS | Exactly 401 without credentials | 20 s socket timeout |
+
+The internal `--spider` request uses wget's existence-check mode; it is separate
+from the explicit public GET requests. Public probes run sequentially, once each,
+and stop at the first failure. TLS certificate and hostname verification use
+Python's defaults. HTTP redirects, including login redirects and HTTPS redirects,
+are rejected. Force SSL does not require following redirects because these probes
+already start at HTTPS. Angular's client-side redirect from `/` to `/overview`
+does not produce an HTTP redirect for the probe. No JavaScript is executed.
+
+Before routing, Compose waits up to 90 s for PostgreSQL, 360 s for the backend and
+120 s for the frontend (command limits: 120, 390 and 150 s). The remote activation
+command has a 2700 s timeout; the workflow job has a 75 minute limit. Public
+routing failures are not retried by the release preparation loop, which retries
+only `DEPLOYMENT_BASE_CHANGED_RETRY`.
+Internal container health is checked independently: PostgreSQL uses `pg_isready`,
+the backend probes `http://127.0.0.1:8080/actuator/health`, and the inspected
+frontend image probes `http://127.0.0.1:8080/healthz`. A healthy container or a
+completed investigation does not establish public edge reachability.
+
+Anonymous public GET comparisons on 2026-10-30 reproduced a rejection based on
+the request's user agent. With curl and only the user agent changed,
+`Python-urllib/3.12` received 403 on all three public endpoints, whereas
+`AI-Policy-Investigator-Deployment/1.0` received 200, 200 and 401 respectively.
+Certificate verification succeeded and no redirects were returned. Response
+headers identified Cloudflare. Repeating the `/healthz` comparison reproduced
+403 versus 200. This proves that an accessible application can fail the original
+probe; it does not establish the exact Cloudflare rule or the response observed
+by the historical VPS run. Direct Python verification from the local machine
+was blocked by its missing trusted issuer; TLS verification was not disabled.
+
+The minimal correction explicitly identifies the deployment probe with that
+user agent. It sends no credentials or cookies, does not impersonate a browser,
+and preserves the exact status contract, redirect rejection and TLS verification.
+A remaining rejection is still a failure, now reported with a bounded route label,
+method and expected/received status, for example
+`PUBLIC_ROUTING_STATUS_FAILED_GET_HEALTHZ_EXPECTED_200_GOT_403`.
+Only these safe codes pass through the existing SSH diagnostic filter; arbitrary
+response bodies, redirect locations and request URLs are not logged. Container,
+SSH host-key and exact-image validation are unchanged. A failed public check still
+prevents updating `validated.json` and `last-successful.json`, even though the
+application containers may already be running the attempted release.
+
+### Angular deep links and refresh
+
+Public root health does not validate an Angular route, asset loading or a signed-in
+session. Navigation within the running SPA is handled by Angular. A browser refresh
+instead requests the deep URL from the server and recreates the JavaScript state.
+Angular requires the server to return `index.html` for these routes; see the
+[official deployment documentation](https://angular.dev/tools/cli/deployment).
+
+The inspected local frontend configuration (`deploy/default.conf.template` in the
+separate frontend checkout) already uses `try_files $uri $uri/ /index.html` and
+keeps `/api/` in a separate proxy location. A public anonymous GET to the synthetic
+path `/investigations/00000000-0000-0000-0000-000000000000` returned 200 without a
+redirect and the same Angular host element, root base URL and application asset
+references as `/`. Cloudflare injected different per-request challenge metadata,
+so the full response bytes differed. No investigation API or inference was invoked.
+This checks HTML fallback only, not rendering or authorization of an investigation.
+
+The local frontend's `src/app/core/auth.ts` stores its token and identity only in
+memory. `src/app/app.ts` displays the login component when identity is absent.
+Reloading therefore loses the session and in-memory recent items and can show the
+login screen on the same deep URL; this is independent of the deployment probe.
+No missing SPA fallback was demonstrated, so neither Nginx nor session persistence
+was changed. The local frontend checkout is not proof of the exact deployed source.
+
 ## Concurrency, release records and recovery
 
 GitHub concurrency groups are repository-scoped. A shared project file lock on the VPS
