@@ -46,6 +46,7 @@ class InitialAdminTest(unittest.TestCase):
     def test_subprocess_uses_only_stdin_and_redacts_diagnostics(self):
         with tempfile.TemporaryDirectory() as d:
             env_file = Path(d) / 'private.env'; env_file.write_text('# synthetic test only\n')
+            env_file.chmod(0o600)
             for outcome in [SimpleNamespace(returncode=1, stdout=self.env()['INVESTIGATOR_INITIAL_PASSWORD'], stderr='private'),
                             subprocess.TimeoutExpired('synthetic', 45)]:
                 with patch.object(bootstrap.subprocess, 'run', **({'side_effect': outcome} if isinstance(outcome, Exception) else {'return_value': outcome})) as run:

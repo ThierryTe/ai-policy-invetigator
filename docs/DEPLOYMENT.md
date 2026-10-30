@@ -78,45 +78,15 @@ responses. Verify HTTPS, login/upload/evidence and Swagger denial after actual d
 
 ## Initial administrator
 
-There is no public signup, production demo password or startup seed. Use
-scripts/provision_initial_admin.py explicitly after migrations, only against an empty
-identity store. It creates one organization, department and ADMIN with existing BCrypt
-and current-access authorization; reruns refuse rather than taking over an account.
+Follow [First production login](FIRST_LOGIN.md) for the minimal tools package,
+Mac-to-VPS transfer commands, mandatory read-only migration/empty-store checks and
+hidden interactive password entry. Install the tools outside the validated release.
+The automatic CI runtime bundle does not include these one-time tools.
 
-Run the helper from a trusted backend copy on the server, or copy its required public
-files preserving their layout: scripts/provision_initial_admin.py,
-deploy/postgres/provision-initial-admin.sql, compose.yaml and compose.production.yaml.
-It targets the existing ai-policy-investigator PostgreSQL service and does not start
-containers. The CI's minimal runtime bundle does not include this one-time bootstrap.
-
-Set the actual trusted helper root and private env-file path, then choose non-secret
-identity metadata in the operator session:
-
-```sh
-: "${BACKEND_DIR:?Trusted backend helper root}"
-: "${DEPLOY_ENV_FILE:?Actual private production env-file path}"
-: "${INVESTIGATOR_INITIAL_EMAIL:?Chosen initial login email}"
-: "${INVESTIGATOR_INITIAL_ORGANIZATION:?Organization name}"
-: "${INVESTIGATOR_INITIAL_DEPARTMENT:?Owning department name}"
-export BACKEND_DIR DEPLOY_ENV_FILE
-export INVESTIGATOR_INITIAL_EMAIL INVESTIGATOR_INITIAL_ORGANIZATION INVESTIGATOR_INITIAL_DEPARTMENT
-export INVESTIGATOR_INITIAL_ADMIN_ENABLED=true
-python3 - <<'PY'
-import getpass, os, subprocess, sys
-env = os.environ.copy()
-env['INVESTIGATOR_INITIAL_PASSWORD'] = getpass.getpass('Initial administrator password: ')
-sys.exit(subprocess.run([
-    sys.executable, os.path.join(env['BACKEND_DIR'], 'scripts/provision_initial_admin.py'),
-    '--env-file', env['DEPLOY_ENV_FILE']], env=env).returncode)
-PY
-unset INVESTIGATOR_INITIAL_ADMIN_ENABLED INVESTIGATOR_INITIAL_EMAIL INVESTIGATOR_INITIAL_ORGANIZATION INVESTIGATOR_INITIAL_DEPARTMENT
-```
-
-The password must contain 16–72 UTF-8 bytes, without control characters. It stays in the
-short-lived child environment/COPY input, not command arguments, SQL literals or logs.
-No consent or cross-department grant is created automatically. Sign in through the
-normal application, then explicitly authorize external processing for synthetic demo
-policies. Do not run the local demo seed against production.
+There is no public signup, production demo password or startup seed. The operator
+helper creates one organization, department and active ADMIN only in an empty identity
+store. It refuses a second initialization and preserves the existing authentication,
+BCrypt and department authorization. Do not use the local demo seed in production.
 
 ## Operator commands for an existing release
 
