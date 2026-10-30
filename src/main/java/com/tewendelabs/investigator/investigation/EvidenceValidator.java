@@ -11,6 +11,20 @@ import com.tewendelabs.investigator.api.ApiFailure;
 public final class EvidenceValidator {
     private static final Set<String> FIELDS = Set.of("actor", "action", "obligation", "condition", "scope", "deadline", "exceptions", "effectiveDate");
 
+    enum ReferenceRejectionReason { UNKNOWN_SOURCE_ID, BLANK_QUOTE, NONLITERAL_QUOTE }
+
+    /** Internal diagnostic only; the public status/code and persisted error remain unchanged. */
+    static final class UnverifiableReference extends ApiFailure {
+        private final ReferenceRejectionReason reason;
+
+        private UnverifiableReference(ReferenceRejectionReason reason) {
+            super(502, "UNVERIFIABLE_SOURCE_REFERENCE");
+            this.reason = reason;
+        }
+
+        ReferenceRejectionReason reason() { return reason; }
+    }
+
     public static void references(JsonNode references, List<Source> sources, Set<UUID> requiredVersions) {
         Map<String, Source> catalog = new HashMap<>();
         for (var s : sources) catalog.put(s.sourceId().toString(), s);
@@ -18,8 +32,9 @@ public final class EvidenceValidator {
         for (var ref : references) {
             Source source = catalog.get(ref.path("sourceId").asString());
             String quote = ref.path("quote").asString("");
-            if (source == null || quote.isBlank() || !source.excerpt().contains(quote))
-                throw new ApiFailure(502, "UNVERIFIABLE_SOURCE_REFERENCE");
+            if (source == null) throw new UnverifiableReference(ReferenceRejectionReason.UNKNOWN_SOURCE_ID);
+            if (quote.isBlank()) throw new UnverifiableReference(ReferenceRejectionReason.BLANK_QUOTE);
+            if (!source.excerpt().contains(quote)) throw new UnverifiableReference(ReferenceRejectionReason.NONLITERAL_QUOTE);
             cited.add(source.versionId());
         }
         if (!cited.containsAll(requiredVersions)) throw new ApiFailure(502, "INSUFFICIENT_CITATION_COVERAGE");

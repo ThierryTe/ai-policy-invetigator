@@ -71,11 +71,14 @@ public class InvestigationWorker {
 
     public void process(Lease lease) {
         boolean checkpointed = false;
+        String diagnosticStage = "EXTRACTING";
         try {
             var snapshot = service.snapshot(lease.actor(), lease.id());
             Map<UUID, JsonNode> extracted = new LinkedHashMap<>();
             List<Source> allSources = new ArrayList<>();
             for (UUID version : snapshot.versions()) {
+                diagnosticStage = version.equals(snapshot.baseline()) ? "EXTRACTING_BASELINE"
+                        : version.equals(snapshot.replacement()) ? "EXTRACTING_REPLACEMENT" : "EXTRACTING_PROCEDURE";
                 service.requireRunnable(lease.actor(), lease.id());
                 List<Source> sources = service.sources(lease.actor(), lease.id(), version);
                 if (sources.isEmpty() || sources.size() > 20 || sources.stream().mapToInt(s -> s.excerpt().length()).sum() > 16000)
@@ -112,6 +115,7 @@ public class InvestigationWorker {
                 return null;
             });
             String task = "Compare baseline " + snapshot.baseline() + " with replacement " + snapshot.replacement() + ". Align ALL baseline/replacement requirement IDs and assess EVERY replacement requirement against EVERY selected procedure version " + snapshot.procedures() + ". Return one assessment per pair. Relevant authorized procedure requirements are retrieved in full for this bounded scope. Evaluate applicability at " + snapshot.date() + ". Extracted requirements by version: " + JsonContract.encode(extracted);
+            diagnosticStage = "ASSESSING";
             Result result = provider.reason(request(lease, InvestigationSchemas.ASSESSMENT, task, allSources));
             EvidenceValidator.assessment(result.content(), snapshot, extracted, allSources);
             if (!result.content().path("complete").asBoolean()) throw new ApiFailure(422, "INCOMPLETE_ASSESSMENT");
@@ -122,6 +126,11 @@ public class InvestigationWorker {
                 return null;
             });
         } catch (RuntimeException e) {
+            if (e instanceof EvidenceValidator.UnverifiableReference rejection) {
+                // Fixed vocabulary and investigation UUID only; the lease token is not a logging identifier.
+                LoggerFactory.getLogger(getClass()).warn("citation_validation_rejected reason={} stage={} investigation_id={}",
+                        rejection.reason(), diagnosticStage, lease.id());
+            }
             String code = e instanceof ApiFailure a ? a.code : "INVESTIGATION_FAILED";
             if (code.equals("NOT_FOUND") || code.equals("UNAUTHENTICATED")) code = "ACCESS_OR_CONSENT_REVOKED";
             finish(lease, checkpointed ? "PARTIAL" : "FAILED", code);
