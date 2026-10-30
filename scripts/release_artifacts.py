@@ -16,7 +16,9 @@ DIGEST = r'sha256:[0-9a-f]{64}'
 RELEASE_ID = r'r[0-9]+-[0-9]+'
 KEYS = (*REPOSITORIES, 'POSTGRES_IMAGE_REF')
 RUNTIME_FILES = ('scripts/production_release.py', 'scripts/deploy_local_images.py',
-                 'scripts/verify_production_compose.py', 'scripts/release_artifacts.py')
+                 'scripts/verify_production_compose.py', 'scripts/release_artifacts.py',
+                 'scripts/release_safety.py', 'scripts/qualification_v8_preflight.sql',
+                 'docs/verification/v8-artifact.json')
 CONFIG_FILES = ('compose.yaml', 'compose.production.yaml', 'deploy/backend/compose.ghcr.yaml',
                 'deploy/frontend/compose.production.yaml', 'deploy/frontend/compose.ghcr.yaml',
                 'deploy/postgres/init.sh', 'frontend/compose.yaml', 'deploy/automation/compose.yaml')

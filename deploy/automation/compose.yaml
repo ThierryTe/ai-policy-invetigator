@@ -1,4 +1,8 @@
 # Applied only by the reviewed production controller; local/manual overlays stay intact.
 services:
+  backend:
+    environment:
+      APP_WORKER_ENABLED: ${APP_WORKER_ENABLED:?Explicit production worker flag required}
+      APP_INVESTIGATION_WORKER_ENABLED: ${APP_INVESTIGATION_WORKER_ENABLED:?Explicit production investigation worker flag required}
   postgres:
     image: ${POSTGRES_IMAGE_REF:?Select the verified locally transferred PostgreSQL image}

@@ -1,0 +1,76 @@
+{
+  "audit_date": "2026-10-30",
+  "scope": "Local backend/frontend source and existing screenshots; no production or VPS access",
+  "status": "PASS_FOR_DOCUMENTATION_CHANGES",
+  "source_text_files_scanned_before_changes": {
+    "backend": 155,
+    "frontend": 73
+  },
+  "screenshots_visually_reviewed": [
+    "frontend/docs/screenshots/desktop-fitted-investigation.png",
+    "frontend/docs/screenshots/mobile-fitted-investigation.png",
+    "frontend/docs/screenshots/desktop-real-investigation.png",
+    "frontend/docs/screenshots/mobile-real-investigation.png",
+    "frontend/docs/screenshots/pdf-real-source.png"
+  ],
+  "python_tests_executed": {
+    "command": "python3 -B -m unittest discover -s scripts/tests -v",
+    "tests": 173,
+    "failures": 0,
+    "result": "OK",
+    "log": "/tmp/english-judge-audit/python-checks.log",
+    "log_sha256": "f02dc8645f156b2a4870cd738ab034740b48356f525c122232b1c5ad522ee4b3"
+  },
+  "local_markdown_links_checked": 71,
+  "edited_or_new_markdown_files_checked_for_french": 7,
+  "qualified_jar_sha256_unchanged": "1ce613cc96861e9c41f5a3cf9a9bd47f5035aa629df561770070a783d93d4008",
+  "v1_v8_migrations_match_qualified_sha256": true,
+  "existing_changed_files": [
+    "backend/README.md",
+    "backend/docs/JUDGE_DEMO.md",
+    "backend/docs/README.md"
+  ],
+  "new_files": [
+    "backend/docs/JUDGE_QUICKSTART.md",
+    "backend/docs/HACKATHON_SUBMISSION.md",
+    "backend/docs/V8_PREPRODUCTION.en.md",
+    "backend/docs/audits/ENGLISH_JUDGE_READINESS.md",
+    "backend/docs/audits/ENGLISH_JUDGE_READINESS_CHECKS.json"
+  ],
+  "preserved_file_groups_verified_against_before_snapshot": {
+    "frontend_files": 80,
+    "backend_application_and_tests": 62,
+    "backend_scripts": 44,
+    "backend_seed_evaluation_files": 3,
+    "backend_verification_files": 8,
+    "original_french_qualification_report": 1
+  },
+  "preserved_original_french_report_sha256": "baf6ba23e35731987528ef774c03e34411a05344f72be48b7a98aa336b463fd4",
+  "remaining_french_prose": [
+    "backend/docs/V8_PREPRODUCTION.md (protected historical record; English companion supplied)",
+    "backend/src/main/java/com/tewendelabs/investigator/ingestion/TextCleaningService.java:5,14 (provenance-pinned imported comments; English equivalents supplied in audit)"
+  ],
+  "provenance_destination_hashes_checked_without_git": 4,
+  "intentional_unicode_test_fixtures_preserved": [
+    "backend/scripts/tests/test_initial_admin.py:31",
+    "backend/scripts/tests/test_setup_demo.py:30"
+  ],
+  "checks_not_executed": [
+    "Java/database suite (application and migrations unchanged)",
+    "Frontend build/unit/browser suites (frontend unchanged)",
+    "Real-provider scripts or inference",
+    "Production routing or judge-login checks",
+    "Submission-portal or final video validation",
+    "scripts/verify_provenance.py (invokes Git; destination hashes checked directly instead)"
+  ],
+  "remaining_readiness_conditions": [
+    "Actual judge URL/account/completed-result handoff and fresh-session rehearsal",
+    "Resource-specific controls and quota-message UX recommended; behavior changes require approval",
+    "Stage and verify honestly labeled fallback",
+    "Owner completes actual track/form/video fields and verifies current accepted rules"
+  ],
+  "before_snapshot": "/tmp/english-judge-audit/before.json",
+  "git_commands_executed": false,
+  "real_meta_called": false,
+  "deployed": false
+}

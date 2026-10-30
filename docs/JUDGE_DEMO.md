@@ -1,4 +1,7 @@
-# Interactive judge access — phase 1
+# Interactive judge access
+
+For the judge-facing walkthrough, use [Judge quickstart](JUDGE_QUICKSTART.md).
+This guide describes operator provisioning, access boundaries and persistent limits.
 
 Judge access uses the existing roles and RLS boundary. There is no `DEMO_TESTER` role,
 public signup, authentication bypass, or general administration API. This phase changes
@@ -18,6 +21,33 @@ policy IDs used by its baseline, replacement and procedures. Provisioning grants
 investigation, PDF sources, evidence, extractions and graph without making a Meta call.
 It cannot append versions, change processing consent or review findings on that shared
 scenario. Save and provide the existing `/investigations/<investigation-id>` link.
+
+With V8, an active, unexpired judge can also create and run a new investigation over
+that shared scenario. Analysis requires existing read access to the replacement policy
+and every selected version; it grants no content write permission. The judge cannot
+run another user's investigation. Ordinary users still need the existing write permission
+on the replacement policy to create and run their own investigation.
+
+`can_analyze_policy` reads the private demo profile through a narrow `SECURITY DEFINER`
+function with a fixed search path and explicit `current_actor()` access checks.
+`investigation_scope_analyzable` and `investigation_runnable` remain `SECURITY INVOKER`.
+Creation RLS and execution both validate the complete visible scope, direct policy
+lineage, procedure kinds, `INDEXED` state, external-processing consent and effective
+dates. Queue admission, each Meta reservation and asynchronous checkpoints recheck
+authorization under the requester identity. The owner must remain `NOBYPASSRLS`, with
+forced content RLS; startup checks include the new definer function's owner.
+
+V8 does not change V7 admission or Meta budgets. A new investigation on shared sources
+consumes the judge's investigation allowance and a pending slot, then individual and
+collective Meta attempts through the existing reservation functions. Reading the
+preloaded investigation still makes no Meta call.
+
+The SQL scope checks also apply to older queued investigations. An inconsistent scope,
+future effective date, revoked source or missing consent now prevents execution even
+if the row was inserted outside Java validation. Qualify the V7-to-V8 upgrade and
+representative queued jobs in staging before deployment. As with expiration, revoking
+sharing or consent cannot recall a provider attempt already authorized and in flight;
+subsequent reservations and checkpoints revalidate access.
 
 Sharing is at **policy level**, including all its versions and other investigations whose
 entire scope is readable. RLS does not restrict reads to one investigation or one version.
@@ -244,8 +274,12 @@ sudo python3 -B "$JUDGE_TOOLS/scripts/provision_judge.py" \
 Required output for this version:
 
 ```text
-Judge preflight passed: local owner authentication; migrations=7. No account created.
+Judge preflight passed: local owner authentication; migrations=8. No account created.
 ```
+
+Generate the operator package from the reviewed source matching the deployed migration
+inventory. A package built before V8 deliberately fails its exact-inventory check on
+a V8 database; do not bypass that check or reuse the older inventory.
 
 The tool invokes `psql -X -w` as **database role `investigator_owner` directly**, through
 `/var/run/postgresql` inside the existing container. The exec process uses the existing
@@ -306,13 +340,15 @@ PostgreSQL environment, with the same owner/migration preflight. It accepts
 Neither mode reads or changes the production environment file. This package is not
 included in the public application image or the automatic deployment runtime bundle.
 
-## Judge workflow and phase-1 limitations
+## Judge workflow and limitations
 
 1. Sign in and open the supplied preloaded investigation link.
-2. Upload a short policy V1, its direct successor V2, and at least one procedure into
-   your test department. Wait for indexing.
-3. Explicitly allow external processing on each document. Selected source text will be
-   sent to Meta. Upload only material you are authorized to share with that service.
+2. Select shared indexed versions, or upload a short policy V1, its direct successor
+   V2, and at least one procedure into your test department and wait for indexing.
+3. Every selected document must allow external processing. Only its owning-department
+   administrator can set this consent; read-only sharing does not grant that authority.
+   Selected source text will be sent to Meta. Upload only material you are authorized
+   to share with that service.
 4. Start an investigation with an analysis date on or after every selected effective date.
 5. Save its URL. The current frontend's recent list is memory-only and clears on sign-out.
 
@@ -337,8 +373,13 @@ and during processing, blocked-lock expiry, source-context preflight, targeted R
 private write isolation, and unsafe provisioning refusal. No live Meta request or
 deployment is required.
 
+V8 coverage also exercises shared read-only analysis, ordinary read-only refusal,
+missing/partial sharing, cross-organization grants, inactive/expired accounts, malformed
+or unready scopes, direct SQL admission and definer scheduling, requester and lease
+fences, concurrent quotas, and source/consent revocation before and during processing.
+
 ```sh
-SPRINGDOTENV_ENABLED=false mvn -B -o -Pdatabase-tests -Dtest=SecurityDatabaseTest test
+SPRINGDOTENV_ENABLED=false mvn -B -o -Pdatabase-tests verify
 python3 -B -m unittest discover -s scripts/tests -p test_provision_judge.py
 python3 -B -m unittest discover -s scripts/tests -p test_package_judge_tools.py
 ```

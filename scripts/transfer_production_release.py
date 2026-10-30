@@ -14,6 +14,7 @@ import tempfile
 
 from deploy_local_images import DeploymentError, require
 from release_artifacts import RELEASE_ID, validate_manifest
+from release_safety import validate_release
 
 BASE = '/opt/ai-policy-investigator'
 
@@ -85,6 +86,11 @@ def transfer(operation, release_id, directory=None, allow_migrations=False):
     require(re.fullmatch(RELEASE_ID, release_id or ''), 'RELEASE_ID_INVALID')
     require(operation in ['deploy', 'rollback'], 'OPERATION_INVALID')
     require(not allow_migrations or operation == 'deploy', 'ROLLBACK_CANNOT_APPLY_MIGRATIONS')
+    if operation == 'deploy':
+        require(directory is not None, 'PREPARED_RELEASE_DIRECTORY_REQUIRED')
+        data = validate_manifest(json.loads((directory / 'release.json').read_text()))
+        require(data['id'] == release_id and 'runtime' in data, 'RELEASE_ID_OR_RUNTIME_INVALID')
+        validate_release(data, allow_migrations)
     env_file = os.environ.get('VPS_ENV_FILE', '')
     require(re.fullmatch(re.escape(BASE) + r'/[A-Za-z0-9_./-]+', env_file)
             and Path(env_file).resolve().is_relative_to(BASE), 'VPS_ENV_FILE_REQUIRED_INSIDE_PROJECT')
@@ -92,11 +98,9 @@ def transfer(operation, release_id, directory=None, allow_migrations=False):
         ssh, scp, target = connection(Path(temporary), os.environ)
         remote = BASE + '/releases/' + release_id
         if operation == 'deploy':
-            require(directory is not None, 'PREPARED_RELEASE_DIRECTORY_REQUIRED')
-            data = validate_manifest(json.loads((directory / 'release.json').read_text()))
-            require(data['id'] == release_id and 'runtime' in data, 'RELEASE_ID_OR_RUNTIME_INVALID')
             execute(ssh + ['umask 077 && test -d ' + BASE + ' && mkdir -p ' + BASE + '/releases && mkdir ' + remote], 'SSH_RELEASE_DIRECTORY_FAILED')
-            execute(scp + ['-r', str(directory / 'configuration'), str(directory / 'scripts'), target + ':' + remote + '/'], 'SSH_CONFIGURATION_TRANSFER_FAILED')
+            execute(scp + ['-r', str(directory / 'configuration'), str(directory / 'scripts'),
+                           str(directory / 'docs'), target + ':' + remote + '/'], 'SSH_CONFIGURATION_TRANSFER_FAILED')
             files = [directory / 'release.json', *(directory / row['archive'] for row in data['images'].values())]
             execute(scp + [str(f) for f in files] + [target + ':' + remote + '/'], 'SSH_IMAGE_TRANSFER_FAILED')
         command = 'python3 ' + remote + '/scripts/production_release.py ' + operation + ' ' + release_id + ' --env-file ' + shlex.quote(env_file)

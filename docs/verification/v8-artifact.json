@@ -1,0 +1,59 @@
+{
+  "artifact_verdict": "PASS",
+  "jar": "ai-policy-investigator-0.1.0-SNAPSHOT.jar",
+  "jar_sha256": "1ce613cc96861e9c41f5a3cf9a9bd47f5035aa629df561770070a783d93d4008",
+  "baseline_sha256": "8d46c1a1802467fc98bafef6088d85ebfd417f3a647f0ef3a9bbb6f757eee063",
+  "migrations": [
+    {
+      "version": "1",
+      "script": "V1__policy_foundation.sql",
+      "checksum": -1407353534,
+      "sha256": "f8732829239af6faa957d191dccd0bf56092d87ec6198912509fcf645db1536d"
+    },
+    {
+      "version": "2",
+      "script": "V2__version_job_progress.sql",
+      "checksum": -954964090,
+      "sha256": "4b7abbca2a49fe6ed38407368aad6806257bddd3c9715cd41c35ac405b90ef89"
+    },
+    {
+      "version": "3",
+      "script": "V3__investigations.sql",
+      "checksum": -244515294,
+      "sha256": "374d4fbc1c14b5adc978e601d6434919099e53b545ddacdd58cdf3c03ad9aa72"
+    },
+    {
+      "version": "4",
+      "script": "V4__external_processing_authority.sql",
+      "checksum": 493766585,
+      "sha256": "8ec624bf7d48449a74d32246920f6a5760dae194585f9afe2da54a933043bbff"
+    },
+    {
+      "version": "5",
+      "script": "V5__configurable_investigation_deadline.sql",
+      "checksum": -852692105,
+      "sha256": "44ba2fef2da5594ffd93699d54f4a07138111811b5ab0b5d027f3e39c8e967bb"
+    },
+    {
+      "version": "6",
+      "script": "V6__finding_reviews.sql",
+      "checksum": -501431300,
+      "sha256": "09c454da3b8d66f75e650ae4e60062ee87184a5688d43fa531ad9e03dfbed8da"
+    },
+    {
+      "version": "7",
+      "script": "V7__judge_demo_access.sql",
+      "checksum": -568498416,
+      "sha256": "f453abf034d28c62a995d08c3da6b2a5e700ed7c503e34f8dae0ca11452f612c"
+    },
+    {
+      "version": "8",
+      "script": "V8__judge_readonly_investigations.sql",
+      "checksum": -14567167,
+      "sha256": "aba6ba0bd4fd7b99806c2d83563705a97b71444939b2712c272bf3df174d31ce"
+    }
+  ],
+  "v1_v7_unchanged": true,
+  "jar_matches_sources": true,
+  "scope": "local artifact only; not VPS or production qualification"
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Automatic post-publication deploy, or explicit manual deploy/rollback for recovery."""
+"""Explicit, attested V8 delivery or retained-release rollback; never push-triggered."""
 import argparse
 import json
 import os
@@ -13,6 +13,7 @@ from publish_release_images import channel_revision
 from release_artifacts import SHA, RELEASE_ID
 from validate_release_dispatch import validate as validate_manual
 from transfer_production_release import current_release, transfer
+from release_safety import from_environment, validate_release
 
 
 def automatic_pair(component, revision):
@@ -23,30 +24,30 @@ def automatic_pair(component, revision):
 
 
 def deploy(args):
+    require(not args.component, 'AUTOMATIC_PRODUCTION_DEPLOYMENT_DISABLED')
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        require(os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch'
+                and os.environ.get('GITHUB_REPOSITORY') == 'ThierryTe/ai-policy-invetigator'
+                and os.environ.get('GITHUB_REF') == 'refs/heads/main', 'MANUAL_BACKEND_MAIN_DISPATCH_REQUIRED')
     if args.operation == 'rollback':
         require(re.fullmatch(RELEASE_ID, args.rollback_release or '') and not args.allow_migrations, 'ROLLBACK_INPUT_INVALID')
         return transfer('rollback', args.rollback_release)
     require(args.run_id.isdecimal() and args.run_attempt.isdecimal(), 'GITHUB_RUN_ID_INVALID')
     require(re.fullmatch(SHA, args.configuration_sha or ''), 'CONFIGURATION_SHA_REQUIRED')
-    for attempt in range(1, 4):
-        base = current_release()
-        backend, frontend = automatic_pair(args.component, args.source_sha) if args.component else (args.backend_sha, args.frontend_sha)
-        require(all(re.fullmatch(SHA, v or '') for v in [backend, frontend]), 'TWO_FULL_SOURCE_SHAS_REQUIRED')
-        # Separate IDs for stale-base retries and workflow reruns, within the existing ID format.
-        namespace = {'backend': '1', 'frontend': '2', None: '0'}[args.component]
-        identity = 'r' + namespace + args.run_id + '-' + str(int(args.run_attempt) * 10 + attempt)
-        directory = args.output / identity
-        data = prepare(directory, backend, frontend, args.configuration_sha, identity)
-        data['expectedPrevious'] = base
-        (directory / 'release.json').write_text(json.dumps(data, indent=2) + '\n')
-        try:
-            return transfer('deploy', identity, directory, args.allow_migrations)
-        except DeploymentError as error:
-            if 'DEPLOYMENT_BASE_CHANGED_RETRY' not in str(error) or attempt == 3:
-                raise
-            # Other repository deployed while we prepared. Resolve its new channel again;
-            # never replace it using our now-stale counterpart selection.
-    raise DeploymentError('DEPLOYMENT_RETRY_LIMIT_REACHED')
+    record = from_environment(os.environ)
+    validate_manual({**os.environ, 'OPERATION': 'deploy', 'BACKEND_SHA': args.backend_sha,
+                     'FRONTEND_SHA': args.frontend_sha, 'ROLLBACK_RELEASE': args.rollback_release,
+                     'ALLOW_MIGRATIONS': str(args.allow_migrations).lower()})
+    require(current_release() == record['expected_previous'], 'APPROVED_RELEASE_BASE_CHANGED')
+    identity = 'r0' + args.run_id + '-' + str(int(args.run_attempt) * 10 + 1)
+    directory = args.output / identity
+    data = prepare(directory, args.backend_sha, args.frontend_sha, args.configuration_sha, identity)
+    data['expectedPrevious'] = record['expected_previous']
+    data['releaseSafety'] = record
+    validate_release(data, args.allow_migrations)
+    (directory / 'release.json').write_text(json.dumps(data, indent=2) + '\n')
+    # A changed base or failure requires a new explicit approval, never an automatic retry.
+    return transfer('deploy', identity, directory, args.allow_migrations)
 
 
 def main():
@@ -64,10 +65,10 @@ def main():
     parser.add_argument('--allow-migrations', action='store_true')
     args = parser.parse_args()
     try:
-        require(not args.component or (not args.backend_sha and not args.frontend_sha and not args.rollback_release and args.operation == 'deploy'), 'AUTOMATIC_AND_MANUAL_INPUTS_DIFFER')
-        if not args.component:
-            validate_manual({'OPERATION': args.operation, 'BACKEND_SHA': args.backend_sha, 'FRONTEND_SHA': args.frontend_sha,
-                             'ROLLBACK_RELEASE': args.rollback_release, 'ALLOW_MIGRATIONS': str(args.allow_migrations).lower()})
+        require(not args.component, 'AUTOMATIC_PRODUCTION_DEPLOYMENT_DISABLED')
+        validate_manual({**os.environ, 'OPERATION': args.operation, 'BACKEND_SHA': args.backend_sha,
+                         'FRONTEND_SHA': args.frontend_sha, 'ROLLBACK_RELEASE': args.rollback_release,
+                         'ALLOW_MIGRATIONS': str(args.allow_migrations).lower()})
         result = deploy(args)
         print(json.dumps(result, indent=2))
     except (DeploymentError, OSError, ValueError, KeyError, TypeError):

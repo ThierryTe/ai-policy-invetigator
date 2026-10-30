@@ -51,13 +51,3 @@ jobs:
     with:
       component: backend
 
-  deploy:
-    needs: publish
-    permissions:
-      contents: read
-      packages: read
-    uses: ./.github/workflows/deploy-production.yml
-    with:
-      component: backend
-      source_sha: ${{ github.sha }}
-    secrets: inherit

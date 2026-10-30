@@ -46,9 +46,10 @@ def release_images(path):
         raise DeploymentError('RELEASE_FILE_INVALID') from None
 
 
-def execute(command, env=None, code='DOCKER_COMMAND_FAILED', timeout=45):
+def execute(command, env=None, code='DOCKER_COMMAND_FAILED', timeout=45, input=None):
     try:
-        result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=timeout)
+        stdin = {'input': input} if input is not None else {}
+        result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=timeout, **stdin)
         require(result.returncode == 0, code)
         return result.stdout
     except (OSError, subprocess.TimeoutExpired):

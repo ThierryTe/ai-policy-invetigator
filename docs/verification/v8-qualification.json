@@ -1,0 +1,402 @@
+{
+  "date": "2026-10-30",
+  "scope": "local PostgreSQL 16.10 only; no production or VPS access; no Git commands; no real Meta services",
+  "technical_verdict": "PASS",
+  "release_verdict": "GO",
+  "release_blocker": null,
+  "reevaluation": {
+    "basis": "Explicit project-owner security decision: option A. Judges may write in their private department; synthetic documents shared from other departments must remain strictly READ-only.",
+    "previous_verdict": "NO-GO",
+    "previous_blocker_resolution": "Private-department WRITE is explicitly authorized. The existing tests demonstrate that WRITE remains denied on shared documents and departmental isolation is preserved.",
+    "verdict_scope": "GO for local V7-to-V8 qualification of the unchanged artifact; not production validation or deployment authorization.",
+    "tests_rerun": false,
+    "reason_no_rerun": "No missing evidence identified. Existing successful cases were reviewed, all 15 Surefire report hashes and counts verified, and the qualified JAR and all migration hashes rechecked.",
+    "evidence": {
+      "shared_documents_read_only": [
+        "judgeReadonlySharedScopeRunsWithAdmissionAndMetaReservationsButWithoutContentWrite",
+        "judgeProvisioningPreservesCompletedScenarioAndProvidesOnlyPrivateWriteAndTargetedRead"
+      ],
+      "department_isolation": [
+        "judgeProvisioningPreservesCompletedScenarioAndProvidesOnlyPrivateWriteAndTargetedRead",
+        "jdbcJpaAndConnectionReuseDenyOtherDepartment",
+        "jpaWritesCannotCrossDepartmentBoundary",
+        "judgeReadonlyRejectsHiddenScopesEvenThroughDefinerScheduling"
+      ],
+      "quotas_and_meta_budgets": [
+        "judgeReadonlyConcurrentSqlAdmissionsKeepQuotaReservations",
+        "demoMetaIndividualBudgetIsAtomicAndInvalidLeaseDoesNotDebit",
+        "demoCollectiveMetaBudgetIsAtomicAcrossDifferentJudges",
+        "judgeReadonlyMetaExhaustionStopsBeforeAnotherTransportCall",
+        "demoRetriesConsumeAttemptsAndStopBeforeTheNextTransportCall",
+        "demoReservationRollsBackWithItsWorkAndRuntimeCannotAlterLimits"
+      ],
+      "rls_and_ordinary_users": [
+        "judgeAnalysisDefinerIsRestrictedAndUnsafeOwnershipBlocksStartup",
+        "effectiveRolesFunctionAclsAndForcedRlsAreSafe",
+        "ordinaryReadersStillNeedWritePermissionToAnalyze",
+        "explicitGrantWorksAndRevocationTakesEffectForJpaAndSql"
+      ]
+    },
+    "remaining_conditions_before_deployment": [
+      "Operator verifies the exact delivered image/JAR and migration inventory against the qualified artifact and retained V7 release.",
+      "Operator obtains a private V7 backup with verified checksum and successful isolated restore, retaining the matching V7 images and role prerequisites.",
+      "Operator runs the V7 preflight on the actual target: PostgreSQL 16, expected roles, FORCE RLS, ACLs and exact Flyway history/checksums; no target environment was accessed during qualification.",
+      "Deployment remains an explicit separate operator action under maintenance, with workers initially disabled, V8 preflight and business/health checks before controlled resumption; rollback after V8 uses a verified V7 restore into a fresh database."
+    ],
+    "files_changed": [
+      "docs/verification/v8-qualification.json",
+      "docs/V8_PREPRODUCTION.md"
+    ]
+  },
+  "java_tests": 172,
+  "python_tests": 173,
+  "migrations_unchanged_during_qualification": true,
+  "v1_v7_baseline_source": "Historical local /tmp/judge-v8-original-migrations.sha256, preserved as docs/verification/v7-migrations.sha256; not a production history attestation",
+  "postgresql_version": "16.10",
+  "image": "pgvector/pgvector:0.8.0-pg16",
+  "suites": [
+    {
+      "suite": "com.tewendelabs.investigator.documentation.DefaultOpenApiTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": 11.766,
+      "report_sha256": "423ec31a2fc0ebbd5fe913a55f8cea684e00c1b2fb606eb527ae26ad8aa11d5c",
+      "cases": [
+        "docsRemainOptInWithoutLocalProfile"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.documentation.ProductionOpenApiTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": 1.461,
+      "report_sha256": "2849c14a0e8efc6425a59259b691af21900376d4b4218becc24805ac047a60cd",
+      "cases": [
+        "productionDeniesDocsWithForcedFeatureFlagsAndNoProfileFile"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.documentation.LocalOpenApiTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": 2.663,
+      "report_sha256": "4a73408cdefb57745f7afbae11ef8b706825ec1ccfd31531ce932c841e1dbe1c",
+      "cases": [
+        "swaggerPageAssetsAndConfigurationLoadWithoutExternalCalls",
+        "generatedContractDescribesExistingRoutesSchemasAndBearerWithoutProviderCalls",
+        "publicMetadataDoesNotGrantDocumentAccess"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.documentation.ProductionProfileSafetyTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": 1.219,
+      "report_sha256": "98a5452aa4dc0389b0d9b3fb508845cc6bb9c9a0610aa21485196d47e6b55383",
+      "cases": [
+        "productionDeniesDocsWithForcedFeatureFlagsAndNoProfileFile"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.config.ApplicationEnvironmentTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": 2.904,
+      "report_sha256": "2be97455e8e7ebcbad84200958781de56f2c31fa870082412dd6437228dbc249",
+      "cases": [
+        "processValuesOverrideFileForCredentialsAndOperationalSettings",
+        "actualApplicationPropertiesResolveRootDotenvSettings"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.config.DotenvConfigurationTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": 8.637,
+      "report_sha256": "dc8ad94a0887a609e9be7385103018273c30b654c604d1fa08085ece57876050",
+      "cases": [
+        "secureDefaultDoesNotReadLocalDotenv",
+        "realProcessEnvironmentOverridesDotenv",
+        "localOptInAllowsMissingOptionalDotenv",
+        "loadsRootDotenvThroughSpringBoot4",
+        "deliberatelyEmptyProcessVariableDoesNotFallBackToDotenv",
+        "missingDotenvDoesNotBreakProductionConfiguration",
+        "productionEnvironmentCanDisableDotenv"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.security.JwtValidationTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": 0.011,
+      "report_sha256": "2e660a6e6d09cf339d5b4d648c49750009ea758a43d3409759b03f6cb1e7c470",
+      "cases": [
+        "acceptsOnlyExpectedIssuerAudienceSubjectAndExpiration",
+        "rejectsWeakKeysAndSignaturesFromAnotherApplication"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.security.LoginThrottleTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": 0.002,
+      "report_sha256": "4a01f298bdf5c64aecad5070ddaefbd7bd1af0ee510f41b62633e9064b6d4cf3",
+      "cases": [
+        "spoofedForwardingHeadersCannotResetLoginThrottle"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.PdfAndVectorTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": 4.676,
+      "report_sha256": "ae3f33adf1382e025c674ba3082db24379640ab890a0dceb4edaf2a9ebb45271",
+      "cases": [
+        "refusesMixedEmptyPagesInsteadOfClaimingCompleteExtraction",
+        "rejectsUnsafeNamesAndInvalidVectors",
+        "childJvmPreservesDistinctPageTextAndLocations",
+        "unicodeOffsetsRoundTripWithoutSplittingCharacters",
+        "rejectsMalformedAndEmptyPdf"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.provider.MetaHttpTransportTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": 0.76,
+      "report_sha256": "e09fbe61816ba64ffed0d9b20401785b9f3fbe5dda7c6d0cfbb03c3f60088b47",
+      "cases": [
+        "credentialsAreNeverFollowedAcrossRedirects",
+        "bodyReadSharesTheRequestDeadline"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.provider.MetaPolicyReasoningProviderTest",
+      "tests": 35,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": 0.16,
+      "report_sha256": "25fac0b12b97effcc554aa5d251621aed95e15cb38f74e4ddf418094f0fb54ff",
+      "cases": [
+        "invalidSchemaStillFailsAfterStopIsLogged",
+        "otherKnownFinishReasonsAreLoggedAndNeverRetried(String)[1]",
+        "otherKnownFinishReasonsAreLoggedAndNeverRetried(String)[2]",
+        "otherKnownFinishReasonsAreLoggedAndNeverRetried(String)[3]",
+        "missingAndInvalidFinishReasonsUseFixedLogVocabulary(String)[1]",
+        "missingAndInvalidFinishReasonsUseFixedLogVocabulary(String)[2]",
+        "missingAndInvalidFinishReasonsUseFixedLogVocabulary(String)[3]",
+        "missingAndInvalidFinishReasonsUseFixedLogVocabulary(String)[4]",
+        "missingAndInvalidFinishReasonsUseFixedLogVocabulary(String)[5]",
+        "unknownFinishReasonsCannotInjectLogsOrBecomeAccepted(String)[1]",
+        "unknownFinishReasonsCannotInjectLogsOrBecomeAccepted(String)[2]",
+        "unknownFinishReasonsCannotInjectLogsOrBecomeAccepted(String)[3]",
+        "unknownFinishReasonsCannotInjectLogsOrBecomeAccepted(String)[4]",
+        "sendsConfiguredBudgetAndPreservesStrictLowReasoning(int)[1]",
+        "sendsConfiguredBudgetAndPreservesStrictLowReasoning(int)[2]",
+        "sendsConfiguredBudgetAndPreservesStrictLowReasoning(int)[3]",
+        "lengthIsMeteredAndLoggedWithoutRetryingOrParsingTruncatedContent",
+        "malformedContentStillFailsAfterStopIsLogged",
+        "refusalsRemainRejectedAndOnlyTheirPresenceIsLogged(String)[1]",
+        "refusalsRemainRejectedAndOnlyTheirPresenceIsLogged(String)[2]",
+        "rejectsBudgetsOutsideApplicationBounds(int)[1]",
+        "rejectsBudgetsOutsideApplicationBounds(int)[2]",
+        "rejectsBudgetsOutsideApplicationBounds(int)[3]",
+        "rejectsBudgetsOutsideApplicationBounds(int)[4]",
+        "rejectsBudgetsOutsideApplicationBounds(int)[5]",
+        "rejectsBudgetsOutsideApplicationBounds(int)[6]",
+        "nullRefusalDoesNotRejectACompleteResponse",
+        "springResolvesActualEnvironmentMappingAndRejectsInvalidConfiguration(String)[1]",
+        "springResolvesActualEnvironmentMappingAndRejectsInvalidConfiguration(String)[2]",
+        "springResolvesActualEnvironmentMappingAndRejectsInvalidConfiguration(String)[3]",
+        "springResolvesActualEnvironmentMappingAndRejectsInvalidConfiguration(String)[4]",
+        "springResolvesActualEnvironmentMappingAndRejectsInvalidConfiguration(String)[5]",
+        "springResolvesActualEnvironmentMappingAndRejectsInvalidConfiguration(String)[6]",
+        "springResolvesActualEnvironmentMappingAndRejectsInvalidConfiguration(String)[7]",
+        "rejectsOversizedSerializedContextBeforeReservingAnAttempt"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.SecurityDatabaseTest",
+      "tests": 93,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": 358.362,
+      "report_sha256": "88045456d8430ddd880d223810077b8bda1eaa2825ff2594ee8977044dbbedc3",
+      "cases": [
+        "entireContextIsCheckedBeforeAdmissionAndBeforeAnyMetaCall(String)[1]",
+        "entireContextIsCheckedBeforeAdmissionAndBeforeAnyMetaCall(String)[2]",
+        "entireContextIsCheckedBeforeAdmissionAndBeforeAnyMetaCall(String)[3]",
+        "workflowPreservesPdfPageEvidenceAndImmutableVersions",
+        "judgeProvisioningPreservesCompletedScenarioAndProvidesOnlyPrivateWriteAndTargetedRead",
+        "judgeAnalysisDefinerIsRestrictedAndUnsafeOwnershipBlocksStartup",
+        "demoExpiryDuringCallPreventsRetryOrCheckpointPersistence(boolean)[1]",
+        "demoExpiryDuringCallPreventsRetryOrCheckpointPersistence(boolean)[2]",
+        "judgeReadonlyRejectsHiddenScopesEvenThroughDefinerScheduling(String)[1]",
+        "judgeReadonlyRejectsHiddenScopesEvenThroughDefinerScheduling(String)[2]",
+        "judgeReadonlyRejectsHiddenScopesEvenThroughDefinerScheduling(String)[3]",
+        "judgeReadonlyRejectsHiddenScopesEvenThroughDefinerScheduling(String)[4]",
+        "judgeReadonlyRejectsHiddenScopesEvenThroughDefinerScheduling(String)[5]",
+        "judgeReadonlyRejectsHiddenScopesEvenThroughDefinerScheduling(String)[6]",
+        "judgeReadonlyRejectsHiddenScopesEvenThroughDefinerScheduling(String)[7]",
+        "fabricatedCitationFailsWithoutPublishingFindings",
+        "adminRoleAndMalformedCrossOrganizationGrantsDoNotBypassScope",
+        "demoInvestigationReplayDoesNotConsumeAgainAndPendingCoversBothKindsOfWork",
+        "demoSqlRefusesDisabledProductionAndUnrelatedIdentityCollisions",
+        "judgeReadonlySharedScopeRunsWithAdmissionAndMetaReservationsButWithoutContentWrite",
+        "deploymentChecksumsMatchActualFlywayHistory",
+        "demoOperatorSeedIsIdempotentAndUsesNormalJwtAndDepartmentAuthorization",
+        "demoMetaIndividualBudgetIsAtomicAndInvalidLeaseDoesNotDebit",
+        "demoImportsAndBytesArePersistentAndIdempotentAndRejectedTransactionsRollBack",
+        "revocationDuringEmbeddingRollsBackAllEvidence",
+        "reviewHistoryPreservesAiOutputRequiresReviewerAndCurrentDocumentAccess",
+        "permissionRevocationBetweenRetryAttemptsStopsPayloads",
+        "incompleteExtractionIsPartialAndNeverNoConflict",
+        "restartRecoveryReusesExtractionCheckpointAndFencesStaleLease",
+        "runtimeCannotReadQueueCredentialsOrBypassImmutability",
+        "judgeReadonlyRevocationStopsReservationsAndAsyncPersistence(String, boolean)[1]",
+        "judgeReadonlyRevocationStopsReservationsAndAsyncPersistence(String, boolean)[2]",
+        "judgeReadonlyRevocationStopsReservationsAndAsyncPersistence(String, boolean)[3]",
+        "judgeReadonlyRevocationStopsReservationsAndAsyncPersistence(String, boolean)[4]",
+        "judgeReadonlyRevocationStopsReservationsAndAsyncPersistence(String, boolean)[5]",
+        "judgeReadonlyRevocationStopsReservationsAndAsyncPersistence(String, boolean)[6]",
+        "judgeReadonlyRevocationStopsReservationsAndAsyncPersistence(String, boolean)[7]",
+        "judgeReadonlyRevocationStopsReservationsAndAsyncPersistence(String, boolean)[8]",
+        "jdbcJpaAndConnectionReuseDenyOtherDepartment",
+        "demoExpiryRejectsLoginExistingJwtSqlContentAndQueuedProcessing",
+        "judgeReadonlyMetaExhaustionStopsBeforeAnotherTransportCall(String, String)[1]",
+        "judgeReadonlyMetaExhaustionStopsBeforeAnotherTransportCall(String, String)[2]",
+        "providerTimeoutRetriesAreBoundedAndConsentWithdrawalStopsDispatch",
+        "explicitGrantWorksAndRevocationTakesEffectForJpaAndSql",
+        "demoReservationRollsBackWithItsWorkAndRuntimeCannotAlterLimits",
+        "demoCollectiveMetaBudgetIsAtomicAcrossDifferentJudges",
+        "totalDeadlineIsConfigurableAndNotResetDuringRecovery",
+        "incompatibleEmbeddingRevisionCannotLookLikeAnEmptySearch",
+        "investigationCompletesWithValidatedRequirementsAndPendingHumanReview",
+        "judgeProvisioningRefusesUnsafeInputsWithoutPartialChanges(String)[1]",
+        "judgeProvisioningRefusesUnsafeInputsWithoutPartialChanges(String)[2]",
+        "judgeProvisioningRefusesUnsafeInputsWithoutPartialChanges(String)[3]",
+        "judgeProvisioningRefusesUnsafeInputsWithoutPartialChanges(String)[4]",
+        "judgeProvisioningRefusesUnsafeInputsWithoutPartialChanges(String)[5]",
+        "judgeProvisioningRefusesUnsafeInputsWithoutPartialChanges(String)[6]",
+        "judgeProvisioningRefusesUnsafeInputsWithoutPartialChanges(String)[7]",
+        "judgeProvisioningRefusesUnsafeInputsWithoutPartialChanges(String)[8]",
+        "consentChangesRequireOwningDepartmentAdminInApiAndSql",
+        "realJwtAndHttpUploadEnforceCurrentAccountStatus",
+        "idempotencyAndLeaseRecoveryRejectDuplicatesAndStaleWorkers",
+        "judgeReadonlyScopeValidationAppliesToJavaRlsAndDefinerScheduling(String, String)[1]",
+        "judgeReadonlyScopeValidationAppliesToJavaRlsAndDefinerScheduling(String, String)[2]",
+        "judgeReadonlyScopeValidationAppliesToJavaRlsAndDefinerScheduling(String, String)[3]",
+        "judgeReadonlyScopeValidationAppliesToJavaRlsAndDefinerScheduling(String, String)[4]",
+        "judgeReadonlyScopeValidationAppliesToJavaRlsAndDefinerScheduling(String, String)[5]",
+        "judgeReadonlyScopeValidationAppliesToJavaRlsAndDefinerScheduling(String, String)[6]",
+        "judgeReadonlyScopeValidationAppliesToJavaRlsAndDefinerScheduling(String, String)[7]",
+        "unauthorizedSearchNeverReachesEmbeddingModel",
+        "demoConcurrentAdmissionsCannotExceedPersistentLimits(String, String)[1]",
+        "demoConcurrentAdmissionsCannotExceedPersistentLimits(String, String)[2]",
+        "demoConcurrentAdmissionsCannotExceedPersistentLimits(String, String)[3]",
+        "demoConcurrentAdmissionsCannotExceedPersistentLimits(String, String)[4]",
+        "inaccessibleExistingCitationIsRejected",
+        "deletedAccountCannotUseAnAlreadyIssuedJwt",
+        "consentRevokedDuringSuccessfulCallPreventsResultPersistence",
+        "jpaWritesCannotCrossDepartmentBoundary",
+        "graphUsesPersistedRequirementsAndVerifiedEvidenceAndDeniesRevocation",
+        "revokedRequesterCannotIngestAndCannotReadPreviouslyCreatedContent",
+        "demoRetriesConsumeAttemptsAndStopBeforeTheNextTransportCall",
+        "forgedEvidenceCannotBeInsertedEvenByAnAuthorizedWriter",
+        "judgeReadonlyScopeFailsClosedForNullUnknownAndDuplicateVersionIds",
+        "judgeReadonlyConcurrentSqlAdmissionsKeepQuotaReservations(String, String)[1]",
+        "judgeReadonlyConcurrentSqlAdmissionsKeepQuotaReservations(String, String)[2]",
+        "ordinaryReadersStillNeedWritePermissionToAnalyze",
+        "demoExpiryWhileWaitingForQuotaLockIsRecheckedAfterTheWait",
+        "malformedProviderOutputAndPermanentAuthenticationFailureDoNotRetry",
+        "reviewRejectsInvalidInputAndGraphsRejectTamperedPersistedCitations",
+        "citationDiagnosticsPreserveStatesAndCheckpointsWithoutLoggingEvidence(String, boolean)[1]",
+        "citationDiagnosticsPreserveStatesAndCheckpointsWithoutLoggingEvidence(String, boolean)[2]",
+        "citationDiagnosticsPreserveStatesAndCheckpointsWithoutLoggingEvidence(String, boolean)[3]",
+        "citationDiagnosticsPreserveStatesAndCheckpointsWithoutLoggingEvidence(String, boolean)[4]",
+        "citationDiagnosticsPreserveStatesAndCheckpointsWithoutLoggingEvidence(String, boolean)[5]",
+        "citationDiagnosticsPreserveStatesAndCheckpointsWithoutLoggingEvidence(String, boolean)[6]"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.investigation.StructuredValidationTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": 0.01,
+      "report_sha256": "be68c93605ba6a9e40878851432b2f745ce4be9c5d3fd777d4a1c8740609a57d",
+      "cases": [
+        "fabricatedSourceOrQuoteCannotPass",
+        "unknownSourceStillTakesPrecedenceOverBlankQuote",
+        "blankQuoteStillFailsEvenWhenItIsALiteralSubstring",
+        "schemaAndCoverageFailuresRetainTheirOwnCodes",
+        "completeRequiresAllSourceIds",
+        "citationDiagnosticPreservesPublicFailureAndContainsNoEvidence(ReferenceRejectionReason)[1]",
+        "citationDiagnosticPreservesPublicFailureAndContainsNoEvidence(ReferenceRejectionReason)[2]",
+        "citationDiagnosticPreservesPublicFailureAndContainsNoEvidence(ReferenceRejectionReason)[3]",
+        "preservesUnknownsAndAssignsIdsOnlyOnServer",
+        "rejectsMalformedJsonAndUndeclaredFields"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.InitialAdminDatabaseTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": 3.949,
+      "report_sha256": "0a1703805773c04f0454989999c68314ef8f0bdde47595fae372211f5a672bd5",
+      "cases": [
+        "refusesExistingIdentityStoreWithoutChangingCredentials",
+        "invalidInputRollsBackWithoutCreatingAnyIdentity",
+        "createsOnlyAnActiveDepartmentAdminWithSpringCompatiblePassword"
+      ]
+    },
+    {
+      "suite": "com.tewendelabs.investigator.V8MigrationDatabaseTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": 22.871,
+      "report_sha256": "159f5b9ccab5da8d8fa88270a24b843ef02925a7e31031c8e800345de0c40bbb",
+      "cases": [
+        "upgradePreservesEveryExistingRowAndV7History",
+        "backupRestoresV7AndFailedV8RollsBackBeforeSuccessfulRetry",
+        "effectiveRolesFunctionAclsAndForcedRlsAreSafe",
+        "pendingV7WorkCompletesAsynchronouslyIncludingPrivateAndReadonlyJudges",
+        "runningV7LeaseIsNotStolenThenRecoversItsCheckpointWithoutDoubleBilling",
+        "queuedV7RevocationAndConcurrentRevocationBlockTransportAndPersistence"
+      ]
+    }
+  ],
+  "local_logs": [
+    "/tmp/v8-qualification/maven-initial-escalated.log",
+    "/tmp/v8-qualification/migration-tests.log",
+    "/tmp/v8-qualification/python-tests-final.log"
+  ],
+  "python_log_sha256": "d66e860ee21a1e9f979fd5b28444eed3ff874fdde300fa4479f0bcd0ac7628c6"
+}

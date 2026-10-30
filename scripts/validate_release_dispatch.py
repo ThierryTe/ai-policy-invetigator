@@ -5,6 +5,7 @@ import re
 import sys
 from deploy_local_images import DeploymentError, require
 from release_artifacts import SHA, RELEASE_ID
+from release_safety import from_environment
 
 
 def validate(env):
@@ -12,6 +13,10 @@ def validate(env):
     if operation == 'deploy':
         require(all(re.fullmatch(SHA, env.get(k, '')) for k in ['BACKEND_SHA', 'FRONTEND_SHA']), 'TWO_FULL_SOURCE_SHAS_REQUIRED')
         require(not env.get('ROLLBACK_RELEASE'), 'DEPLOY_CANNOT_SELECT_ROLLBACK')
+        record = from_environment(env)
+        require(env.get('ALLOW_MIGRATIONS') in ('true', 'false')
+                and (env['ALLOW_MIGRATIONS'] == 'true') == (record['phase'] == 'migrate-v8'),
+                'PHASE_MIGRATION_PERMISSION_MISMATCH')
     else:
         require(operation == 'rollback' and re.fullmatch(RELEASE_ID, env.get('ROLLBACK_RELEASE', '')), 'VALIDATED_ROLLBACK_RELEASE_ID_REQUIRED')
         require(not env.get('BACKEND_SHA') and not env.get('FRONTEND_SHA'), 'ROLLBACK_CANNOT_SELECT_NEW_IMAGES')

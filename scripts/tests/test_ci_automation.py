@@ -138,9 +138,9 @@ class PairSelectionTest(unittest.TestCase):
 
 class ConcurrentDeployTest(unittest.TestCase):
     def args(self, directory):
-        return SimpleNamespace(operation='deploy', component='backend', source_sha=BACK, backend_sha='', frontend_sha='',
+        return SimpleNamespace(operation='deploy', component=None, source_sha='', backend_sha=BACK, frontend_sha=FRONT,
                                configuration_sha=BACK, run_id='123', run_attempt='1', output=directory,
-                               allow_migrations=False, rollback_release='')
+                               allow_migrations=True, rollback_release='')
 
     def test_changed_remote_base_is_rejected_before_images_are_loaded(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -151,25 +151,29 @@ class ConcurrentDeployTest(unittest.TestCase):
                 fixtures.ControllerTest()._activation(directory, expected_previous=None)
             self.assertEqual(json.loads((directory / 'last-successful.json').read_text()), state)
 
-    def test_stale_base_retries_with_fresh_pair_and_unique_id(self):
+    def test_stale_base_requires_new_approval_without_automatic_pair_retry(self):
+        from test_release_safety import attestations, release
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); captured = []
             def prepare(output, backend, frontend, configuration, identity):
-                output.mkdir(); captured.append((backend, frontend, identity)); return {'id': identity}
-            with patch.object(pipeline, 'current_release', side_effect=[None, 'r122-1']), \
-                 patch.object(pipeline, 'automatic_pair', side_effect=[(BACK, FRONT), (BACK, 'c' * 40)]), \
+                output.mkdir(); captured.append((backend, frontend, identity)); return release()
+            with patch.dict(os.environ, attestations(), clear=True), \
+                 patch.object(pipeline, 'current_release', return_value='r122-1'), \
                  patch.object(pipeline, 'prepare', side_effect=prepare), \
-                 patch.object(pipeline, 'transfer', side_effect=[DeploymentError('SSH_RELEASE_FAILED: DEPLOYMENT_BASE_CHANGED_RETRY'), {'result': 'VALIDATED'}]):
-                self.assertEqual(pipeline.deploy(self.args(root))['result'], 'VALIDATED')
-            self.assertEqual(captured, [(BACK, FRONT, 'r1123-11'), (BACK, 'c' * 40, 'r1123-12')])
-            self.assertEqual(json.loads((root / 'r1123-12/release.json').read_text())['expectedPrevious'], 'r122-1')
+                 patch.object(pipeline, 'transfer', side_effect=DeploymentError('SSH_RELEASE_FAILED: DEPLOYMENT_BASE_CHANGED_RETRY')) as transferred:
+                with self.assertRaisesRegex(DeploymentError, 'BASE_CHANGED'):
+                    pipeline.deploy(self.args(root))
+                transferred.assert_called_once()
+            self.assertEqual(captured, [(BACK, FRONT, 'r0123-11')])
+            self.assertEqual(json.loads((root / 'r0123-11/release.json').read_text())['expectedPrevious'], 'r122-1')
 
     def test_provider_network_or_health_errors_do_not_trigger_blind_redeploy(self):
+        from test_release_safety import attestations, release
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            def prepare(output, *args): output.mkdir(); return {}
-            with patch.object(pipeline, 'current_release', return_value=None), \
-                 patch.object(pipeline, 'automatic_pair', return_value=(BACK, FRONT)), \
+            def prepare(output, *args): output.mkdir(); return release()
+            with patch.dict(os.environ, attestations(), clear=True), \
+                 patch.object(pipeline, 'current_release', return_value='r122-1'), \
                  patch.object(pipeline, 'prepare', side_effect=prepare), \
                  patch.object(pipeline, 'transfer', side_effect=DeploymentError('BACKEND_HEALTH_FAILED')) as transfer:
                 with self.assertRaisesRegex(DeploymentError, 'HEALTH'): pipeline.deploy(self.args(root))
