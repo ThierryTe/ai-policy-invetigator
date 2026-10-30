@@ -44,6 +44,7 @@ public final class DotenvProbeFixture {
                 Map.entry("app.investigation.worker-enabled", "false"),
                 Map.entry("app.investigation.budget-seconds", "180"),
                 Map.entry("meta.model", "fixture-model"),
+                Map.entry("meta.max-completion-tokens", "8192"),
                 Map.entry("meta.timeout-seconds", "12"),
                 Map.entry("meta.max-retries", "1"),
                 Map.entry("meta.concurrency", "1"),
@@ -56,6 +57,7 @@ public final class DotenvProbeFixture {
             expected.put("spring.datasource.hikari.maximum-pool-size", "4");
             expected.put("app.jwt.audience", "process-audience");
             expected.put("meta.timeout-seconds", "15");
+            expected.put("meta.max-completion-tokens", "4096");
         }
         return expected.entrySet().stream().allMatch(entry -> entry.getValue().equals(environment.getProperty(entry.getKey())));
     }

@@ -38,6 +38,7 @@ helper does not populate root `.env` or create Meta credentials.
 | OWNER_DB_PASSWORD | Migration-owner password |
 | APP_DB_PASSWORD | Runtime-role password |
 | META_MODEL_ID | Verified default muse-spark-1.3; verify availability before changing |
+| META_MAX_COMPLETION_TOKENS | Per-call generation budget, including reasoning; default 4096, application bounds 4096–8192 |
 | META_TIMEOUT_SECONDS / META_MAX_RETRIES / META_CONCURRENCY | Bounded provider timeout, retry and concurrency controls |
 | META_INVESTIGATION_BUDGET_SECONDS | Persisted total investigation deadline |
 | DB_URL / APP_DB_USERNAME / OWNER_DB_USERNAME | JDBC connection and separate roles for host execution |
@@ -54,6 +55,52 @@ Real process variables take precedence, including intentionally empty values.
 `scripts/run_local.py` enables dotenv by default unless the process explicitly disables
 it, and treats ignored legacy local files as fallbacks. Production disables dotenv
 and injects runtime environment values.
+
+## Meta generation budget and diagnostics
+
+`META_MAX_COMPLETION_TOKENS` maps to `meta.max-completion-tokens` and the Meta
+Chat Completions `max_completion_tokens` request field. The backend refuses startup
+for non-integers, empty values, or values outside 4096–8192. These are conservative
+application bounds, not a published Meta model output maximum. The default remains
+4096; raising it is an explicit operator choice. Compose forwards the variable to
+the backend through both the production and image-only release overlays. An unset
+or empty Compose interpolation value uses 4096; a directly injected empty Spring
+property is invalid.
+
+The [official model catalog](https://dev.meta.ai/docs/models) lists a 1,048,576-token
+context window for `muse-spark-1.3`. That is not a separately guaranteed output limit.
+The [Chat Completions guide](https://dev.meta.ai/docs/protocols/chat-completions)
+describes the generation limit as model-dependent, and the
+[request schema](https://dev.meta.ai/docs/api-reference/chat-completions/schemas)
+states that it includes visible output and reasoning tokens. The public references
+checked on 2026-10-30 do not publish a numeric maximum for this model's
+`max_completion_tokens`. Do not infer support for 8192 from its context window or
+from a successful local fixture test. Confirm that value with Meta before using
+`META_MAX_COMPLETION_TOKENS=8192` for a first controlled investigation.
+
+After confirmation, set that single non-secret variable in the protected runtime
+configuration used by the existing production release workflow. Release the updated
+backend image and Compose configuration together through that workflow; a restart
+alone does not inject changed environment values into an existing container. Verify
+the selected value with `printenv META_MAX_COMPLETION_TOKENS` inside the backend,
+then create a new investigation. A terminal failed investigation is not automatically
+requeued; use a new investigation request/idempotency key. Keep the existing timeout,
+retry, concurrency, and total investigation budgets for this first trial.
+
+For HTTP 200 responses with valid usage counters, `meta_provider_event` logs contain
+only the investigation UUID, per-call attempt number, normalized `finish_reason`,
+refusal-presence boolean, prompt/completion/total token counters, configured generation
+budget, and latency. The finish-reason vocabulary is `stop`, `length`, `content_filter`,
+`tool_calls`, `function_call`, `missing`, or `other`; unrecognized provider text is never
+copied into logs. The refusal text, response body, prompts, source text, credentials,
+and lease tokens are never included. Logging occurs before content parsing and schema
+validation, so `stop` does not mean that a response passed the later validations.
+Malformed envelopes or invalid usage counters fail before this diagnostic event.
+
+`reasoning_effort=low`, strict JSON Schema, citation/coverage validation, and
+`FAILED`/`PARTIAL`/`COMPLETED` semantics remain unchanged. `INCOMPLETE_PROVIDER_OUTPUT`
+is still terminal for the provider call and is not automatically retried. A larger
+generation budget does not guarantee a complete response within the existing timeout.
 
 ## Docker startup
 

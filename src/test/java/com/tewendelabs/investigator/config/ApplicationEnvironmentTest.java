@@ -32,6 +32,7 @@ class ApplicationEnvironmentTest {
                 APP_WORKER_ENABLED=false
                 APP_INVESTIGATION_WORKER_ENABLED=false
                 META_MODEL_ID=fixture-model
+                META_MAX_COMPLETION_TOKENS=8192
                 META_TIMEOUT_SECONDS=12
                 META_MAX_RETRIES=1
                 META_CONCURRENCY=1
@@ -56,6 +57,6 @@ class ApplicationEnvironmentTest {
 
     @Test void actualApplicationPropertiesResolveRootDotenvSettings() throws Exception {verify("file-settings",Map.of());}
     @Test void processValuesOverrideFileForCredentialsAndOperationalSettings() throws Exception {
-        verify("process-settings",Map.of("APP_DB_PASSWORD","process-runtime-marker","DB_POOL_MAX_SIZE","4","JWT_AUDIENCE","process-audience","META_TIMEOUT_SECONDS","15"));
+        verify("process-settings",Map.of("APP_DB_PASSWORD","process-runtime-marker","DB_POOL_MAX_SIZE","4","JWT_AUDIENCE","process-audience","META_TIMEOUT_SECONDS","15","META_MAX_COMPLETION_TOKENS","4096"));
     }
 }
