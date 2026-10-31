@@ -136,7 +136,7 @@ def ghcr_manifest(repository, tag, absent=False, missing_ok=False):
     return {'manifestDigest': digest, 'configDigest': manifest['config']['digest'], 'indexDigest': top_digest}
 
 
-def prepare(output, backend_sha, frontend_sha, configuration_sha, release_id, root=ROOT):
+def prepare(output, backend_sha, frontend_sha, configuration_sha, release_id, root=ROOT, approved_images=None):
     require(all(re.fullmatch(SHA, value) for value in [backend_sha, frontend_sha, configuration_sha]), 'FULL_SOURCE_SHA_REQUIRED')
     require(re.fullmatch(RELEASE_ID, release_id), 'RELEASE_ID_INVALID')
     require(not output.exists(), 'RELEASE_OUTPUT_ALREADY_EXISTS')
@@ -148,7 +148,21 @@ def prepare(output, backend_sha, frontend_sha, configuration_sha, release_id, ro
         revision = frontend_sha if key == 'FRONTEND_IMAGE_REF' else backend_sha
         tag = 'sha-' + revision if key in REPOSITORIES else '0.8.0-pg16'
         source = repository + ':' + tag
-        if key in REPOSITORIES:
+        if approved_images and key in approved_images:
+            source = repository + '@' + approved_images[key]
+            if key in REPOSITORIES:
+                metadata = ghcr_manifest(repository, approved_images[key])
+                require(metadata['indexDigest'] == approved_images[key], 'APPROVED_IMAGE_DIGEST_CHANGED')
+            else:
+                raw_manifest = run(['docker', 'buildx', 'imagetools', 'inspect', source, '--raw'])
+                matching = next((raw for raw in [raw_manifest, raw_manifest.removesuffix(b'\n')]
+                                 if 'sha256:' + sha(raw) == approved_images[key]), None)
+                require(matching is not None, 'POSTGRES_MANIFEST_DIGEST_MISMATCH')
+                metadata = {'manifestDigest': approved_images[key], 'indexDigest': approved_images[key],
+                            'configDigest': json.loads(matching)['config']['digest']}
+                # Preserve the existing PostgreSQL source identity in release manifests.
+                source = repository + ':0.8.0-pg16'
+        elif key in REPOSITORIES:
             metadata = ghcr_manifest(repository, tag)
         else:
             descriptor = json.loads(run(['docker', 'buildx', 'imagetools', 'inspect', source, '--format', '{{json .Manifest}}']))

@@ -42,9 +42,15 @@ def commands(data, env_file, root=ROOT):
     require(env_file.is_file() and not env_file.is_symlink()
             and env_file.stat().st_uid == os.geteuid()
             and stat.S_IMODE(env_file.stat().st_mode) & 0o077 == 0, 'PRIVATE_ENV_FILE_PERMISSIONS_REQUIRE_600')
-    worker_inputs = explicit_worker_inputs(env_file)
+    if data.get('releaseSafety', {}).get('phase') in ('migrate-v8', 'activate-v8'):
+        value = 'false' if data['releaseSafety']['phase'] == 'migrate-v8' else 'true'
+        worker_inputs = dict.fromkeys(('APP_WORKER_ENABLED', 'APP_INVESTIGATION_WORKER_ENABLED'), value)
+    else:
+        worker_inputs = explicit_worker_inputs(env_file)
     # Do not inherit stale image/secret variables from SSH or sudo.
     env = {'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'HOME': pwd.getpwuid(os.geteuid()).pw_dir}
+    if 'v7Preparation' in data:
+        env['DOCKER_HOST'] = 'unix:///var/run/docker.sock'
     env.update({key: value['localRef'] for key, value in data['images'].items()})
     # Pin validated literals across later Compose calls even if the private file changes.
     env.update(worker_inputs)
@@ -177,7 +183,7 @@ def routing(front, env, public_url):
         check_url(public_url + path, status)
 
 
-def activate(directory, data, settings, rollback=False, allow_migrations=False, base=BASE, root=ROOT):
+def activate(directory, data, settings, rollback=False, allow_migrations=False, base=BASE, root=ROOT, acceptance=None):
     phase = validate_release(data, allow_migrations) if not rollback else None
     reviewed_configuration(data, root)
     back, front, env, config = commands(data, Path(settings['envFile']), root)
@@ -237,6 +243,8 @@ def activate(directory, data, settings, rollback=False, allow_migrations=False, 
     healthy_service(front, 'frontend', env)
     migration_gate(history(back, env), data['migrations'], rollback=True)
     routing(front, env, settings['publicUrl'])
+    if acceptance is not None:
+        acceptance()  # Conservation must pass before either success marker is written.
     # Commit state only after every health, migration and routing check succeeds.
     result = {'id': data['id'], 'backendSha': data['backendSha'], 'frontendSha': data['frontendSha'],
               'migrations': data['migrations'], 'previous': previous['id'] if previous else None,
@@ -247,6 +255,11 @@ def activate(directory, data, settings, rollback=False, allow_migrations=False, 
                       validationScope='Automated release checks passed; external checks remain operator attestations.',
                       targetPreflightVerified=True, qualifiedMigrationInventoryVerified=True,
                       binaryIdentityVerified=False)
+        if 'automatedV7Verification' in data:
+            result.update(automatedV7Verification=data['automatedV7Verification'],
+                          postV8DataConservationVerified=True,
+                          validationScope='V7 preflight, fresh backup, isolated restore and V8 data conservation automated; '
+                                          'external writer freeze, GitHub protection and image qualification approved by operator.')
     (directory / 'validated.json').write_text(json.dumps(result, indent=2) + '\n')
     temporary = base / 'last-successful.tmp'
     temporary.write_text(json.dumps(result, indent=2) + '\n')
