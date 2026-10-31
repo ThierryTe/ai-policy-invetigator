@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import re
 from types import SimpleNamespace
 import shutil
 import sys
@@ -119,11 +120,40 @@ class CandidateTest(unittest.TestCase):
                     'CONFIRM_WRITE_FREEZE', 'CONFIRM_IMAGE_QUALIFICATION', 'EVIDENCE_REF']:
             with self.assertRaises(DeploymentError): runner.validate({**env, key: ''})
 
+    def test_missing_or_malformed_demo_stops_before_remote_access(self):
+        for demo in [None, '', 'not-a-uuid', inputs()['V7_DEMO_INVESTIGATION_ID'] + '\n']:
+            env = inputs()
+            env.pop('V7_DEMO_INVESTIGATION_ID')
+            if demo is not None:
+                env['V7_DEMO_INVESTIGATION_ID'] = demo
+            with self.subTest(demo=demo), patch.object(runner, 'current_release') as current, \
+                    patch.object(runner, 'reviewed_revisions') as registry, patch.object(runner, 'transfer') as transfer:
+                with self.assertRaisesRegex(DeploymentError, 'COMPLETED_PRODUCTION_DEMO_UUID_REQUIRED'):
+                    runner.run(env, Path('/unused'))
+                current.assert_not_called(); registry.assert_not_called(); transfer.assert_not_called()
+
     def test_runner_never_rebuilds_and_stale_base_stops_before_registry(self):
         with patch.object(runner, 'current_release', return_value='r120-1'), \
                 patch.object(runner, 'reviewed_revisions') as lookup, patch.object(runner, 'transfer') as transfer:
             with self.assertRaisesRegex(DeploymentError, 'BASE_CHANGED'): runner.run(inputs(), Path('/unused'))
             lookup.assert_not_called(); transfer.assert_not_called()
+
+
+class ReviewedWorkflowTest(unittest.TestCase):
+    def test_prod_configuration_reaches_both_python_steps_after_environment_approval(self):
+        workflow = (Path(__file__).resolve().parents[2] / '.github/workflows/deploy-production.yml').read_text()
+        job, steps = workflow.split('    steps:\n', 1)
+        self.assertIn('    environment:\n      name: prod\n', job)
+        for name in ['V7_DEMO_INVESTIGATION_ID', 'V7_BACKUP_DIR']:
+            self.assertNotIn('${{ vars.' + name + ' }}', job)
+        for title in ['Validate reviewed preparation or migration approval',
+                      'Prepare or deploy the retained approved image pair']:
+            step = steps.split('      - name: ' + title + '\n', 1)[1].split('      - name:', 1)[0]
+            environment = step.split('        env:\n', 1)[1].split('        run:', 1)[0]
+            for name in ['V7_DEMO_INVESTIGATION_ID', 'V7_BACKUP_DIR']:
+                self.assertRegex(environment, re.escape('          ' + name + ': ${{ vars.' + name + ' }}'))
+            self.assertIn('python3 -B scripts/run_reviewed_release.py', step)
+        self.assertLess(steps.index('scripts/run_reviewed_release.py --validate-only'), steps.index('GHCR_TOKEN:'))
 
 
 class BackupTest(unittest.TestCase):
