@@ -1,5 +1,6 @@
 """Main-branch publication and automatic pair selection; no Docker/SSH/registry calls."""
 import copy
+import io
 import json
 import os
 from pathlib import Path
@@ -125,6 +126,39 @@ class PublicationTest(unittest.TestCase):
 
 
 class PublicationWorkflowTest(unittest.TestCase):
+    def test_manual_publication_requires_successful_main_ci_for_exact_source(self):
+        text = (Path(__file__).resolve().parents[2] / '.github/workflows/publish-images.yml').read_text()
+        step = text.split('- name: Require successful backend CI for manual publication\n', 1)[1]
+        match = re.search(r"python3 - <<'PY'\n(.*?)\n          PY", step, re.S)
+        code = '\n'.join(line[10:] for line in match[1].splitlines())
+        valid = {'head_sha': BACK, 'head_branch': 'main', 'event': 'push',
+                 'path': '.github/workflows/verify.yml', 'status': 'completed', 'conclusion': 'success',
+                 'head_repository': {'full_name': 'ThierryTe/ai-policy-invetigator'}}
+        invalid = [[]] + [[{**valid, key: value}] for key, value in [
+            ('head_sha', FRONT), ('head_branch', 'develop'), ('event', 'pull_request'),
+            ('path', '.github/workflows/other.yml'), ('status', 'in_progress'),
+            ('conclusion', 'failure'), ('conclusion', 'cancelled'),
+            ('head_repository', {'full_name': 'other/repository'}), ('head_repository', None),
+        ]]
+        for runs in [[valid], *invalid]:
+            with self.subTest(runs=runs), patch.dict(os.environ, {'GITHUB_SHA': BACK}, clear=True), \
+                    patch('urllib.request.urlopen', return_value=io.BytesIO(json.dumps({'workflow_runs': runs}).encode())) as lookup:
+                if runs == [valid]:
+                    exec(compile(code, '<manual-ci-guard>', 'exec'), {})
+                else:
+                    with self.assertRaisesRegex(SystemExit, 'SUCCESSFUL_BACKEND_CI_FOR_EXACT_SHA_REQUIRED'):
+                        exec(compile(code, '<manual-ci-guard>', 'exec'), {})
+                self.assertIn('head_sha=' + BACK, lookup.call_args.args[0].full_url)
+        with patch.dict(os.environ, {'GITHUB_SHA': BACK}, clear=True), \
+                patch('urllib.request.urlopen', side_effect=TimeoutError):
+            with self.assertRaises(TimeoutError):
+                exec(compile(code, '<manual-ci-guard>', 'exec'), {})
+        self.assertIn('  workflow_dispatch:\n', text)
+        self.assertIn('  workflow_call:\n', text)
+        self.assertIn('options: [backend]', text)
+        self.assertIn("github.event_name != 'workflow_dispatch' && inputs.component == 'frontend'", text)
+        self.assertLess(text.index('SUCCESSFUL_BACKEND_CI_FOR_EXACT_SHA_REQUIRED'), text.index('uses: actions/checkout'))
+
     def test_tooling_revision_guard_rejects_floating_or_injected_refs(self):
         text = (Path(__file__).resolve().parents[2] / '.github/workflows/publish-images.yml').read_text()
         match = re.search(r"python3 - <<'PY'\n(.*?)\n          PY", text, re.S)
