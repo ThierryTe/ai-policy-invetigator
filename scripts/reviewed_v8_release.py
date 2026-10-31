@@ -15,6 +15,7 @@ from release_artifacts import validate_manifest, file_sha, RELEASE_ID
 from release_safety import from_environment, qualified_migrations, validate_release
 from production_release import BASE, deployment_lock, reviewed_configuration, verify_archives, activate
 from v7_backup_restore import ENV_FILE, PG_MANIFEST, PG_CONFIG, DOCKER_ENV, private_env, source, verify_backup, psql, TOOLS, private_run
+from v7_backup_restore import restore_start_timeout, RESTORE_START_TIMEOUT_SECONDS
 
 APPROVED = {
     'BACKEND_IMAGE_REF': 'sha256:97a96a48cb9e4ec47726cbcf7f9a7219ec174483165de23c9ed103e16ea813cb',
@@ -34,6 +35,7 @@ def validate_candidate(data):
     require(request['expected_previous'] == data['expectedPrevious']
             and re.fullmatch(RELEASE_ID, request['expected_previous']), 'APPROVED_RELEASE_BASE_CHANGED')
     require(request['env_file'] == str(ENV_FILE), 'PRODUCTION_ENV_PATH_INVALID')
+    restore_start_timeout(request.get('restore_start_timeout_seconds', RESTORE_START_TIMEOUT_SECONDS))
     return request
 
 

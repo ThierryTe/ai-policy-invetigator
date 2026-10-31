@@ -64,6 +64,11 @@ performed. Retain cluster credentials/configuration separately: a logical dump
 does not include role credentials. Backup/restore does not expose or compare
 password-derived hashes; that original limitation is preserved.
 
+Optional `prod` variable `V7_RESTORE_START_TIMEOUT_SECONDS` sets the isolated
+PostgreSQL startup deadline (default **300 seconds**, integer **60–900**). It is
+validated before remote access and retained in the release manifest, so the frozen
+deployment rehearsal uses the same value. Older manifests use the default.
+
 ## Authorized preparation operation
 
 After explicit dispatch approval, select the existing workflow on `main` with:
@@ -101,6 +106,37 @@ private on the VPS. Nonempty stderr blocks success for private review. Successfu
 preparation stops only its own rehearsal container; the container and volume are
 retained. Failed checks never produce a success record. No retention cleanup is
 automated.
+
+The copied non-secret initializer is mode 644 inside the private mode-700 evidence
+directory and is mounted read-only. This permits the image's `postgres` user to
+read it even though the reviewed entry point uses `umask 077`; initializer bytes,
+SQL hashes, secrets and production file permissions remain unchanged. Readiness
+requires PID 1 to be `postgres` and the local Unix socket to accept connections,
+so the entrypoint's temporary initialization server cannot pass the check. See
+the [PostgreSQL image entrypoint](https://github.com/docker-library/postgres/blob/master/16/bookworm/docker-entrypoint.sh)
+and [pg_isready documentation](https://www.postgresql.org/docs/16/app-pg-isready.html).
+
+Startup failures return fixed codes distinguishing a still-running initialization
+timeout (`RESTORE_POSTGRES_START_TIMEOUT_INITIALIZING`), an unready final server,
+an invalid probe, initializer failure/permission denial, container exit, OOM,
+disk-full, or process-resource errors when supported by state/log evidence. These
+resource codes do not establish whether the host or container limit caused them.
+Only safe scalar state and reason codes appear in `restore-startup-failure.json`;
+the last 200 log lines stay in private mode-600 `restore-startup.log`. Failed
+rehearsals never create the verified `report.json` or `prepared.json`; a dump and
+checksum alone are **not a verified backup/restore**. Failure records are best
+effort if storage cannot accept writes. Cleanup verifies the exact random name,
+purpose label and dedicated data-volume name, then stops only that container's
+immutable ID. It never removes volumes. Cleanup failure blocks success and cannot
+replace the primary startup failure; `cleanup-failed.json` flags it for review.
+
+After this tooling is available on reviewed `main`, a newly approved
+`prepare-reviewed` rerun is safe: it gets a fresh release/evidence directory and
+new rehearsal container/volume, and leaves production PostgreSQL and applications
+running. Rerun the workflow (a new run attempt generates a new release ID); do not
+reuse the failed upload's release directory. Retained failed rehearsals consume
+disk space; the unchanged capacity checks must still pass. This retry guidance
+does not authorize `deploy-reviewed` or a production deployment.
 
 The safe Actions summary returns `PREPARED_AWAITING_V8_APPROVAL`, the retained
 release ID, source/configuration revisions and manifest digests. Its private

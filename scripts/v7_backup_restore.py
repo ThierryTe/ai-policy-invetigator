@@ -32,6 +32,125 @@ SQL_SHA256 = {
 INIT_SHA256 = '8a8bf87c66a2dad9efa0a1934fa7d58eea93e04469e15043f3f25e4a51a94261'
 DOCKER_ENV = {'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
               'DOCKER_HOST': 'unix:///var/run/docker.sock'}
+RESTORE_START_TIMEOUT_SECONDS = 300
+
+
+def restore_start_timeout(value=RESTORE_START_TIMEOUT_SECONDS):
+    require(re.fullmatch(r'[0-9]{1,3}', str(value)) is not None
+            and 60 <= int(value) <= 900, 'RESTORE_START_TIMEOUT_INVALID_60_TO_900_SECONDS')
+    return int(value)
+
+
+def restore_state(name, timeout=10):
+    try:
+        state = json.loads(execute(['docker', 'container', 'inspect', '--format', '{{json .State}}', name],
+                                   DOCKER_ENV, code='RESTORE_STATE_INSPECTION_FAILED', timeout=timeout))
+        require(isinstance(state, dict) and state.get('Status') in
+                {'created', 'running', 'paused', 'restarting', 'removing', 'exited', 'dead'}
+                and type(state.get('ExitCode')) is int and type(state.get('OOMKilled')) is bool,
+                'RESTORE_STATE_INSPECTION_FAILED')
+        return state
+    except (ValueError, TypeError):
+        raise DeploymentError('RESTORE_STATE_INSPECTION_FAILED') from None
+
+
+def failure_record(evidence, filename, record):
+    # A full/read-only filesystem must not replace the original failure code.
+    try:
+        (evidence / filename).write_text(json.dumps(record, indent=2) + '\n')
+    except OSError:
+        pass
+
+
+def restore_start_failure(name, evidence, state, reason, timeout):
+    """Raw diagnostics stay private; only fixed reason codes and scalar state escape."""
+    log = evidence / 'restore-startup.log'
+    collected = False
+    try:
+        with log.open('xb') as output:
+            log.chmod(0o600)
+            result = subprocess.run(['docker', 'logs', '--tail', '200', name], env=DOCKER_ENV,
+                                    stdout=output, stderr=subprocess.STDOUT, timeout=10)
+            collected = result.returncode == 0
+        with log.open('rb') as output:
+            output.seek(max(0, log.stat().st_size - 65536))
+            text = output.read().decode('utf-8', errors='replace') if collected else ''
+    except (OSError, subprocess.TimeoutExpired):
+        text = ''
+    detail = (text + '\n' + str(state.get('Error', ''))).lower()
+    if state.get('OOMKilled'):
+        reason = 'OOM_KILLED'
+    elif 'no space left on device' in detail:
+        reason = 'DISK_FULL'
+    elif 'out of memory' in detail or 'cannot allocate memory' in detail:
+        reason = 'MEMORY_EXHAUSTED'
+    elif 'resource temporarily unavailable' in detail or 'cannot fork' in detail:
+        reason = 'PROCESS_RESOURCE_EXHAUSTED'
+    elif state.get('Status') in {'exited', 'dead'}:
+        if ('/docker-entrypoint-initdb.d/01-investigator.sh' in text
+                and 'PostgreSQL init process complete' not in text and state['ExitCode'] != 0):
+            reason = 'INITIALIZER_NOT_READABLE' if 'permission denied' in detail else 'INITIALIZER_FAILED'
+        else:
+            reason = 'CONTAINER_EXITED_' + str(state['ExitCode'])
+    elif state.get('Error'):
+        reason = 'CONTAINER_RUNTIME_ERROR'
+    code = 'RESTORE_POSTGRES_' + reason
+    failure_record(evidence, 'restore-startup-failure.json', {
+        'result': 'FAILED', 'code': code, 'timeoutSeconds': timeout,
+        'containerStatus': state.get('Status'), 'exitCode': state.get('ExitCode'),
+        'oomKilled': state.get('OOMKilled'), 'privateLogCollected': collected,
+        'backupAndRestoreVerified': False, 'deploymentAuthorized': False})
+    raise DeploymentError(code)
+
+
+def wait_for_restore(name, evidence, timeout):
+    deadline = time.monotonic() + timeout
+    phase = 'INITIALIZING'
+    while True:
+        remaining = deadline - time.monotonic()
+        state = restore_state(name, timeout=min(10, max(0.1, remaining)))
+        if state['Status'] != 'running' or state.get('OOMKilled') or state.get('Error'):
+            restore_start_failure(name, evidence, state, 'CONTAINER_NOT_RUNNING', timeout)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            restore_start_failure(name, evidence, state, 'START_TIMEOUT_' + phase, timeout)
+        try:
+            # The entrypoint runs a temporary server during initialization. PID 1
+            # must have exec'd postgres before that server can count as ready.
+            probe = subprocess.run(['docker', 'exec', '--user', 'postgres', name, 'sh', '-c',
+                'test "$(cat /proc/1/comm)" = postgres || exit 10; '
+                'exec pg_isready -q -h /var/run/postgresql -p 5432 -t 2 -U postgres -d investigator'],
+                env=DOCKER_ENV, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=min(10, remaining))
+            if probe.returncode == 0:
+                if time.monotonic() <= deadline:
+                    return
+                continue
+            phase = {10: 'INITIALIZING', 1: 'REJECTING_CONNECTIONS', 2: 'NO_RESPONSE'}.get(probe.returncode, 'PROBE_FAILED')
+            if phase == 'PROBE_FAILED':
+                restore_start_failure(name, evidence, restore_state(name), 'READINESS_PROBE_FAILED', timeout)
+        except subprocess.TimeoutExpired:
+            phase = 'PROBE_TIMEOUT'
+        except OSError:
+            restore_start_failure(name, evidence, state, 'READINESS_PROBE_FAILED', timeout)
+        time.sleep(min(1, max(0, deadline - time.monotonic())))
+
+
+def stop_restore(name, volume):
+    require(re.fullmatch(r'investigator-v7-restore-[0-9a-f]{24}', name) is not None
+            and volume == name + '-data', 'RESTORE_CLEANUP_TARGET_INVALID')
+    rows = json_command(['docker', 'container', 'inspect', name], DOCKER_ENV,
+                        code='RESTORE_CLEANUP_INSPECTION_FAILED')
+    require(isinstance(rows, list) and len(rows) == 1 and isinstance(rows[0], dict),
+            'RESTORE_CLEANUP_INSPECTION_FAILED')
+    row = rows[0]
+    require(row.get('Name') == '/' + name and re.fullmatch(r'[0-9a-f]{64}', row.get('Id', ''))
+            and (row.get('Config', {}).get('Labels') or {}).get('purpose') == 'investigator-v7-restore'
+            and any(m.get('Destination') == '/var/lib/postgresql/data' and m.get('Type') == 'volume'
+                    and m.get('Name') == volume for m in row.get('Mounts', [])),
+            'RESTORE_CLEANUP_OWNERSHIP_MISMATCH')
+    # Stop by immutable ID after checking ownership. Never remove containers or volumes.
+    execute(['docker', 'stop', row['Id']], DOCKER_ENV, code='ISOLATED_RESTORE_STOP_FAILED', timeout=60)
 
 
 def private_env(path=ENV_FILE):
@@ -197,6 +316,7 @@ def evidence_directory(backup_root, database_bytes):
 
 def verify_backup(base, request, frozen=False):
     """Caller holds deployment.lock for the entire operation and any subsequent migration."""
+    timeout = restore_start_timeout(request.get('restore_start_timeout_seconds', RESTORE_START_TIMEOUT_SECONDS))
     private_env()
     require(all(file_sha(TOOLS / name) == digest for name, digest in SQL_SHA256.items()), 'REVIEWED_SQL_CHECK_CHANGED')
     demo = request['demo_id']
@@ -210,6 +330,10 @@ def verify_backup(base, request, frozen=False):
     (evidence / 'tools.json').write_text(json.dumps({p: file_sha(TOOLS / p) for p in
         ['qualification_v8_preflight.sql', 'qualification_v7_backup.sql']}, indent=2) + '\n')
     shutil.copyfile(release / 'configuration/deploy/postgres/init.sh', evidence / 'init.sh')
+    # copyfile under the reviewed entrypoint's umask 077 creates mode 0600.
+    # The non-secret script must be readable by postgres inside its read-only
+    # file bind mount; the containing evidence directory stays private (0700).
+    (evidence / 'init.sh').chmod(0o644)
     preflight(pg['Id'], evidence, 'source-preflight')
     dump = evidence / 'investigator-v7.dump'
     with snapshot(pg['Id'], evidence) as token:
@@ -232,29 +356,31 @@ def verify_backup(base, request, frozen=False):
     env_file.write_text('POSTGRES_DB=investigator\nPOSTGRES_USER=postgres\n' + ''.join(
         key + '=' + secrets.token_hex(32) + '\n' for key in ['POSTGRES_PASSWORD', 'OWNER_DB_PASSWORD', 'APP_DB_PASSWORD']))
     env_file.chmod(0o600)
-    started = False
+    run_attempted = False
+    failed = False
     try:
         # Random names plus explicit absence checks; never reuse an existing volume/container.
         for kind, target in [('container', name), ('volume', volume)]:
             probe = subprocess.run(['docker', kind, 'inspect', target], env=DOCKER_ENV, capture_output=True)
             require(probe.returncode != 0, 'RESTORE_TARGET_ALREADY_EXISTS')
         execute(['docker', 'volume', 'create', '--label', 'purpose=investigator-v7-restore', volume], DOCKER_ENV)
-        execute(['docker', 'run', '-d', '--pull', 'never', '--name', name, '--network', 'none', '--restart', 'no',
+        run_attempted = True
+        try:
+            execute(['docker', 'run', '-d', '--pull', 'never', '--name', name, '--network', 'none', '--restart', 'no',
                  '--memory', '1g', '--cpus', '1', '--pids-limit', '256', '--security-opt', 'no-new-privileges',
                  '--cap-drop', 'NET_RAW', '--cap-drop', 'NET_ADMIN', '--label', 'purpose=investigator-v7-restore',
                  '--env-file', str(env_file), '--mount', 'type=volume,source=' + volume + ',target=/var/lib/postgresql/data',
                  '--mount', 'type=bind,source=' + str(evidence / 'init.sh') + ',target=/docker-entrypoint-initdb.d/01-investigator.sh,readonly',
-                 pg['Image'], 'postgres', '-c', 'listen_addresses=', '-c', 'max_connections=10'], DOCKER_ENV)
-        started = True
-        ready = False
-        for _ in range(60):
-            probe = subprocess.run(['docker', 'exec', '--user', 'postgres', name, 'sh', '-c',
-                'test "$(cat /proc/1/comm)" = postgres && pg_isready -U postgres -d investigator'],
-                env=DOCKER_ENV, capture_output=True, timeout=10)
-            if probe.returncode == 0:
-                ready = True; break
-            time.sleep(1)
-        require(ready, 'RESTORE_POSTGRES_START_TIMEOUT')
+                 pg['Image'], 'postgres', '-c', 'listen_addresses=', '-c', 'max_connections=10'], DOCKER_ENV,
+                 code='RESTORE_POSTGRES_LAUNCH_FAILED')
+        except DeploymentError:
+            # docker run may create the container even when its client fails.
+            try:
+                state = restore_state(name)
+            except DeploymentError:
+                state = {}
+            restore_start_failure(name, evidence, state, 'LAUNCH_FAILED', timeout)
+        wait_for_restore(name, evidence, timeout)
         isolation(name, volume, pg['Image'], evidence)
         require(file_sha(dump) == digest, 'BACKUP_CHECKSUM_CHANGED')
         private_run(['docker', 'exec', '-i', '--user', 'postgres', name, 'pg_restore', '-U', 'postgres', '-d',
@@ -267,9 +393,21 @@ def verify_backup(base, request, frozen=False):
         isolation(name, volume, pg['Image'], evidence)
         preflight(pg['Id'], evidence, 'source-final-preflight')
         require(file_sha(dump) == digest, 'BACKUP_CHECKSUM_CHANGED')
+    except Exception:
+        failed = True
+        failure_record(evidence, 'rehearsal-failed.json', {
+            'result': 'FAILED', 'backupAndRestoreVerified': False, 'deploymentAuthorized': False})
+        raise
     finally:
-        if started:
-            execute(['docker', 'stop', name], DOCKER_ENV, code='ISOLATED_RESTORE_STOP_FAILED', timeout=60)
+        if run_attempted:
+            try:
+                stop_restore(name, volume)
+            except (DeploymentError, OSError, ValueError, KeyError, TypeError):
+                failure_record(evidence, 'cleanup-failed.json', {
+                    'result': 'FAILED', 'code': 'ISOLATED_RESTORE_STOP_FAILED',
+                    'backupAndRestoreVerified': False, 'deploymentAuthorized': False})
+                if not failed:
+                    raise DeploymentError('ISOLATED_RESTORE_STOP_FAILED') from None
     report = {'result': 'V7_BACKUP_AND_ISOLATED_RESTORE_VERIFIED', 'release': request['expected_previous'],
               'verifiedAtUtc': datetime.now(timezone.utc).isoformat(), 'sourceContainer': pg['Id'],
               'backupLocation': str(dump), 'sha256': digest, 'completedDemoInvestigation': demo,
