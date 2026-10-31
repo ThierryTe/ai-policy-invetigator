@@ -54,7 +54,7 @@ on:
         description: Reviewed linux/amd64 backend child manifest digest
         type: string
       evidence_ref:
-        description: Non-secret change-record ID (uppercase letters, digits, dot, dash, underscore)
+        description: 'Change-record ID: 3-80 uppercase letters/digits/dot/dash/underscore, e.g. CHG-V8-20261031'
         type: string
       confirm_github_protection:
         description: I attest prod required reviewers/main-only protection is configured (not verified here)
@@ -141,10 +141,12 @@ jobs:
         if: inputs.operation == 'prepare-reviewed' || inputs.operation == 'deploy-reviewed'
         # Resolve prod variables at step scope, after the runner declares the environment.
         env:
+          CONFIGURATION_SHA: ${{ steps.tooling.outputs.commit }}
           V7_DEMO_INVESTIGATION_ID: ${{ vars.V7_DEMO_INVESTIGATION_ID }}
           V7_BACKUP_DIR: ${{ vars.V7_BACKUP_DIR }}
           V7_RESTORE_START_TIMEOUT_SECONDS: ${{ vars.V7_RESTORE_START_TIMEOUT_SECONDS }}
-        run: python3 -B scripts/run_reviewed_release.py --validate-only
+        # Both Python calls read the same dispatch form directly, including booleans.
+        run: python3 -B scripts/run_reviewed_release.py --validate-only --event-file "$GITHUB_EVENT_PATH"
       - name: Verify deployment tooling and production topology
         env:
           POLICY_FRONTEND_DIRECTORY: ${{ github.workspace }}/.ci/frontend
@@ -194,7 +196,7 @@ jobs:
           mkdir -p "$DOCKER_CONFIG"
           trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-          python3 -B scripts/run_reviewed_release.py --output "$RUNNER_TEMP/policy-releases" >> "$GITHUB_STEP_SUMMARY"
+          python3 -B scripts/run_reviewed_release.py --event-file "$GITHUB_EVENT_PATH" --output "$RUNNER_TEMP/policy-releases" >> "$GITHUB_STEP_SUMMARY"
       - name: Report verification boundary
         if: always()
         run: |
