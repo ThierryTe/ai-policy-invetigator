@@ -10,6 +10,8 @@ RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -Pneural-embeddings -Dmaven.te
 # Retain the exact Java runtime image used by the verified local workflow.
 FROM eclipse-temurin:21-jre-jammy@sha256:affcab5356e1270ac35d2361ee83135af2f03e8d580eca78a6d5d6fdbf048db0
 WORKDIR /app
+# Rust comes from pinned tokenizers-0.36.0; never acquire a native engine online.
+ENV DJL_DEFAULT_ENGINE=Rust DJL_OFFLINE=true OPT_OUT_TRACKING=true DJL_CACHE_DIR=/tmp/embedding-native
 COPY --from=build --chown=10001:10001 /workspace/target/ai-policy-investigator-0.1.0-SNAPSHOT.jar /app/investigator.jar
 USER 10001:10001
 CMD ["java", "-Xmx512m", "-Duser.home=/runtime", "-jar", "/app/investigator.jar"]

@@ -47,6 +47,20 @@ def verified(repository, revision, metadata, component):
 
 def publish(component, revision, context):
     require(component in SOURCE_REPOSITORIES and re.fullmatch(SHA, revision or ''), 'PUBLICATION_INPUT_INVALID')
+    provenance = {'sourceRepository': SOURCE_REPOSITORIES[component], 'sourceRevision': revision,
+                  'platform': 'linux/amd64', 'toolingRevision': None, 'githubRun': None}
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        tooling = os.environ.get('PUBLICATION_TOOLING_SHA', '')
+        require(re.fullmatch(SHA, tooling) and (component != 'backend' or tooling == revision),
+                'FULL_PUBLICATION_TOOLING_SHA_REQUIRED')
+        repository = SOURCE_REPOSITORIES[component].removeprefix('https://github.com/')
+        run_id, attempt = os.environ.get('GITHUB_RUN_ID', ''), os.environ.get('GITHUB_RUN_ATTEMPT', '')
+        require(os.environ.get('GITHUB_REPOSITORY') == repository
+                and os.environ.get('GITHUB_SHA') == revision
+                and run_id.isdecimal() and attempt.isdecimal(), 'PUBLICATION_RUN_BINDING_INVALID')
+        provenance.update(toolingRevision=tooling, githubRun={
+            'repository': repository, 'runId': run_id, 'runAttempt': attempt,
+            'url': 'https://github.com/' + repository + '/actions/runs/' + run_id})
     paths = [('BACKEND_IMAGE_REF', 'deploy/backend/Dockerfile'), ('MODEL_INIT_IMAGE_REF', 'deploy/embeddings/Dockerfile')] \
         if component == 'backend' else [('FRONTEND_IMAGE_REF', 'Dockerfile')]
     published = []
@@ -68,7 +82,10 @@ def publish(component, revision, context):
     for repository, metadata in published:
         run(['docker', 'buildx', 'imagetools', 'create', '--tag', repository + ':' + CHANNEL,
              repository + '@' + metadata['manifestDigest']])
-    return {'component': component, 'sha': revision, 'images': {repo: value['manifestDigest'] for repo, value in published}}
+    return {'component': component, 'sha': revision, 'provenance': provenance,
+            'images': {repo: value['manifestDigest'] for repo, value in published},
+            'identities': {repo: {key: value[key] for key in ('manifestDigest', 'configDigest', 'indexDigest')}
+                           for repo, value in published}}
 
 
 def channel_revision(component, initial_revision=''):

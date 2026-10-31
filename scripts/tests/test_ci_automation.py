@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import re
+import subprocess
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -23,6 +25,35 @@ META = {'manifestDigest': 'sha256:' + 'a' * 64, 'configDigest': 'sha256:' + 'b' 
 
 
 class PublicationTest(unittest.TestCase):
+    def setUp(self):
+        environment = patch.dict(os.environ, {}, clear=True)
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    def test_publication_retains_source_tooling_run_and_all_digest_identities(self):
+        env = {'GITHUB_ACTIONS': 'true', 'GITHUB_REPOSITORY': 'ThierryTe/ai-policy-invetigator-frontend',
+               'GITHUB_SHA': FRONT, 'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '2',
+               'PUBLICATION_TOOLING_SHA': BACK}
+        with patch.dict(os.environ, env, clear=True), patch.object(publisher, 'ghcr_manifest', return_value=META), \
+                patch.object(publisher, 'verified'), patch.object(publisher, 'run'):
+            result = publisher.publish('frontend', FRONT, Path('/unused'))
+        self.assertEqual(result['identities'][REPOSITORIES['FRONTEND_IMAGE_REF']], META)
+        self.assertEqual(result['provenance']['sourceRevision'], FRONT)
+        self.assertEqual(result['provenance']['toolingRevision'], BACK)
+        self.assertEqual(result['provenance']['githubRun']['runAttempt'], '2')
+
+    def test_invalid_ci_provenance_stops_before_registry_or_publication(self):
+        env = {'GITHUB_ACTIONS': 'true', 'GITHUB_REPOSITORY': 'ThierryTe/ai-policy-invetigator',
+               'GITHUB_SHA': BACK, 'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '1',
+               'PUBLICATION_TOOLING_SHA': BACK}
+        for key, value in [('PUBLICATION_TOOLING_SHA', 'main'), ('PUBLICATION_TOOLING_SHA', FRONT),
+                           ('GITHUB_SHA', FRONT), ('GITHUB_REPOSITORY', 'other/repo'), ('GITHUB_RUN_ID', '')]:
+            with self.subTest(key=key, value=value), patch.dict(os.environ, {**env, key: value}, clear=True), \
+                    patch.object(publisher, 'ghcr_manifest') as registry, patch.object(publisher, 'run') as docker:
+                with self.assertRaises(DeploymentError):
+                    publisher.publish('backend', BACK, Path('/unused'))
+                registry.assert_not_called(); docker.assert_not_called()
+
     def test_new_backend_pair_is_verified_before_channel_advances(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -91,6 +122,27 @@ class PublicationTest(unittest.TestCase):
         with patch.object(publisher, 'configuration', return_value=image):
             with self.assertRaisesRegex(DeploymentError, 'SOURCE_REPOSITORY_MISMATCH'):
                 publisher.verified(REPOSITORIES['FRONTEND_IMAGE_REF'], FRONT, META, 'frontend')
+
+
+class PublicationWorkflowTest(unittest.TestCase):
+    def test_tooling_revision_guard_rejects_floating_or_injected_refs(self):
+        text = (Path(__file__).resolve().parents[2] / '.github/workflows/publish-images.yml').read_text()
+        match = re.search(r"python3 - <<'PY'\n(.*?)\n          PY", text, re.S)
+        self.assertIsNotNone(match)
+        code = '\n'.join(line[10:] for line in match[1].splitlines())
+        for revision in [BACK, '', 'main', 'abc', 'a' * 39, 'a' * 41, BACK + '\nmain']:
+            with self.subTest(revision=revision):
+                result = subprocess.run([sys.executable, '-c', code], env={'TOOLING_SHA': revision},
+                                        text=True, capture_output=True)
+                self.assertEqual(result.returncode == 0, revision == BACK)
+        self.assertLess(text.index('FULL_PUBLICATION_TOOLING_SHA_REQUIRED'), text.index('uses: actions/checkout'))
+        self.assertNotIn("|| 'main'", text)
+        self.assertIn('PUBLICATION_TOOLING_SHA: ${{ steps.tooling.outputs.commit }}', text)
+        self.assertIn('path: ${{ runner.temp }}/publication.json', text)
+        self.assertNotIn('environment:', text)
+        self.assertNotIn('VPS_', text)
+        for use in re.findall(r'uses: ([^\s]+)', text):
+            self.assertRegex(use, r'@[0-9a-f]{40}$')
 
 
 class PairSelectionTest(unittest.TestCase):

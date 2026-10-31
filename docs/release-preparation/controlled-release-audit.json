@@ -1,0 +1,177 @@
+{
+  "format": 1,
+  "recordType": "Controlled release preparation and read-only audit; no publication or deployment",
+  "recordedAtUtc": "2026-10-31T13:08:59.963343+00:00",
+  "preparationResult": "PASS",
+  "productionVerdict": "NO-GO",
+  "publicationAuthorized": false,
+  "productionDeploymentAuthorized": false,
+  "observedRemoteMain": {
+    "backend": "afa68f0c62ba502f213a4235e6f281a1a5fb17cd",
+    "frontend": "a07f52c25aead414ac08e6593667f864a4c33a20"
+  },
+  "remoteObservationsArePointInTime": true,
+  "sourceReconciliation": {
+    "backendQualifiedBuildInputsCompared": 67,
+    "backendRuntimeInputDifferencesFromRemote": [
+      "pom.xml",
+      "deploy/backend/Dockerfile"
+    ],
+    "backendRuntimeInputsUnchangedDuringThisAudit": true,
+    "frontendDifferentOrLocalOnlyFiles": [
+      "src/app/app.routes.ts",
+      "src/app/app.ts",
+      "src/app/app.config.ts",
+      "src/app/core/auth-navigation.ts",
+      "src/app/core/auth.spec.ts",
+      "src/app/core/auth.guard.ts",
+      "src/app/core/auth-routing.spec.ts",
+      "src/app/core/auth.ts",
+      "src/app/shared/shell.ts",
+      "src/app/features/auth/login.ts",
+      "e2e/auth-restoration.spec.ts",
+      "e2e/session.spec.ts",
+      "e2e/workflow.spec.ts",
+      "docs/AUTH_RELEASE_REVIEW.md"
+    ],
+    "frontendCheckoutUnchangedDuringAudit": true,
+    "snapshots": "/private/tmp/controlled-release-preparation-001/source-reconciliation.json",
+    "toolingSnapshots": "/private/tmp/controlled-release-preparation-001/tooling-reconciliation.json",
+    "candidateBackendRevision": null,
+    "candidateFrontendRevision": null,
+    "candidatePublishedIdentities": null
+  },
+  "reusedEvidence": {
+    "localBackend": {
+      "result": "PASS",
+      "gates": 269,
+      "artifacts": {
+        "jarSha256": "6e57c1852c96ac87f335453cad6f36324d94ff76b83e1f52f0821b5b37a8867b",
+        "imageManifestDigest": "sha256:a0373a4558724c868de46069912741297145f41e3b71817ab41c09422fa8b3cf",
+        "imageConfigDigest": "sha256:29bfd30f5c3c54a49ee741fd9cb220a6697e787634068b178b02b6d7c124dfbb",
+        "localImageId": "sha256:a0373a4558724c868de46069912741297145f41e3b71817ab41c09422fa8b3cf",
+        "archiveSha256": "8af055347da902bb4350cdc1314a4314a1b2e811c336e6feff6ffadf31ba4dd7",
+        "buildImageId": "sha256:a0373a4558724c868de46069912741297145f41e3b71817ab41c09422fa8b3cf"
+      },
+      "reportSha256": "83e8ceb02eb582bedd0f164a692b39e31a4690f19695ca8a078a921cfd97def5",
+      "scope": "Exact local image offline inference and isolated startup only; no published-source claim"
+    },
+    "frontend": {
+      "unitRoutingTests": 62,
+      "syntheticChromiumTests": 8,
+      "productionBuild": "PASS",
+      "basis": "Operator-provided current evidence and adjacent AUTH_RELEASE_REVIEW.md; not rerun",
+      "reviewSha256": "f389741ab249d40e0ff5a021a7ea8b2140db1c0204d5816e6615ae92c938daf5",
+      "localInputsManifestSha256": "5020d8e19b4b1b1c250c009c82a30daf790e18356acf0d1f62756659e2ae4e00"
+    },
+    "historicalMigrations": "Existing qualification reused; no repeats or changes; original artifact scope retained"
+  },
+  "frontendDeliveryBlocker": {
+    "historicalRun": {
+      "url": "https://github.com/ThierryTe/ai-policy-invetigator-frontend/actions/runs/40950112694",
+      "conclusion": "failure",
+      "jobs": 0,
+      "checkRuns": 0,
+      "annotation": "verify.yml line 50: failed to fetch called deploy-production.yml@main: workflow was not found"
+    },
+    "currentStructuralBlocker": "Frontend reusable deployment call cannot satisfy backend-main manual-dispatch guard; no frontend-only phase; existing controller recreates backend/model-init",
+    "resolutionStatus": "Owner handoff prepared; frontend checkout unchanged; independent target procedure and approval still required",
+    "handoff": "docs/release-preparation/frontend-publication.patch.template",
+    "noBackendMigrationRequiredForFrontendFix": true
+  },
+  "safePreparationChanges": {
+    "files": [
+      ".github/workflows/prepare-backend-qualification.yml",
+      ".github/workflows/publish-images.yml",
+      "scripts/publish_release_images.py",
+      "scripts/tests/test_ci_automation.py",
+      "scripts/tests/test_prepare_backend_qualification.py"
+    ],
+    "behavior": [
+      "Require frontend publication tooling full SHA before checkout",
+      "Pin frontend tooling checkout instead of main; backend uses its validated SHA",
+      "Bind publication metadata to actual tooling/source/run and manifest/config/index digests",
+      "Retain non-secret publication JSON artifact after success",
+      "Remove historical failed-image identity defaults from preparation workflow"
+    ],
+    "notDeployed": true,
+    "frontendCallerMustAdoptNewToolingInput": true,
+    "productionControllerAndGuardsUnchanged": true
+  },
+  "validation": {
+    "focusedSuites": {
+      "publication-tests-ci-environment.log": {
+        "status": "PASS",
+        "tests": 21,
+        "sha256": "b83e4fdf7238b0fe2054216ba5d002b40d0515406d0cfbd05e6e800596a06c38"
+      },
+      "preparation-tests-ci-environment.log": {
+        "status": "PASS",
+        "tests": 18,
+        "sha256": "f51359d72cb21b1fb484a5a899fdbe3f505cb292498d11d463a25befcc9ebdc5"
+      }
+    },
+    "uniqueTests": 39,
+    "workflowYamlSyntax": "PASS (two modified workflows plus rendered handoff)",
+    "handoffPatchDryRun": "PASS on scratch copy only",
+    "actionlintAvailable": false,
+    "hostedGitHubValidation": "NOT_RUN",
+    "existingApplicationTestsRepeated": false,
+    "containersOrApplicationStarted": false
+  },
+  "preservation": {
+    "result": "PASS",
+    "auditFilesChecked": 132,
+    "auditExpectedChangedFiles": 5,
+    "previousQualificationInventoryChecked": 645,
+    "unexpectedChanges": [],
+    "migrations": "V1-V8 unchanged",
+    "historicalDefaultRuntimeResult": "FAIL",
+    "historicalBinaryIdentity": "MISMATCH",
+    "originalFailedReportSha256": "1b9fab72998257f7148a0b9cf8b07f826fee47ddd115a1ce98c575a9749788d2"
+  },
+  "remainingBlockers": [
+    {
+      "gate": "Publication authorization",
+      "status": "REQUIRED",
+      "action": "Approve GHCR writes, model-init and discovery-channel updates before auto-publishing main changes"
+    },
+    {
+      "gate": "Source-bound release candidates",
+      "status": "MISSING",
+      "action": "Owners record reviewed backend B and frontend F; frontend pins reusable workflow and tooling to approved backend SHA"
+    },
+    {
+      "gate": "Published backend identity and exact-image qualification",
+      "status": "MISSING",
+      "action": "Capture actual CI manifest/config/JAR identities; use existing preparation and offline-runtime harness once on exact published candidate"
+    },
+    {
+      "gate": "Independent frontend production delivery",
+      "status": "BLOCKED",
+      "action": "Approve service-only delivery/rollback preserving actual V7 backend/database/model-init/workers/config; legacy call and both V8 phases are unsuitable"
+    },
+    {
+      "gate": "Target-specific deployment approval/readiness",
+      "status": "REQUIRED",
+      "action": "Prod review plus actual V7 base/preflight, freeze, private backup and restoration of that exact dump in isolation"
+    },
+    {
+      "gate": "V8 acceptance and worker activation",
+      "status": "REQUIRED",
+      "action": "Verify judge/data/grant/quota preservation with workers false; then separate reactivation approval using same images/config/tooling"
+    }
+  ],
+  "operatorPlan": "docs/CONTROLLED_RELEASE_PLAN.en.md",
+  "notPerformed": [
+    "Git commands",
+    "image publication",
+    "workflow dispatch",
+    "VPS access",
+    "migrations",
+    "deployment",
+    "real Meta calls",
+    "judge/quota changes",
+    "environment administration"
+  ]
+}
