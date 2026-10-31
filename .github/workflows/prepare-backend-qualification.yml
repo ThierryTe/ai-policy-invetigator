@@ -1,0 +1,81 @@
+name: Prepare backend qualification only
+on:
+  workflow_dispatch:
+    inputs:
+      backend_sha:
+        description: Approved full backend source revision
+        type: string
+        required: true
+        default: 48669d57b32cd1acb83acc57bd9da50b02ee3cd0
+      approved_backend_digest:
+        description: Approved linux/amd64 platform manifest digest (not an index)
+        type: string
+        required: true
+        default: sha256:dca3389c5555b09c13e4f643074a6c7684d9ba7d3d73f931b34d53fcb9276eea
+      approved_config_digest:
+        description: Independently approved backend config digest
+        type: string
+        required: true
+        default: sha256:baf9cf5911c21e0129afa1700a91abec14f88bd4c4ff9d74b8943efd45baf76d
+      evidence_ref:
+        description: Non-secret approved change-record ID (uppercase letters, digits, dot, dash, underscore)
+        type: string
+        required: true
+      confirm_authorized:
+        description: I authorize preparation and storage of this image in downloadable run artifacts; no deployment
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+  packages: read
+jobs:
+  prepare:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'ThierryTe/ai-policy-invetigator'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Require explicit preparation authorization
+        env:
+          CONFIRM_AUTHORIZED: ${{ inputs.confirm_authorized }}
+        run: test "$CONFIRM_AUTHORIZED" = true
+      - name: Check out reviewed tooling for this dispatch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Test preparation safety without registry or Docker access
+        run: python3 -B -m unittest discover -s scripts/tests -p test_prepare_backend_qualification.py -v
+      - name: Prepare and verify the approved backend image only
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCKER_CONFIG: ${{ runner.temp }}/backend-qualification-registry
+          BACKEND_SHA: ${{ inputs.backend_sha }}
+          APPROVED_BACKEND_DIGEST: ${{ inputs.approved_backend_digest }}
+          APPROVED_CONFIG_DIGEST: ${{ inputs.approved_config_digest }}
+          EVIDENCE_REF: ${{ inputs.evidence_ref }}
+        run: |
+          set -euo pipefail
+          mkdir -m 700 "$DOCKER_CONFIG"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          python3 -B scripts/prepare_backend_qualification.py \
+            --revision "$BACKEND_SHA" \
+            --manifest-digest "$APPROVED_BACKEND_DIGEST" \
+            --config-digest "$APPROVED_CONFIG_DIGEST" \
+            --evidence-ref "$EVIDENCE_REF" --confirm-authorized \
+            --output "$RUNNER_TEMP/backend-qualification" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload verified archive, evidence and file checksums
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-qualification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/backend-qualification/BACKEND_IMAGE_REF.tar
+            ${{ runner.temp }}/backend-qualification/evidence.json
+            ${{ runner.temp }}/backend-qualification/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
