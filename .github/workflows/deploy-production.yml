@@ -106,8 +106,6 @@ jobs:
       OPERATION: ${{ inputs.operation }}
       PREPARED_RELEASE: ${{ inputs.prepared_release }}
       VPS_ENV_FILE: /opt/ai-policy-investigator/.env.production
-      V7_DEMO_INVESTIGATION_ID: ${{ vars.V7_DEMO_INVESTIGATION_ID }}
-      V7_BACKUP_DIR: ${{ vars.V7_BACKUP_DIR }}
       BACKEND_SHA: ${{ inputs.backend_sha }}
       FRONTEND_SHA: ${{ inputs.frontend_sha }}
       ROLLBACK_RELEASE: ${{ inputs.rollback_release }}
@@ -141,6 +139,10 @@ jobs:
         run: python3 -B scripts/validate_release_dispatch.py
       - name: Validate reviewed preparation or migration approval
         if: inputs.operation == 'prepare-reviewed' || inputs.operation == 'deploy-reviewed'
+        # Resolve prod variables at step scope, after the runner declares the environment.
+        env:
+          V7_DEMO_INVESTIGATION_ID: ${{ vars.V7_DEMO_INVESTIGATION_ID }}
+          V7_BACKUP_DIR: ${{ vars.V7_BACKUP_DIR }}
         run: python3 -B scripts/run_reviewed_release.py --validate-only
       - name: Verify deployment tooling and production topology
         env:
@@ -174,6 +176,8 @@ jobs:
       - name: Prepare or deploy the retained approved image pair
         if: inputs.operation == 'prepare-reviewed' || inputs.operation == 'deploy-reviewed'
         env:
+          V7_DEMO_INVESTIGATION_ID: ${{ vars.V7_DEMO_INVESTIGATION_ID }}
+          V7_BACKUP_DIR: ${{ vars.V7_BACKUP_DIR }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCKER_CONFIG: ${{ runner.temp }}/policy-registry
           CONFIGURATION_SHA: ${{ steps.tooling.outputs.commit }}

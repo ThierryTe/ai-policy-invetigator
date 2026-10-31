@@ -50,6 +50,14 @@ Set these two protected `prod` variables from actual production records:
 | `V7_DEMO_INVESTIGATION_ID` | The existing completed judge investigation UUID, never a local fixture ID. Missing/wrong/incomplete demo fails the original SQL qualification. |
 | `V7_BACKUP_DIR` | Existing encrypted/access-controlled private backup directory outside `/opt/ai-policy-investigator` and repositories, deployment-user owned, mode 700, no symlinks. |
 
+In `ThierryTe/ai-policy-invetigator`, use **Settings → Environments → prod →
+Environment variables**, not Environment secrets. The UUID is non-secret
+configuration; `COMPLETED_PRODUCTION_DEMO_UUID_REQUIRED` is an error code, not a
+variable name. Both variables are passed explicitly to the Python validation and
+execution steps after `prod` approval. Keep them at step scope: environment-level
+variables are available only after the runner declares the environment, as
+described in [GitHub's vars context documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#vars-context).
+
 Disk checks require at least four times the database size plus 1 GiB free on both
 the backup and Docker data filesystems. No pruning or automatic provisioning is
 performed. Retain cluster credentials/configuration separately: a logical dump
