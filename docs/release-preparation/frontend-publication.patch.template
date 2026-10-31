@@ -1,0 +1,27 @@
+--- a/.github/workflows/verify.yml
++++ b/.github/workflows/verify.yml
+@@ -38,22 +38,7 @@
+     permissions:
+       contents: read
+       packages: write
+-    uses: ThierryTe/ai-policy-invetigator/.github/workflows/publish-images.yml@main
++    uses: ThierryTe/ai-policy-invetigator/.github/workflows/publish-images.yml@__APPROVED_BACKEND_TOOLING_SHA__
+     with:
+       component: frontend
+-
+-  deploy:
+-    needs: publish
+-    permissions:
+-      contents: read
+-      packages: read
+-    uses: ThierryTe/ai-policy-invetigator/.github/workflows/deploy-production.yml@main
+-    with:
+-      component: frontend
+-      source_sha: ${{ github.sha }}
+-    secrets:
+-      VPS_HOST: ${{ secrets.VPS_HOST }}
+-      VPS_USERNAME: ${{ secrets.VPS_USERNAME }}
+-      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+-      VPS_PORT: ${{ secrets.VPS_PORT }}
+-      VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
++      tooling_sha: __APPROVED_BACKEND_TOOLING_SHA__

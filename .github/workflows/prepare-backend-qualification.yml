@@ -6,17 +6,14 @@ on:
         description: Approved full backend source revision
         type: string
         required: true
-        default: 48669d57b32cd1acb83acc57bd9da50b02ee3cd0
       approved_backend_digest:
         description: Approved linux/amd64 platform manifest digest (not an index)
         type: string
         required: true
-        default: sha256:dca3389c5555b09c13e4f643074a6c7684d9ba7d3d73f931b34d53fcb9276eea
       approved_config_digest:
         description: Independently approved backend config digest
         type: string
         required: true
-        default: sha256:baf9cf5911c21e0129afa1700a91abec14f88bd4c4ff9d74b8943efd45baf76d
       evidence_ref:
         description: Non-secret approved change-record ID (uppercase letters, digits, dot, dash, underscore)
         type: string

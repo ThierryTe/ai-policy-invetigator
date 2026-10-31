@@ -5,6 +5,11 @@ on:
       component:
         type: string
         required: true
+      tooling_sha:
+        description: Frontend callers must pin this to the same full backend SHA as the reusable workflow reference
+        type: string
+        required: false
+        default: ''
 permissions:
   contents: read
   packages: write
@@ -14,17 +19,27 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
+      - name: Require an immutable publication tooling revision
+        env:
+          TOOLING_SHA: ${{ inputs.component == 'backend' && github.sha || inputs.tooling_sha }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          if not re.fullmatch(r'[0-9a-f]{40}', os.environ.get('TOOLING_SHA', '')):
+              raise SystemExit('FULL_PUBLICATION_TOOLING_SHA_REQUIRED')
+          PY
       - name: Check out the CI-validated application source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           path: source
           persist-credentials: false
-      - name: Check out backend tooling from validated source or stable main
+      - name: Check out the pinned backend publication tooling
+        id: tooling
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ThierryTe/ai-policy-invetigator
-          ref: ${{ inputs.component == 'backend' && github.sha || 'main' }}
+          ref: ${{ inputs.component == 'backend' && github.sha || inputs.tooling_sha }}
           path: tooling
           persist-credentials: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -35,9 +50,19 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCKER_CONFIG: ${{ runner.temp }}/policy-registry
           COMPONENT: ${{ inputs.component }}
+          PUBLICATION_TOOLING_SHA: ${{ steps.tooling.outputs.commit }}
         run: |
+          set -euo pipefail
           mkdir -m 700 "$DOCKER_CONFIG"
           trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           python3 -B tooling/scripts/publish_release_images.py "$COMPONENT" \
-            --sha "$GITHUB_SHA" --context "$GITHUB_WORKSPACE/source" >> "$GITHUB_STEP_SUMMARY"
+            --sha "$GITHUB_SHA" --context "$GITHUB_WORKSPACE/source" > "$RUNNER_TEMP/publication.json"
+          cat "$RUNNER_TEMP/publication.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain publication identities without application or production secrets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: publication-${{ inputs.component }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/publication.json
+          if-no-files-found: error
+          retention-days: 30

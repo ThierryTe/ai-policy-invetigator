@@ -200,6 +200,13 @@
                 <dependency>
                     <groupId>org.springframework.ai</groupId>
                     <artifactId>spring-ai-starter-model-transformers</artifactId>
+                    <!-- ONNX inference uses the pinned Rust NDArray engine bundled in tokenizers. -->
+                    <exclusions>
+                        <exclusion>
+                            <groupId>ai.djl.pytorch</groupId>
+                            <artifactId>pytorch-engine</artifactId>
+                        </exclusion>
+                    </exclusions>
                 </dependency>
             </dependencies>
         </profile>
