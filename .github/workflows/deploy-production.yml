@@ -143,6 +143,7 @@ jobs:
         env:
           V7_DEMO_INVESTIGATION_ID: ${{ vars.V7_DEMO_INVESTIGATION_ID }}
           V7_BACKUP_DIR: ${{ vars.V7_BACKUP_DIR }}
+          V7_RESTORE_START_TIMEOUT_SECONDS: ${{ vars.V7_RESTORE_START_TIMEOUT_SECONDS }}
         run: python3 -B scripts/run_reviewed_release.py --validate-only
       - name: Verify deployment tooling and production topology
         env:
@@ -178,6 +179,7 @@ jobs:
         env:
           V7_DEMO_INVESTIGATION_ID: ${{ vars.V7_DEMO_INVESTIGATION_ID }}
           V7_BACKUP_DIR: ${{ vars.V7_BACKUP_DIR }}
+          V7_RESTORE_START_TIMEOUT_SECONDS: ${{ vars.V7_RESTORE_START_TIMEOUT_SECONDS }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCKER_CONFIG: ${{ runner.temp }}/policy-registry
           CONFIGURATION_SHA: ${{ steps.tooling.outputs.commit }}

@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 from types import SimpleNamespace
 import shutil
 import sys
@@ -101,6 +102,7 @@ class CandidateTest(unittest.TestCase):
         for change in [lambda d: d['migrations'][0].update(checksum=0),
                        lambda d: d['v7Preparation'].update(env_file='/opt/ai-policy-investigator/.env'),
                        lambda d: d['v7Preparation'].update(expected_previous='r120-1'),
+                       lambda d: d['v7Preparation'].update(restore_start_timeout_seconds=901),
                        lambda d: d['images']['POSTGRES_IMAGE_REF'].update(configDigest='sha256:' + '0' * 64)]:
             data = candidate(); change(data)
             with self.assertRaises(DeploymentError): reviewed.validate_candidate(data)
@@ -111,6 +113,26 @@ class CandidateTest(unittest.TestCase):
                        {'VPS_ENV_FILE': '/opt/ai-policy-investigator/other.env'}, {'EXPECTED_PREVIOUS': ''},
                        {'BACKEND_SHA': BACK}, {'PREPARED_RELEASE': 'r123-1'}]:
             with self.assertRaises(DeploymentError): runner.validate({**inputs(), **change})
+
+    def test_restore_timeout_is_bounded_before_remote_access_and_retained_in_manifest(self):
+        for value in ['59', '901', '-1', '1.5', 'unbounded', '300\n']:
+            with self.subTest(value=value), patch.object(runner, 'current_release') as remote:
+                with self.assertRaisesRegex(DeploymentError, 'RESTORE_START_TIMEOUT_INVALID'):
+                    runner.run({**inputs(), 'V7_RESTORE_START_TIMEOUT_SECONDS': value}, Path('/unused'))
+                remote.assert_not_called()
+        for value, expected in [('', 300), ('60', 60), ('900', 900)]:
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as temp:
+                def prepare(directory, *args, **kwargs):
+                    directory.mkdir()
+                    data = candidate(); data['id'] = args[3]
+                    return data
+                with patch.object(runner, 'current_release', return_value='r122-1'), \
+                        patch.object(runner, 'reviewed_revisions', return_value=(BACK, FRONT)), \
+                        patch.object(runner, 'prepare', side_effect=prepare), patch.object(runner, 'transfer') as transfer:
+                    runner.run({**inputs(), 'V7_RESTORE_START_TIMEOUT_SECONDS': value}, Path(temp))
+                directory = transfer.call_args.args[2]
+                retained = json.loads((directory / 'release.json').read_text())
+                self.assertEqual(retained['v7Preparation']['restore_start_timeout_seconds'], expected)
 
     def test_migration_requires_retained_release_and_explicit_human_approvals(self):
         env = {**inputs('deploy-reviewed'), **attestations(), 'PREPARED_RELEASE': 'r123-1',
@@ -144,13 +166,13 @@ class ReviewedWorkflowTest(unittest.TestCase):
         workflow = (Path(__file__).resolve().parents[2] / '.github/workflows/deploy-production.yml').read_text()
         job, steps = workflow.split('    steps:\n', 1)
         self.assertIn('    environment:\n      name: prod\n', job)
-        for name in ['V7_DEMO_INVESTIGATION_ID', 'V7_BACKUP_DIR']:
+        for name in ['V7_DEMO_INVESTIGATION_ID', 'V7_BACKUP_DIR', 'V7_RESTORE_START_TIMEOUT_SECONDS']:
             self.assertNotIn('${{ vars.' + name + ' }}', job)
         for title in ['Validate reviewed preparation or migration approval',
                       'Prepare or deploy the retained approved image pair']:
             step = steps.split('      - name: ' + title + '\n', 1)[1].split('      - name:', 1)[0]
             environment = step.split('        env:\n', 1)[1].split('        run:', 1)[0]
-            for name in ['V7_DEMO_INVESTIGATION_ID', 'V7_BACKUP_DIR']:
+            for name in ['V7_DEMO_INVESTIGATION_ID', 'V7_BACKUP_DIR', 'V7_RESTORE_START_TIMEOUT_SECONDS']:
                 self.assertRegex(environment, re.escape('          ' + name + ': ${{ vars.' + name + ' }}'))
             self.assertIn('python3 -B scripts/run_reviewed_release.py', step)
         self.assertLess(steps.index('scripts/run_reviewed_release.py --validate-only'), steps.index('GHCR_TOKEN:'))
@@ -212,10 +234,10 @@ class BackupTest(unittest.TestCase):
             with self.assertRaises(DeploymentError): check(changed)
         with self.assertRaisesRegex(DeploymentError, 'EXTERNAL_ROUTE'): check(row, 'header\nexternal\n')
 
-    def run_backup(self, root, fail=None):
+    def run_backup(self, root, fail=None, startup_failure=None, cleanup_failure=False):
         release = root / 'old'; (release / 'configuration/deploy/postgres').mkdir(parents=True)
         (release / 'configuration/deploy/postgres/init.sh').write_text('unchanged synthetic initializer')
-        evidence = root / 'evidence'; evidence.mkdir()
+        evidence = root / 'evidence'; evidence.mkdir(mode=0o700)
         pg = {'Id': 'a' * 64, 'Image': 'sha256:' + 'b' * 64}
         apps = [{'State': {'Running': False}}, {'State': {'Running': False}}]
         events = []
@@ -231,14 +253,29 @@ class BackupTest(unittest.TestCase):
             (output_path or directory / (name + '.out')).write_bytes(value)
         def execute(command, *args, **kwargs):
             events.append(command)
+            if command[:2] == ['docker', 'run'] and fail == 'launch':
+                raise DeploymentError('RESTORE_POSTGRES_LAUNCH_FAILED')
+            if command[:2] == ['docker', 'stop'] and cleanup_failure:
+                raise DeploymentError('ISOLATED_RESTORE_STOP_FAILED')
+            if '--format' in command:
+                return json.dumps({'Status': 'running', 'ExitCode': 0, 'OOMKilled': False})
             return '1024' if 'SELECT pg_database_size(current_database());' in command else ''
+        def inspect(command, *args, **kwargs):
+            name = command[-1]
+            return [{'Name': '/' + name, 'Id': 'c' * 64, 'Config': {'Labels': {'purpose': 'investigator-v7-restore'}},
+                     'Mounts': [{'Destination': '/var/lib/postgresql/data', 'Type': 'volume', 'Name': name + '-data'}]}]
         def probe(command, **kwargs):
+            if fail == 'collision':
+                return SimpleNamespace(returncode=0)
             return SimpleNamespace(returncode=1 if command[1] in ['container', 'volume'] else 0)
         request = candidate()['v7Preparation']
         with patch.object(backup, 'private_env'), patch.object(backup, 'source', return_value=(release, pg, apps)), \
                 patch.object(backup, 'evidence_directory', return_value=evidence), patch.object(backup, 'execute', side_effect=execute), \
                 patch.object(backup, 'preflight'), patch.object(backup, 'snapshot', side_effect=snapshot), \
                 patch.object(backup, 'private_run', side_effect=private), patch.object(backup.subprocess, 'run', side_effect=probe), \
+                patch.object(backup, 'json_command', side_effect=inspect), \
+                patch.object(backup, 'wait_for_restore', wraps=backup.wait_for_restore,
+                             side_effect=DeploymentError(startup_failure) if startup_failure else None), \
                 patch.object(backup, 'isolation') as isolation:
             try:
                 result = backup.verify_backup(root, request, frozen=True)
@@ -261,7 +298,7 @@ class BackupTest(unittest.TestCase):
             run = next(c for c in commands if c[:2] == ['docker', 'run'])
             self.assertEqual(run[run.index('--network') + 1], 'none')
             self.assertIn('listen_addresses=', run)
-            self.assertTrue(any(c[:2] == ['docker', 'stop'] and c[-1].startswith('investigator-v7-restore-') for c in commands))
+            self.assertTrue(any(c[:2] == ['docker', 'stop'] and c[-1] == 'c' * 64 for c in commands))
             self.assertFalse(any('rm' in c or 'prune' in c or 'up' in c for c in commands))
 
     def test_failed_restore_or_fingerprint_mismatch_never_produces_success_and_stops_only_rehearsal(self):
@@ -272,7 +309,61 @@ class BackupTest(unittest.TestCase):
                 self.assertFalse((root / 'evidence/report.json').exists())
                 stops = [c for c in self.events if isinstance(c, list) and c[:2] == ['docker', 'stop']]
                 self.assertEqual(len(stops), 1)
-                self.assertTrue(stops[0][-1].startswith('investigator-v7-restore-'))
+                self.assertEqual(stops[0][-1], 'c' * 64)
+
+    def test_private_umask_keeps_initializer_readable_without_exposing_secrets(self):
+        previous = os.umask(0o077)
+        try:
+            with tempfile.TemporaryDirectory() as temp:
+                evidence, _ = self.run_backup(Path(temp))
+                self.assertEqual(stat.S_IMODE((evidence / 'init.sh').stat().st_mode), 0o644)
+                self.assertEqual((evidence / 'init.sh').read_bytes(),
+                                 (Path(temp) / 'old/configuration/deploy/postgres/init.sh').read_bytes())
+                self.assertEqual(stat.S_IMODE(evidence.stat().st_mode), 0o700)
+                self.assertEqual(stat.S_IMODE((evidence / 'restore.env').stat().st_mode), 0o600)
+                self.assertEqual(stat.S_IMODE((evidence / 'investigator-v7.dump').stat().st_mode), 0o400)
+        finally:
+            os.umask(previous)
+
+    def test_startup_failure_blocks_restore_and_cleanup_does_not_mask_it(self):
+        for cleanup_failure in [False, True]:
+            with self.subTest(cleanup_failure=cleanup_failure), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                with self.assertRaisesRegex(DeploymentError, '^RESTORE_POSTGRES_INITIALIZER_FAILED$'):
+                    self.run_backup(root, startup_failure='RESTORE_POSTGRES_INITIALIZER_FAILED',
+                                    cleanup_failure=cleanup_failure)
+                self.assertNotIn('restore', self.events)
+                self.assertFalse((root / 'evidence/report.json').exists())
+                failed = json.loads((root / 'evidence/rehearsal-failed.json').read_text())
+                self.assertFalse(failed['backupAndRestoreVerified'])
+                self.assertFalse(failed['deploymentAuthorized'])
+                self.assertEqual((root / 'evidence/cleanup-failed.json').exists(), cleanup_failure)
+
+    def test_cleanup_failure_after_verification_still_blocks_success_report(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            with self.assertRaisesRegex(DeploymentError, 'ISOLATED_RESTORE_STOP_FAILED'):
+                self.run_backup(root, cleanup_failure=True)
+            self.assertFalse((root / 'evidence/report.json').exists())
+
+    def test_failed_run_still_attempts_only_guarded_rehearsal_cleanup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            with self.assertRaisesRegex(DeploymentError, '^RESTORE_POSTGRES_LAUNCH_FAILED$'):
+                self.run_backup(root, fail='launch', cleanup_failure=True)
+            self.assertFalse((root / 'evidence/report.json').exists())
+            self.assertNotIn('restore', self.events)
+            stops = [c for c in self.events if isinstance(c, list) and c[:2] == ['docker', 'stop']]
+            self.assertEqual(stops, [['docker', 'stop', 'c' * 64]])
+
+    def test_existing_target_is_never_started_or_cleaned_up(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            with self.assertRaisesRegex(DeploymentError, '^RESTORE_TARGET_ALREADY_EXISTS$'):
+                self.run_backup(root, fail='collision')
+            self.assertFalse((root / 'evidence/report.json').exists())
+            commands = [c for c in self.events if isinstance(c, list)]
+            self.assertFalse(any(c[:2] in [['docker', 'run'], ['docker', 'stop'], ['docker', 'volume']] for c in commands))
 
     def test_snapshot_session_is_held_until_explicit_rollback(self):
         # Real pipe/process behavior catches buffered-output and stdin lifecycle errors.
@@ -318,6 +409,18 @@ class ReviewBoundaryTest(unittest.TestCase):
                 self.assertEqual(result['result'], 'PREPARED_AWAITING_V8_APPROVAL')
                 backup_check.assert_called_once_with(root, data['v7Preparation'])
                 activate.assert_not_called(); execute.assert_not_called()
+            self.assertFalse((directory / 'attempt.json').exists())
+
+    def test_failed_startup_never_marks_release_prepared_or_allows_activation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve(); data, directory = self.setup_release(root)
+            with self.gates(data), patch.object(reviewed, 'verify_backup',
+                    side_effect=DeploymentError('RESTORE_POSTGRES_INITIALIZER_NOT_READABLE')), \
+                    patch.object(reviewed, 'activate') as activate, patch.object(reviewed, 'execute') as execute:
+                with self.assertRaisesRegex(DeploymentError, 'INITIALIZER_NOT_READABLE'):
+                    reviewed.run('prepare-reviewed', data['id'], base=root)
+                activate.assert_not_called(); execute.assert_not_called()
+            self.assertFalse((directory / 'prepared.json').exists())
             self.assertFalse((directory / 'attempt.json').exists())
 
     def test_unapproved_or_changed_preparation_cannot_stop_containers(self):

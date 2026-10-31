@@ -15,7 +15,7 @@ from release_artifacts import SHA, RELEASE_ID
 from release_safety import CONFIRMATIONS
 from reviewed_v8_release import APPROVED, validate_candidate
 from transfer_production_release import transfer, current_release
-from v7_backup_restore import ENV_FILE
+from v7_backup_restore import ENV_FILE, restore_start_timeout, RESTORE_START_TIMEOUT_SECONDS
 
 
 def validate(env):
@@ -24,6 +24,7 @@ def validate(env):
     require(re.fullmatch(RELEASE_ID, env.get('EXPECTED_PREVIOUS', '')), 'APPROVED_PREVIOUS_RELEASE_REQUIRED')
     require(env.get('VPS_ENV_FILE') == str(ENV_FILE), 'PRODUCTION_ENV_PATH_INVALID')
     if operation == 'prepare-reviewed':
+        restore_start_timeout(env.get('V7_RESTORE_START_TIMEOUT_SECONDS') or RESTORE_START_TIMEOUT_SECONDS)
         require(env.get('ALLOW_MIGRATIONS') == 'false', 'PREPARATION_CANNOT_MIGRATE')
         require(not env.get('PREPARED_RELEASE'), 'PREPARATION_CANNOT_REUSE_RELEASE_ID')
         require(re.fullmatch(r'[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}', env.get('V7_DEMO_INVESTIGATION_ID', '')),
@@ -68,7 +69,9 @@ def run(env, output):
         data = prepare(directory, backend, frontend, env['CONFIGURATION_SHA'], identity, approved_images=APPROVED)
         data['expectedPrevious'] = env['EXPECTED_PREVIOUS']
         data['v7Preparation'] = {'expected_previous': env['EXPECTED_PREVIOUS'], 'env_file': str(ENV_FILE),
-                                 'demo_id': env['V7_DEMO_INVESTIGATION_ID'], 'backup_root': env['V7_BACKUP_DIR']}
+                                 'demo_id': env['V7_DEMO_INVESTIGATION_ID'], 'backup_root': env['V7_BACKUP_DIR'],
+                                 'restore_start_timeout_seconds': restore_start_timeout(
+                                     env.get('V7_RESTORE_START_TIMEOUT_SECONDS') or RESTORE_START_TIMEOUT_SECONDS)}
         validate_candidate(data)
         (directory / 'release.json').write_text(json.dumps(data, indent=2) + '\n')
         return transfer('prepare-reviewed', identity, directory)
