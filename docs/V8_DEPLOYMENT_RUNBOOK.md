@@ -4,6 +4,15 @@
 external requirements below are satisfied.** This runbook describes the hardened
 existing release automation. It does not record a deployment, backup or restore.
 
+For the now-published, approved hackathon images, follow
+[REVIEWED_V8_DEPLOYMENT.md](REVIEWED_V8_DEPLOYMENT.md). The existing workflow's
+`prepare-reviewed` operation now automates the unchanged V7 SQL checks, snapshot
+backup and isolated restore; `deploy-reviewed` repeats them under the approved
+freeze before the existing migration controller runs. The manual attestation
+instructions below remain the legacy `operation=deploy` path. Worker activation
+still needs a separate approval. Tooling-only main changes run tests without
+rebuilding or publishing application images.
+
 ## Safety boundary
 
 `verify.yml` still runs CI and publishes images after a successful backend `main`

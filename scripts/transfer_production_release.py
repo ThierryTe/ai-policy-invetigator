@@ -82,32 +82,49 @@ def current_release():
     return identity
 
 
-def transfer(operation, release_id, directory=None, allow_migrations=False):
+def transfer(operation, release_id, directory=None, allow_migrations=False, approval=None):
     require(re.fullmatch(RELEASE_ID, release_id or ''), 'RELEASE_ID_INVALID')
-    require(operation in ['deploy', 'rollback'], 'OPERATION_INVALID')
-    require(not allow_migrations or operation == 'deploy', 'ROLLBACK_CANNOT_APPLY_MIGRATIONS')
-    if operation == 'deploy':
+    require(operation in ['deploy', 'rollback', 'prepare-reviewed', 'deploy-reviewed'], 'OPERATION_INVALID')
+    require(not allow_migrations or operation in ['deploy', 'deploy-reviewed'], 'ROLLBACK_CANNOT_APPLY_MIGRATIONS')
+    upload = operation in ['deploy', 'prepare-reviewed']
+    if upload:
         require(directory is not None, 'PREPARED_RELEASE_DIRECTORY_REQUIRED')
         data = validate_manifest(json.loads((directory / 'release.json').read_text()))
         require(data['id'] == release_id and 'runtime' in data, 'RELEASE_ID_OR_RUNTIME_INVALID')
-        validate_release(data, allow_migrations)
+        if operation == 'deploy':
+            validate_release(data, allow_migrations)
+        else:
+            from reviewed_v8_release import validate_candidate
+            validate_candidate(data)
     env_file = os.environ.get('VPS_ENV_FILE', '')
     require(re.fullmatch(re.escape(BASE) + r'/[A-Za-z0-9_./-]+', env_file)
             and Path(env_file).resolve().is_relative_to(BASE), 'VPS_ENV_FILE_REQUIRED_INSIDE_PROJECT')
+    if operation in ['prepare-reviewed', 'deploy-reviewed']:
+        require(env_file == BASE + '/.env.production', 'PRODUCTION_ENV_PATH_INVALID')
     with tempfile.TemporaryDirectory(prefix='policy-ssh-') as temporary:
         ssh, scp, target = connection(Path(temporary), os.environ)
         remote = BASE + '/releases/' + release_id
-        if operation == 'deploy':
+        if upload:
             execute(ssh + ['umask 077 && test -d ' + BASE + ' && mkdir -p ' + BASE + '/releases && mkdir ' + remote], 'SSH_RELEASE_DIRECTORY_FAILED')
             execute(scp + ['-r', str(directory / 'configuration'), str(directory / 'scripts'),
                            str(directory / 'docs'), target + ':' + remote + '/'], 'SSH_CONFIGURATION_TRANSFER_FAILED')
             files = [directory / 'release.json', *(directory / row['archive'] for row in data['images'].values())]
             execute(scp + [str(f) for f in files] + [target + ':' + remote + '/'], 'SSH_IMAGE_TRANSFER_FAILED')
-        command = 'python3 ' + remote + '/scripts/production_release.py ' + operation + ' ' + release_id + ' --env-file ' + shlex.quote(env_file)
-        if allow_migrations:
+        if operation in ['prepare-reviewed', 'deploy-reviewed']:
+            command = 'python3 ' + remote + '/scripts/reviewed_v8_release.py ' + operation + ' ' + release_id
+            if operation == 'deploy-reviewed':
+                require(allow_migrations and approval is not None, 'EXPLICIT_V8_APPROVAL_REQUIRED')
+                path = Path(temporary) / 'approval.json'
+                path.write_text(json.dumps(approval) + '\n'); path.chmod(0o600)
+                execute(scp + [str(path), target + ':' + remote + '/requested-approval.json'], 'SSH_APPROVAL_TRANSFER_FAILED')
+                command += ' --approval-file ' + remote + '/requested-approval.json'
+        else:
+            command = 'python3 ' + remote + '/scripts/production_release.py ' + operation + ' ' + release_id + ' --env-file ' + shlex.quote(env_file)
+        if allow_migrations and operation == 'deploy':
             command += ' --allow-migrations'
-        result = json.loads(execute(ssh + [command], 'SSH_RELEASE_FAILED', timeout=2700))
-        require(result.get('result') == 'VALIDATED' and result.get('id') == release_id, 'REMOTE_VALIDATION_REPORT_INVALID')
+        result = json.loads(execute(ssh + [command], 'SSH_RELEASE_FAILED', timeout=3600))
+        expected_result = 'PREPARED_AWAITING_V8_APPROVAL' if operation == 'prepare-reviewed' else 'VALIDATED'
+        require(result.get('result') == expected_result and result.get('id') == release_id, 'REMOTE_VALIDATION_REPORT_INVALID')
         return result
 
 

@@ -117,6 +117,11 @@ does not cause Docker's restart policy to restart a container.
 
 ## PostgreSQL backup
 
+For a V7 backup and fresh, network-isolated restore rehearsal without changing
+production application containers, use [V7 backup and isolated restore](V7_BACKUP_RESTORE.md).
+It shares one exported snapshot between the dump and source checks; a later
+migration still requires its separately approved writer freeze and current backup.
+
 Keep backups encrypted/access-controlled outside repositories/build contexts. They
 contain protected documents and password hashes. pg_dump provides a consistent snapshot;
 for a migration rollback point, stop only this application's frontend/backend first to

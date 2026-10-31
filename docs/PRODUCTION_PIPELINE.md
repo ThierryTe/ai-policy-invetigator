@@ -1,10 +1,20 @@
 # Production CI/CD
 
-Main pushes run **tests → Docker build/publication**, without automatic deployment.
+Main pushes run tests and, when runtime image inputs change, Docker build/publication,
+without automatic deployment. Tooling/docs-only changes run the same tests and skip
+image builds/publication; changed paths come from GitHub's compare API, with no
+Git commands and no build fallback on an incomplete comparison.
 Production delivery is an explicit backend `workflow_dispatch`, using the
 [two-phase V8 runbook](V8_DEPLOYMENT_RUNBOOK.md). Develop pushes and pull requests run
 CI only. Configure the [SSH host identity pin](#current-ssh-configuration) before delivery.
 This guide does not certify a live VPS run or independently verify operator attestations.
+
+For the approved hackathon image pair, use
+[REVIEWED_V8_DEPLOYMENT.md](REVIEWED_V8_DEPLOYMENT.md): `prepare-reviewed` automates
+the documented V7 preflight/backup/isolated restore without changing production
+apps; the separate `deploy-reviewed` operation requires explicit approval and
+repeats verification under the writer freeze before migrating. No image rebuilds
+or manual backup attestations are needed for that path.
 
 ## Repositories and workflows
 
@@ -126,7 +136,11 @@ Set these variables in the backend prod environment:
 | Variable | Purpose |
 |---|---|
 | VPS_HOST_KEY | Independently verified single Ed25519 public host-key line; required for SSH/SCP |
-| VPS_ENV_FILE | Actual absolute private production env-file path under the deployment directory |
+| V7_DEMO_INVESTIGATION_ID | Actual existing completed production judge investigation UUID for reviewed preparation |
+| V7_BACKUP_DIR | Existing private encrypted/access-controlled backup directory outside the deployment tree/repositories |
+
+The workflow pins `VPS_ENV_FILE=/opt/ai-policy-investigator/.env.production` directly;
+no env-path variable discovery or secret-file edit is required.
 
 `AUTO_APPLY_MIGRATIONS` and initial counterpart discovery variables no longer control
 production deployment. Use the explicit phase, SHAs, base, digest and confirmations

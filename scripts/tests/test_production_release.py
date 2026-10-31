@@ -340,7 +340,7 @@ class ControllerTest(unittest.TestCase):
             build.return_value.open.side_effect = urllib.error.HTTPError('url', 502, '', {}, None)
             with self.assertRaisesRegex(DeploymentError, 'STATUS_FAILED'): controller.check_url('https://example.invalid/', 200)
 
-    def _activation(self, directory, fail=None, rollback=False, expected_previous='UNSET', routing_error=None):
+    def _activation(self, directory, fail=None, rollback=False, expected_previous='UNSET', routing_error=None, acceptance=None):
         data = manifest()
         if expected_previous != 'UNSET': data['expectedPrevious'] = expected_previous
         applied = [{**migration(), 'success': True, 'type': 'SQL'}]
@@ -358,7 +358,8 @@ class ControllerTest(unittest.TestCase):
              patch.object(controller, 'check_runtime'), patch.object(controller, 'verify_existing_postgres'), \
              patch.object(controller, 'history', return_value=applied), patch.object(controller, 'routing', side_effect=routing_error), \
              patch.object(controller, 'healthy_service'):
-            result = controller.activate(directory, data, {'envFile': 'unused', 'publicUrl': 'https://example.invalid'}, rollback, base=directory)
+            result = controller.activate(directory, data, {'envFile': 'unused', 'publicUrl': 'https://example.invalid'},
+                                         rollback, base=directory, acceptance=acceptance)
             return result, run.call_args_list
 
     def test_success_requires_health_checks_and_only_replaces_app_services(self):
@@ -389,6 +390,18 @@ class ControllerTest(unittest.TestCase):
             error = DeploymentError('PUBLIC_ROUTING_STATUS_FAILED_GET_HEALTHZ_EXPECTED_200_GOT_403')
             with self.assertRaisesRegex(DeploymentError, str(error)):
                 self._activation(directory, routing_error=error)
+            self.assertEqual(json.loads((directory / 'last-successful.json').read_text()), old)
+            self.assertFalse((directory / 'validated.json').exists())
+
+    def test_post_migration_conservation_failure_preserves_both_success_markers(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            old = {'id': 'r122-1', 'migrations': [migration()]}
+            (directory / 'last-successful.json').write_text(json.dumps(old))
+            def acceptance():
+                raise DeploymentError('V8_PRODUCTION_DATA_CONSERVATION_FAILED')
+            with self.assertRaisesRegex(DeploymentError, 'CONSERVATION_FAILED'):
+                self._activation(directory, acceptance=acceptance)
             self.assertEqual(json.loads((directory / 'last-successful.json').read_text()), old)
             self.assertFalse((directory / 'validated.json').exists())
 

@@ -18,6 +18,8 @@ KEYS = (*REPOSITORIES, 'POSTGRES_IMAGE_REF')
 RUNTIME_FILES = ('scripts/production_release.py', 'scripts/deploy_local_images.py',
                  'scripts/verify_production_compose.py', 'scripts/release_artifacts.py',
                  'scripts/release_safety.py', 'scripts/qualification_v8_preflight.sql',
+                 'scripts/reviewed_v8_release.py', 'scripts/v7_backup_restore.py',
+                 'scripts/qualification_v7_backup.sql',
                  'docs/verification/v8-artifact.json')
 CONFIG_FILES = ('compose.yaml', 'compose.production.yaml', 'deploy/backend/compose.ghcr.yaml',
                 'deploy/frontend/compose.production.yaml', 'deploy/frontend/compose.ghcr.yaml',
@@ -152,7 +154,9 @@ def validate_manifest(data):
         require(image['archive'] == key + '.tar', 'RELEASE_ARCHIVE_NAME_INVALID')
         if key != 'POSTGRES_IMAGE_REF':
             expected_sha = data['frontendSha'] if key == 'FRONTEND_IMAGE_REF' else data['backendSha']
-            require(image['sourceRef'] == repo + ':sha-' + expected_sha, 'RELEASE_SOURCE_PAIR_MISMATCH')
+            require(image['sourceRef'] in (repo + ':sha-' + expected_sha,
+                                         repo + '@' + image.get('indexDigest', image['manifestDigest'])),
+                    'RELEASE_SOURCE_PAIR_MISMATCH')
         else:
             require(image['sourceRef'] == 'pgvector/pgvector:0.8.0-pg16', 'POSTGRES_UPGRADE_FORBIDDEN')
     require(isinstance(data['configuration'], dict) and set(data['configuration']) == set(CONFIG_FILES), 'RELEASE_CONFIG_ALLOWLIST_INVALID')

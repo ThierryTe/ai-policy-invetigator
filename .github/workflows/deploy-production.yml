@@ -24,8 +24,11 @@ on:
     inputs:
       operation:
         type: choice
-        options: [deploy, rollback]
-        default: deploy
+        options: [prepare-reviewed, deploy-reviewed, deploy, rollback]
+        default: prepare-reviewed
+      prepared_release:
+        description: Retained release ID returned by prepare-reviewed; deploy-reviewed only
+        type: string
       backend_sha:
         description: Full backend source SHA for manual recovery
         type: string
@@ -101,6 +104,10 @@ jobs:
       url: https://ai-policy.tewendelabs.com
     env:
       OPERATION: ${{ inputs.operation }}
+      PREPARED_RELEASE: ${{ inputs.prepared_release }}
+      VPS_ENV_FILE: /opt/ai-policy-investigator/.env.production
+      V7_DEMO_INVESTIGATION_ID: ${{ vars.V7_DEMO_INVESTIGATION_ID }}
+      V7_BACKUP_DIR: ${{ vars.V7_BACKUP_DIR }}
       BACKEND_SHA: ${{ inputs.backend_sha }}
       FRONTEND_SHA: ${{ inputs.frontend_sha }}
       ROLLBACK_RELEASE: ${{ inputs.rollback_release }}
@@ -130,7 +137,11 @@ jobs:
         with:
           python-version: '3.12'
       - name: Validate explicit inputs before registry or SSH access
+        if: inputs.operation == 'deploy' || inputs.operation == 'rollback'
         run: python3 -B scripts/validate_release_dispatch.py
+      - name: Validate reviewed preparation or migration approval
+        if: inputs.operation == 'prepare-reviewed' || inputs.operation == 'deploy-reviewed'
+        run: python3 -B scripts/run_reviewed_release.py --validate-only
       - name: Verify deployment tooling and production topology
         env:
           POLICY_FRONTEND_DIRECTORY: ${{ github.workspace }}/.ci/frontend
@@ -138,6 +149,7 @@ jobs:
           python3 -B -m unittest discover -s scripts/tests -v
           python3 -B scripts/verify_production_compose.py --frontend-directory .ci/frontend
       - name: Transfer exact images and deploy via existing VPS SSH account
+        if: inputs.operation == 'deploy' || inputs.operation == 'rollback'
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCKER_CONFIG: ${{ runner.temp }}/policy-registry
@@ -148,7 +160,7 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
           VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
           VPS_HOST_KEY: ${{ vars.VPS_HOST_KEY }}
-          VPS_ENV_FILE: ${{ vars.VPS_ENV_FILE }}
+          VPS_ENV_FILE: /opt/ai-policy-investigator/.env.production
         run: |
           mkdir -m 700 "$DOCKER_CONFIG"
           trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
@@ -159,7 +171,25 @@ jobs:
                 --backend-sha "$BACKEND_SHA" --frontend-sha "$FRONTEND_SHA" --rollback-release "$ROLLBACK_RELEASE")
           if [[ "$ALLOW_MIGRATIONS" == true ]]; then args+=(--allow-migrations); fi
           python3 -B scripts/run_production_deploy.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Prepare or deploy the retained approved image pair
+        if: inputs.operation == 'prepare-reviewed' || inputs.operation == 'deploy-reviewed'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCKER_CONFIG: ${{ runner.temp }}/policy-registry
+          CONFIGURATION_SHA: ${{ steps.tooling.outputs.commit }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USERNAME: ${{ secrets.VPS_USERNAME }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+          VPS_HOST_KEY: ${{ vars.VPS_HOST_KEY }}
+        run: |
+          umask 077
+          mkdir -p "$DOCKER_CONFIG"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          python3 -B scripts/run_reviewed_release.py --output "$RUNNER_TEMP/policy-releases" >> "$GITHUB_STEP_SUMMARY"
       - name: Report verification boundary
         if: always()
         run: |
-          printf '%s\n' 'VALIDATED means automated release checks passed. Backup, isolated restore, write freeze, GitHub protection and image qualification are OPERATOR ATTESTATIONS, not independently verified by this workflow. Embedded SQL matching does not establish JAR binary identity. Worker reactivation requires a separate activate-v8 dispatch. No automatic database rollback is performed.' >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' 'prepare-reviewed: approved digests retained; unchanged V7 preflight and backup SQL, snapshot dump and isolated restore are automated; production apps stay running. deploy-reviewed: explicit migration approval, stop only project apps, repeat frozen backup/restore, migrate with workers disabled, verify V8 and data conservation before success. Legacy deploy backup/restore inputs remain OPERATOR ATTESTATIONS. Edge/external writer freeze, GitHub protection and image qualification remain human approvals. Embedded SQL matching does not establish JAR binary identity. Worker reactivation requires a separate activate-v8 dispatch. No automatic database rollback is performed. Private dumps, fingerprints, logs and env files stay on the VPS.' >> "$GITHUB_STEP_SUMMARY"

@@ -41,7 +41,13 @@ def deploy(args):
     require(current_release() == record['expected_previous'], 'APPROVED_RELEASE_BASE_CHANGED')
     identity = 'r0' + args.run_id + '-' + str(int(args.run_attempt) * 10 + 1)
     directory = args.output / identity
-    data = prepare(directory, args.backend_sha, args.frontend_sha, args.configuration_sha, identity)
+    if record['phase'] == 'activate-v8' and os.environ.get('PREPARED_RELEASE'):
+        require(os.environ['PREPARED_RELEASE'] == record['expected_previous'], 'ACTIVATION_PREPARED_RELEASE_MISMATCH')
+        from reviewed_v8_release import APPROVED
+        data = prepare(directory, args.backend_sha, args.frontend_sha, args.configuration_sha, identity,
+                       approved_images=APPROVED)
+    else:
+        data = prepare(directory, args.backend_sha, args.frontend_sha, args.configuration_sha, identity)
     data['expectedPrevious'] = record['expected_previous']
     data['releaseSafety'] = record
     validate_release(data, args.allow_migrations)

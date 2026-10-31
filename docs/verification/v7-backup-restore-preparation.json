@@ -1,0 +1,69 @@
+{
+  "recordType": "V7 production backup and isolated restore preparation",
+  "recordedAtUtc": "2026-10-31T18:19:26.617432+00:00",
+  "productionStatus": "HOLD_ACCESS_UNAVAILABLE",
+  "productionConnected": false,
+  "expectedTopologySource": "docs/DEPLOYMENT.md; compose.yaml; compose.production.yaml; scripts/production_release.py",
+  "actualProductionTopologyVerified": false,
+  "productionBackup": {
+    "location": null,
+    "sha256": null,
+    "created": false,
+    "checksumVerified": false,
+    "integrityVerified": false
+  },
+  "productionBackupRestore": {
+    "result": "NOT_RUN",
+    "flywayVersionVerified": false,
+    "completedDemoVerified": false,
+    "networkIsolationVerified": false
+  },
+  "blockers": [
+    "Approved production host/account/port, pinned SSH host key and identity are not configured in this session.",
+    "Actual validated V7 release, protected production env-file path and production demo investigation UUID are not supplied or verified.",
+    "Private backup storage, source preflight, exact production dump checksum, restoration and target isolation require operator execution."
+  ],
+  "operatorProcedure": "docs/V7_BACKUP_RESTORE.md",
+  "reusedInfrastructure": [
+    "docs/DEPLOYMENT.md Compose exec helper and pg_dump -Fc procedure",
+    "deploy/postgres/init.sh",
+    "scripts/qualification_v8_preflight.sql with target_version=7",
+    "existing deployment.lock"
+  ],
+  "localValidation": {
+    "result": "PASS",
+    "scope": "Synthetic local V7 fixture only; no production evidence",
+    "privateEvidenceDirectory": "/private/tmp/v7-backup-restore-preparation-001",
+    "consistentSnapshotUnderConcurrentWrite": true,
+    "exactSyntheticArchiveRestored": true,
+    "v7PreflightBothInstances": true,
+    "sourceAndRestoreFingerprintsMatch": true,
+    "networkIsolationBothInstances": true,
+    "negativeChecks": [
+      "wrong demo",
+      "incomplete demo",
+      "quota mismatch",
+      "missing V7",
+      "checksum corruption"
+    ],
+    "syntheticContainersStopped": true
+  },
+  "safety": {
+    "gitCommandsRun": false,
+    "v8MigrationRun": false,
+    "productionApplicationContainersChanged": false,
+    "productionDataChanged": false,
+    "productionCredentialsExposed": false,
+    "productionAttestationsMarkedComplete": false,
+    "deploymentAuthorized": false
+  },
+  "limitations": [
+    "Online snapshot validation is not a migration writer freeze or proof of backup currency at a later deployment.",
+    "Password hashes are excluded from comparison fingerprints. Production role credentials require secure separate escrow."
+  ],
+  "tools": {
+    "scripts/qualification_v7_backup.sql": "8a0a58b7fb98e4ca39b570fbf3a48be6de401dfcfb41ebbabfabe57bbae12751",
+    "scripts/qualification_v8_preflight.sql": "0209cd7f0631f0726f04fc79eb8990a1ddec6be6c7a88a19d0cf4498ab4b8a59",
+    "deploy/postgres/init.sh": "8a8bf87c66a2dad9efa0a1934fa7d58eea93e04469e15043f3f25e4a51a94261"
+  }
+}
