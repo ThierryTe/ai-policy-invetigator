@@ -169,6 +169,41 @@ empty. Both reviewed images are fixed by code, so this operation cannot select a
 different application image. No runner image preparation or new release transfer
 is repeated for deployment.
 
+Both reviewed Python steps receive `--event-file "$GITHUB_EVENT_PATH"`. The
+runner reads `workflow_dispatch.inputs` from that event for both `--validate-only`
+and execution, using the same mapping. Form fields take precedence over inherited
+environment values; missing fields remain missing. Boolean values and GitHub's
+string representations `true`/`false` are supported without changing approval
+requirements. No form values are interpolated into shell commands or printed.
+
+| Form field | Python parameter | Required for `deploy-reviewed` |
+| --- | --- | --- |
+| `operation` | `OPERATION` | `deploy-reviewed` |
+| `prepared_release` | `PREPARED_RELEASE` | Retained prepared release ID |
+| `expected_previous` | `EXPECTED_PREVIOUS` | Approved current release ID |
+| `phase` | `RELEASE_PHASE` | `migrate-v8` |
+| `allow_migrations` | `ALLOW_MIGRATIONS` | `true` |
+| `evidence_ref` | `EVIDENCE_REF` | 3–80 uppercase letters/digits/dot/dash/underscore, e.g. `CHG-V8-20261031` |
+| `confirm_github_protection` | `CONFIRM_GITHUB_PROTECTION` | `true` |
+| `confirm_write_freeze` | `CONFIRM_WRITE_FREEZE` | `true` |
+| `confirm_image_qualification` | `CONFIRM_IMAGE_QUALIFICATION` | `true` |
+
+`RELEASE_OPERATOR` comes from `GITHUB_ACTOR`. Repository/main/manual-dispatch
+metadata, run ID/attempt and the fixed production env path are checked during
+`--validate-only`, before registry or SSH access. `backend_sha`, `frontend_sha`
+and `rollback_release` must remain empty. The approved backend child digest is
+still derived from the pinned image, and backup/restore confirmations are still
+earned by verification on the VPS.
+
+The original workflow already declared `EVIDENCE_REF: ${{ inputs.evidence_ref }}`;
+its generic `NONSECRET_CHANGE_RECORD_REFERENCE_REQUIRED` error also covered
+nonempty invalid values, so that message alone did not prove a transmission loss.
+The direct event path removes that dependency. Validation now reports all invalid
+fields together and distinguishes a missing reference from
+`NONSECRET_CHANGE_RECORD_REFERENCE_INVALID_FORMAT_…`, while retaining the exact
+same reference format rules. A URL, lowercase reference, leading/trailing space
+or line break is rejected; no automatic replacement or case conversion occurs.
+
 Under one VPS lock, deployment verifies the immutable prepared release/current
 base and config, records approval/run/operator/change IDs, stops only the exact
 frontend and backend containers of this project, and performs a **new** V7 backup
