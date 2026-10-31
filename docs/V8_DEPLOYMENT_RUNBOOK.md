@@ -19,6 +19,83 @@ is introduced. The controller still verifies archives/platforms/digests, Postgre
 isolation/volume identity, model initialization, container health, exact Flyway history
 and HTTPS routing, and refuses incompatible application rollback.
 
+## Prepare the published backend without deployment
+
+Use [Prepare backend qualification only](../.github/workflows/prepare-backend-qualification.yml)
+to prepare a single backend image before seeking production approval. After this workflow
+has been reviewed and is present on the default branch, an authorized repository writer
+chooses **Actions → Prepare backend qualification only → Run workflow → main**.
+The only trigger is `workflow_dispatch`; pushes do not run this preparation workflow.
+GitHub requires repository write access for a [manual dispatch](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+
+| Input | Exact approved V8 value |
+| --- | --- |
+| `backend_sha` | `48669d57b32cd1acb83acc57bd9da50b02ee3cd0` |
+| `approved_backend_digest` | `sha256:dca3389c5555b09c13e4f643074a6c7684d9ba7d3d73f931b34d53fcb9276eea` |
+| `approved_config_digest` | `sha256:baf9cf5911c21e0129afa1700a91abec14f88bd4c4ff9d74b8943efd45baf76d` |
+| `evidence_ref` | Actual non-secret approved change-record ID, 3–80 uppercase letters/digits/dot/dash/underscore characters |
+| `confirm_authorized` | `true` only when preparation and downloadable artifact storage are authorized; defaults to `false` |
+
+The three image inputs default to these approved values and can be reused for a later
+reviewed V8-compatible image. The fixed backend repository cannot be overridden. The
+confirmation records the dispatcher's authorization; it does not verify the change record
+or assert production readiness. False confirmation fails before checkout or authentication.
+The job and command both reject non-manual Actions execution, other repositories and
+non-`main` refs.
+
+No `prod` environment approval or production secrets are required. The job has only
+`contents: read` and `packages: read`, using the automatically supplied `GITHUB_TOKEN`
+for GHCR. The package must grant this backend repository Actions read access. Production
+SSH secrets remain confined to the existing production workflow. There is no image build,
+push, SSH, VPS access, database connection, migration execution, container start or worker
+execution in this preparation path.
+
+The new [backend preparation command](../scripts/prepare_backend_qualification.py) reuses
+`ghcr_manifest`, `normalized_archive`, `archive_image` and `qualified_migrations` from the
+existing release scripts. It verifies the registry manifest hash, rejects an index digest,
+requires the approved config digest, and pulls only `repository@digest` for `linux/amd64`.
+It inspects the runner platform, assigns the existing digest-based local alias, saves and
+normalizes exactly one image, then verifies config bytes, platform, revision/source labels
+and every layer's uncompressed DiffID. It reads the JAR inside the verified layers and
+requires exact versions, filenames, Flyway checksums and SHA-256 values for V1–V8 against
+the historical inventory whose SHA-256 is pinned in `release_safety.py`. Docker image IDs
+are not treated as registry digests or portable content proofs.
+
+Only a successful verification uploads the artifact
+`backend-qualification-<run_id>-<run_attempt>`, containing exactly:
+
+- `BACKEND_IMAGE_REF.tar`: normalized Docker-save backend archive.
+- `evidence.json`: image identity, migration inventory, layer DiffIDs, historical evidence
+  hash, archive SHA-256, change-record reference and Actions run/tooling revision.
+- `SHA256SUMS`: SHA-256 checksums of the archive and evidence report.
+
+Download from the successful run's **Artifacts** section and run `sha256sum -c SHA256SUMS`
+from the extracted artifact directory before use. Access follows the repository's Actions
+artifact policy; authorize storage according to that visibility. Retention is seven days,
+subject to repository policy; retain the approved evidence privately if it is needed longer.
+The upload service's outer artifact digest is separate from the individual file checksums.
+Checksums detect changes; retain the trusted run provenance with them. Authentication
+files, raw saves and resolved Docker environments are excluded from the upload allowlist.
+A failed run uploads no qualification artifact; discard any partial local output and use
+a fresh output directory for a retry.
+
+A PASS establishes **published image integrity and migration equivalence**. The report
+explicitly records `binaryIdentityVerified=false` and
+`productionBuildProfileQualified=false`. It neither compares the full image JAR with the
+historical qualified JAR nor runs or tests the `neural-embeddings` production build.
+Those false values mean unverified, not a demonstrated binary mismatch or profile failure.
+Existing local JAR qualification and CI publication are separate evidence. Production
+remains NO-GO until the exact production image/build profile has separate supporting
+qualification, and all target preflight, backup/restore, freeze, protection and approval
+conditions below are satisfied. Do not set `confirm_image_qualification=true` based solely
+on this preparation PASS. V8 acceptance and worker reactivation still need separate approval.
+
+The command is also reusable in an explicitly authorized trusted runner with Docker and
+GHCR read authentication, using `--revision`, `--manifest-digest`, `--config-digest`,
+`--evidence-ref`, `--confirm-authorized` and `--output`. Output must be a new directory
+outside the repository. It does not need frontend/configuration release inputs or a
+production release ID, and its evidence is not a deployable `release.json`.
+
 ## 1. GitHub settings — owner must configure and verify
 
 The YAML's `environment: prod` does not itself configure reviewers. In GitHub:
