@@ -22,6 +22,17 @@ def needs_images(paths):
     return any(p in EXACT or p.startswith(('src/', '.mvn/')) for p in paths)
 
 
+def comparison_paths(comparison, allowed=('ahead', 'identical', 'diverged')):
+    require(comparison.get('status') in allowed, 'CI_COMPARISON_NOT_LINEAR')
+    files = comparison.get('files')
+    require(isinstance(files, list) and len(files) < 300, 'CI_COMPARISON_FILE_LIST_INCOMPLETE')
+    require(all(isinstance(r, dict) and isinstance(r.get('filename'), str) for r in files), 'CI_COMPARISON_FILE_LIST_INVALID')
+    require(files or comparison['status'] == 'identical', 'CI_COMPARISON_FILE_LIST_EMPTY')
+    paths = [r[k] for r in files for k in ['filename', 'previous_filename'] if k in r]
+    require(all(isinstance(p, str) for p in paths), 'CI_COMPARISON_FILE_LIST_INVALID')
+    return paths
+
+
 def classify(event, fetch):
     if 'pull_request' in event:
         before, after = (event['pull_request'][side]['sha'] for side in ['base', 'head'])
@@ -31,14 +42,11 @@ def classify(event, fetch):
     if before == '0' * 40:
         return True  # First source publication has no base.
     comparison = fetch(before, after)
-    allowed = ('ahead', 'identical', 'diverged') if 'pull_request' in event else ('ahead', 'identical')
-    require(comparison.get('status') in allowed, 'CI_COMPARISON_NOT_LINEAR')
-    files = comparison.get('files')
-    require(isinstance(files, list) and len(files) < 300, 'CI_COMPARISON_FILE_LIST_INCOMPLETE')
-    require(all(isinstance(r, dict) and isinstance(r.get('filename'), str) for r in files), 'CI_COMPARISON_FILE_LIST_INVALID')
-    require(files or comparison['status'] == 'identical', 'CI_COMPARISON_FILE_LIST_EMPTY')
-    paths = [r[k] for r in files for k in ['filename', 'previous_filename'] if k in r]
-    require(all(isinstance(p, str) for p in paths), 'CI_COMPARISON_FILE_LIST_INVALID')
+    paths = comparison_paths(comparison)
+    if 'pull_request' not in event and comparison['status'] == 'diverged':
+        # A comparison lists merge-base -> head changes. Also check the old side
+        # so a rewritten push cannot hide removed/reverted runtime inputs.
+        paths += comparison_paths(fetch(after, before), allowed=('diverged',))
     return needs_images(paths)
 
 
