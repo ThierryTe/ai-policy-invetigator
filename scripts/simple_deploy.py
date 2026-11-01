@@ -15,6 +15,8 @@ import time
 import urllib.error
 import urllib.request
 
+from simple_diagnostics import classify, emit, phase, public_code, status
+
 BASE = Path('/opt/ai-policy-investigator')
 PUBLIC = 'https://ai-policy.tewendelabs.com'
 PROJECT = 'ai-policy-investigator'
@@ -31,13 +33,20 @@ def require(condition, code):
         raise DeployError(code)
 
 
-def run(command, env=None, timeout=360):
+def run(command, env=None, timeout=360, *, step='command'):
+    emit(step, 'started')
     try:
-        result = subprocess.run(command, env=env, text=True, capture_output=True, timeout=timeout)
-        require(result.returncode == 0, 'COMMAND_FAILED_' + command[0].upper())
-        return result.stdout
-    except (OSError, subprocess.TimeoutExpired):
+        result = subprocess.run(command, env=env, text=True, errors='replace', capture_output=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        emit(step, 'failed', 'timeout')
         raise DeployError('COMMAND_UNAVAILABLE_OR_TIMED_OUT') from None
+    except OSError:
+        emit(step, 'failed', 'unavailable')
+        raise DeployError('COMMAND_UNAVAILABLE_OR_TIMED_OUT') from None
+    if result.returncode:
+        emit(step, 'failed', classify(result.stdout, result.stderr, step=step, exit_code=result.returncode), result.returncode)
+        raise DeployError('COMMAND_FAILED_DOCKER' if command[0] == 'docker' else 'COMMAND_FAILED_COMMAND')
+    return result.stdout
 
 
 def save(path, value):
@@ -47,11 +56,20 @@ def save(path, value):
     temporary.replace(path)
 
 
+def record_current(state, value):
+    emit('state.current', 'started')
+    try:
+        save(state / 'current.json', value)
+    except OSError:
+        emit('state.current', 'failed', 'state_write')
+        raise
+
+
 def container(project, service):
     ids = run(['docker', 'ps', '-aq', '--filter', 'label=com.docker.compose.project=' + project,
-               '--filter', 'label=com.docker.compose.service=' + service]).split()
+               '--filter', 'label=com.docker.compose.service=' + service], step='container.' + service + '.list').split()
     require(len(ids) == 1, 'EXISTING_CONTAINER_REQUIRED_' + service.upper())
-    return json.loads(run(['docker', 'inspect', ids[0]]))[0]
+    return json.loads(run(['docker', 'inspect', ids[0]], step='container.' + service + '.inspect'))[0]
 
 
 def healthy(row):
@@ -64,7 +82,7 @@ def history():
     healthy(postgres)
     sql = "SELECT coalesce(json_agg(t ORDER BY installed_rank),'[]'::json) FROM (SELECT installed_rank,version,script,checksum,success,type FROM public.flyway_schema_history) t"
     rows = json.loads(run(['docker', 'exec', '--user', 'postgres', postgres['Id'], 'psql', '-X', '-U', 'postgres',
-                          '-d', 'investigator', '-At', '-v', 'ON_ERROR_STOP=1', '-c', sql]))
+                          '-d', 'investigator', '-At', '-v', 'ON_ERROR_STOP=1', '-c', sql], step='history'))
     require(rows and all(r['success'] for r in rows) and any(r['version'] == '8' for r in rows), 'HEALTHY_V8_HISTORY_REQUIRED')
     return rows
 
@@ -108,11 +126,11 @@ def verify(images):
     for row in (back, front, postgres):
         healthy(row)
     for component, row in [('backend', back), ('frontend', front)]:
-        expected = json.loads(run(['docker', 'image', 'inspect', images[component]]))[0]['Id']
+        expected = json.loads(run(['docker', 'image', 'inspect', images[component]], step='image.' + component + '.inspect'))[0]['Id']
         require(row['Image'] == expected, 'RUNNING_IMAGE_MISMATCH')
     # This endpoint aggregates DB and the workers indicator (successful queue polls + a local embedding).
     result = run(['docker', 'exec', back['Id'], 'curl', '--fail', '--silent', '--max-time', '20',
-                  'http://127.0.0.1:8080/actuator/health']) if images.get('worker_probe', True) else None
+                  'http://127.0.0.1:8080/actuator/health'], step='workers.health') if images.get('worker_probe', True) else None
     if result is not None:
         require(json.loads(result).get('status') == 'UP', 'BACKEND_OR_WORKERS_NOT_READY')
     wait_for_public()
@@ -137,8 +155,8 @@ def commands(bundle, env_file, images):
 
 def check_topology(bundle, env_file, images):
     back, front, env = commands(bundle, env_file, images)
-    config = json.loads(run(back + ['config', '--format', 'json'], env))
-    web = json.loads(run(front + ['config', '--format', 'json'], env))
+    config = json.loads(run(back + ['config', '--format', 'json'], env, step='compose.backend.config'))
+    web = json.loads(run(front + ['config', '--format', 'json'], env, step='compose.frontend.config'))
     for name in ('APP_WORKER_ENABLED', 'APP_INVESTIGATION_WORKER_ENABLED'):
         require(config['services']['backend']['environment'][name] == 'true', 'SET_BOTH_WORKER_FLAGS_TRUE')
     require(bool(config['services']['backend']['environment'].get('MODEL_API_KEY', '').strip()), 'META_KEY_REQUIRED')
@@ -190,7 +208,7 @@ def snapshot(bundle, env_file, state):
     images = {'backend': back['Image'], 'frontend': front['Image'], 'postgres': pg['Image'],
               'worker_probe': False}
     # Keep available registry manifest digests as well as immutable local image IDs.
-    digests = {s: json.loads(run(['docker', 'image', 'inspect', row['Image']]))[0].get('RepoDigests', [])
+    digests = {s: json.loads(run(['docker', 'image', 'inspect', row['Image']], step='image.' + s + '.inspect'))[0].get('RepoDigests', [])
                for s, row in [('backend', back), ('frontend', front), ('postgres', pg)]}
     record = {'bundle': str(destination), 'env_file': str(destination / 'production.env'),
               'images': images, 'registry_digests': digests, 'history': history()}
@@ -202,7 +220,8 @@ def restore(previous):
     require(history() == previous['history'], 'SCHEMA_CHANGED_ROLLBACK_BLOCKED')
     back, front, env = commands(Path(previous['bundle']), Path(previous['env_file']), previous['images'])
     for command, service in [(back, 'backend'), (front, 'frontend')]:
-        run(command + ['up', '-d', '--no-deps', '--no-build', '--pull', 'never', '--wait', '--wait-timeout', '240', service], env)
+        run(command + ['up', '-d', '--no-deps', '--no-build', '--pull', 'never', '--wait', '--wait-timeout', '240', service],
+            env, step='compose.' + service + '.up')
     verify(previous['images'])
     require(history() == previous['history'], 'SCHEMA_CHANGED_DURING_ROLLBACK')
 
@@ -215,27 +234,37 @@ def deploy(bundle, env_file, state):
     back, front, env = check_topology(bundle, env_file, images)
     public_check()
     # Pull both images before touching either running service. Never pull PostgreSQL or models.
-    for component in ('backend', 'frontend'):
-        run(['docker', 'pull', images[component]], timeout=300)
-    previous = snapshot(bundle, env_file, state)
-    save(state / 'previous.json', previous)
-    print('Previous healthy image IDs and configuration saved', flush=True)
+    with phase('pull'):
+        for component in ('backend', 'frontend'):
+            run(['docker', 'pull', images[component]], timeout=300, step='image.' + component + '.pull')
+    with phase('snapshot'):
+        previous = snapshot(bundle, env_file, state)
+        save(state / 'previous.json', previous)
     try:
-        for command, service in [(back, 'backend'), (front, 'frontend')]:
-            print('Updating ' + service + ' and waiting for health', flush=True)
-            run(command + ['up', '-d', '--no-deps', '--no-build', '--pull', 'never', '--wait', '--wait-timeout', '240', service], env)
-        verify(images)
-        require(history() == previous['history'], 'UNEXPECTED_SCHEMA_CHANGE')
-    except Exception:
-        try:
-            restore(previous)
-        except Exception:
-            save(state / 'blocked.json', {'reason': 'ROLLBACK_FAILED_OR_SCHEMA_CHANGED', 'snapshot': previous['bundle']})
-            raise DeployError('DEPLOY_FAILED_ROLLBACK_FAILED_OR_BLOCKED_REVIEW_PRIVATE_STATE') from None
+        with phase('update'):
+            for command, service in [(back, 'backend'), (front, 'frontend')]:
+                run(command + ['up', '-d', '--no-deps', '--no-build', '--pull', 'never', '--wait', '--wait-timeout', '240', service],
+                    env, step='compose.' + service + '.up')
+        with phase('verify'):
+            verify(images)
+            require(history() == previous['history'], 'UNEXPECTED_SCHEMA_CHANGE')
+        with phase('commit'):
+            record_current(state, {'bundle': str(bundle), 'images': images, 'ci_run': data['run_id'],
+                                   'backend_sha': data['backend_sha'], 'frontend_sha': data['frontend_sha']})
+    except Exception as error:
+        status(public_code(error))
+        with phase('rollback'):
+            status('ROLLBACK_STARTED')
+            try:
+                restore(previous)
+            except Exception as rollback_error:
+                status(public_code(rollback_error))
+                status('ROLLBACK_FAILED')
+                save(state / 'blocked.json', {'reason': 'ROLLBACK_FAILED_OR_SCHEMA_CHANGED', 'snapshot': previous['bundle']})
+                raise DeployError('DEPLOY_FAILED_ROLLBACK_FAILED_OR_BLOCKED_REVIEW_PRIVATE_STATE') from None
+            status('ROLLBACK_SUCCEEDED')
         raise DeployError('DEPLOY_FAILED_ROLLBACK_SUCCEEDED_DATABASE_UNCHANGED') from None
-    save(state / 'current.json', {'bundle': str(bundle), 'images': images, 'ci_run': data['run_id'],
-                                 'backend_sha': data['backend_sha'], 'frontend_sha': data['frontend_sha']})
-    print('DEPLOY_SUCCEEDED: public HTTPS, API routing, containers, PostgreSQL and worker readiness verified; schema unchanged')
+    status('DEPLOY_SUCCEEDED')
 
 
 @contextmanager
@@ -267,18 +296,22 @@ def main():
             require(not (state / 'blocked.json').exists(), 'PREVIOUS_FAILURE_REQUIRES_REVIEW')
             if args.operation == 'rollback':
                 previous = json.loads((state / 'previous.json').read_text())
-                try:
-                    restore(previous)
-                except Exception:
-                    save(state / 'blocked.json', {'reason': 'ROLLBACK_FAILED_OR_SCHEMA_CHANGED', 'snapshot': previous['bundle']})
-                    raise DeployError('ROLLBACK_FAILED_OR_SCHEMA_CHANGED_REVIEW_PRIVATE_STATE') from None
-                save(state / 'current.json', {'bundle': previous['bundle'], 'images': previous['images'], 'rollback': True})
-                print('ROLLBACK_SUCCEEDED: previous application images healthy; database unchanged; prior worker settings restored')
+                with phase('rollback'):
+                    status('ROLLBACK_STARTED')
+                    try:
+                        restore(previous)
+                        record_current(state, {'bundle': previous['bundle'], 'images': previous['images'], 'rollback': True})
+                    except Exception as error:
+                        status(public_code(error))
+                        status('ROLLBACK_FAILED')
+                        save(state / 'blocked.json', {'reason': 'ROLLBACK_FAILED_OR_SCHEMA_CHANGED', 'snapshot': previous['bundle']})
+                        raise DeployError('ROLLBACK_FAILED_OR_SCHEMA_CHANGED_REVIEW_PRIVATE_STATE') from None
+                    status('ROLLBACK_SUCCEEDED')
             else:
                 deploy(bundle, env_file, state)
     except (DeployError, ValueError, OSError, KeyError, TypeError):
         error = sys.exc_info()[1]
-        print(str(error) if isinstance(error, DeployError) else 'DEPLOYMENT_INPUT_OR_STATE_INVALID', file=sys.stderr)
+        status(public_code(error) if isinstance(error, DeployError) else 'DEPLOYMENT_INPUT_OR_STATE_INVALID')
         return 1
     return 0
 
