@@ -150,7 +150,7 @@ class ActivationDispatchTest(unittest.TestCase):
                 self.assertEqual(record['confirmations'], {key: key in REQUIRED for key in dispatch.CONFIRMATIONS})
                 self.assertEqual(validated[0]['ALLOW_MIGRATIONS'], 'false')
 
-    def assert_rejected(self, form, code):
+    def assert_rejected(self, form, code, withheld=()):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / 'event.json'
             path.write_text(json.dumps({'inputs': form}))
@@ -162,12 +162,16 @@ class ActivationDispatchTest(unittest.TestCase):
             result = self.validate_cli(path, env)
             self.assertEqual(result.returncode, 2)
             self.assertIn(code, result.stderr)
+            for value in withheld:
+                self.assertNotIn(value, result.stdout + result.stderr)
             with patch.object(pipeline, 'current_release') as current, \
                     patch.object(pipeline, 'prepare') as prepare, patch.object(pipeline, 'transfer') as transfer:
                 status, out, err = self.execute_cli(path, Path(temp), env)
                 self.assertEqual(status, 2)
                 self.assertEqual(out, '')
                 self.assertIn(code, err)
+                for value in withheld:
+                    self.assertNotIn(value, out + err)
                 current.assert_not_called()
                 prepare.assert_not_called()
                 transfer.assert_not_called()
@@ -182,19 +186,50 @@ class ActivationDispatchTest(unittest.TestCase):
                     form['confirm_' + key] = value
                 with self.subTest(approval=key, value=value):
                     code = 'AMBIGUOUS_OPERATOR_CONFIRMATIONS' if value is None else 'PHASE_OPERATOR_CONFIRMATIONS_REQUIRED'
-                    self.assert_rejected(form, code)
+                    self.assert_rejected(form, code + ': incorrect_fields=confirm_' + key + ' (expected true)\n')
 
     def test_each_migration_approval_true_is_still_rejected_during_activation(self):
         for key in sorted(MIGRATION_ONLY):
             form = self.form()
             form['confirm_' + key] = True
             with self.subTest(approval=key):
-                self.assert_rejected(form, 'PHASE_OPERATOR_CONFIRMATIONS_REQUIRED')
+                self.assert_rejected(form, 'PHASE_OPERATOR_CONFIRMATIONS_REQUIRED: incorrect_fields=confirm_'
+                                     + key + ' (expected false)\n')
 
     def test_activation_never_accepts_migration_permission(self):
         form = self.form()
         form['allow_migrations'] = True
-        self.assert_rejected(form, 'PHASE_MIGRATION_PERMISSION_MISMATCH')
+        self.assert_rejected(form, 'PHASE_MIGRATION_PERMISSION_MISMATCH: '
+                             'incorrect_fields=allow_migrations (expected false)\n')
+
+    def test_all_nine_incorrect_fields_are_reported_together_without_weakening_gates(self):
+        form = self.form()
+        for key in dispatch.BOOLEAN_INPUTS:
+            form[key] = not form[key]
+        fields = ['confirm_' + key + ' (expected ' + ('true' if key in REQUIRED else 'false') + ')'
+                  for key in dispatch.CONFIRMATIONS]
+        fields.append('allow_migrations (expected false)')
+        self.assert_rejected(form, 'PHASE_OPERATOR_CONFIRMATIONS_REQUIRED: incorrect_fields='
+                             + ', '.join(fields) + '\n')
+
+    def test_ambiguous_approval_reports_all_divergences_without_received_values_or_other_inputs(self):
+        form = self.form()
+        marker = 'SENSITIVE-MARKER-DO-NOT-PRINT'
+        form.update(confirm_v8_acceptance=marker + '\nforged=true', confirm_v7_backup=True,
+                    confirm_worker_reactivation=False, allow_migrations=True, unused_private_field=marker)
+        self.assert_rejected(form, 'AMBIGUOUS_OPERATOR_CONFIRMATIONS: incorrect_fields='
+                             'confirm_v7_backup (expected false), confirm_v8_acceptance (expected true), '
+                             'confirm_worker_reactivation (expected true), allow_migrations (expected false)\n',
+                             withheld=[marker, 'forged=true', 'unused_private_field'])
+
+    def test_migration_diagnostics_keep_the_opposite_phase_requirements(self):
+        form = self.form()
+        form.update(phase='migrate-v8', allow_migrations=False, confirm_v7_preflight=True,
+                    confirm_v7_backup=True, confirm_isolated_restore=False,
+                    confirm_v8_acceptance=False, confirm_worker_reactivation=True)
+        self.assert_rejected(form, 'PHASE_OPERATOR_CONFIRMATIONS_REQUIRED: incorrect_fields='
+                             'confirm_isolated_restore (expected true), confirm_worker_reactivation (expected false), '
+                             'allow_migrations (expected true)\n')
 
     def test_nonliteral_approvals_are_not_coerced_into_true(self):
         for value in ['', 'TRUE', '1', ' true']:
@@ -227,7 +262,8 @@ class ActivationDispatchTest(unittest.TestCase):
                 inherited = dict(resolved)
                 inherited.pop('CONFIRM_' + key.upper())
                 with self.subTest(approval=key):
-                    with self.assertRaisesRegex(DeploymentError, '^PHASE_OPERATOR_CONFIRMATIONS_REQUIRED$'):
+                    with self.assertRaisesRegex(DeploymentError, '^PHASE_OPERATOR_CONFIRMATIONS_REQUIRED: '
+                                                'incorrect_fields=confirm_' + key + r' \(expected true\)$'):
                         dispatch.validate(inherited)
                     result = self.validate_cli(path, inherited)
                     self.assertEqual(result.returncode, 0, result.stderr)
