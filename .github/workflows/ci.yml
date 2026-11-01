@@ -104,7 +104,7 @@ jobs:
           mkdir -p .ci/deployment
           cp compose.yaml compose.production.yaml .ci/deployment/
           cp deploy/simple/compose.images.yaml deploy/simple/compose.frontend.yaml .ci/deployment/
-          cp scripts/simple_deploy.py scripts/ci_images.py .ci/deployment/
+          cp scripts/simple_deploy.py scripts/simple_diagnostics.py scripts/ci_images.py .ci/deployment/
           python3 -B scripts/ci_images.py record --file .ci/deployment/images.json
           cat .ci/deployment/images.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

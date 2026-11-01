@@ -190,6 +190,70 @@ and authorize the migration separately. Then deploy matching code. Do not bypass
 If the previous image becomes incompatible, establish a compatible recovery point before
 using image rollback. Image rollback never reverses a database change.
 
+## Docker failure diagnostics
+
+The old `COMMAND_FAILED_DOCKER` meant only that a subprocess whose executable was
+`docker` returned nonzero. `simple_deploy.run()` captured stdout/stderr and discarded
+both when raising that code. `simple_ssh.execute()` then discarded remote output again,
+retaining only a bare uppercase error code. `tee` did not cause the missing message;
+the deployment step explicitly enables `pipefail` to retain Python's failure status.
+
+There is no way to recover the original failing command or message from that old code
+alone. The first Docker command during deployment is:
+
+```text
+docker ps -aq --filter label=com.docker.compose.project=ai-policy-investigator --filter label=com.docker.compose.service=postgres
+```
+
+Every command below can produce the generic Docker error, including nonzero exit codes
+from programs run *inside* containers:
+
+| Diagnostic step | Docker command | Purpose |
+| --- | --- | --- |
+| `container.{service}.list` | `docker ps -aq --filter ... --filter ...` | Locate backend/frontend/PostgreSQL by project/service labels |
+| `container.{service}.inspect` | `docker inspect <container ID>` | Read health, environment, networks and volumes |
+| `compose.{service}.config` | `docker compose <project/env/files> config --format json` | Resolve backend/frontend configuration before changes |
+| `image.{service}.pull` | `docker pull <immutable image reference>` | Fetch backend, then frontend; no PostgreSQL pull |
+| `image.{service}.inspect` | `docker image inspect <image reference or ID>` | Snapshot digests or verify running images |
+| `history` | `docker exec --user postgres <ID> psql -X -U postgres -d investigator -At -v ON_ERROR_STOP=1 -c <SELECT>` | Read Flyway history for snapshot/verification/rollback |
+| `compose.{service}.up` | `docker compose <project/env/files> up -d --no-deps --no-build --pull never --wait --wait-timeout 240 <service>` | Replace backend/frontend, or restore previous images |
+| `workers.health` | `docker exec <backend ID> curl --fail --silent --max-time 20 http://127.0.0.1:8080/actuator/health` | Verify backend/worker readiness |
+
+In normal deployment, errors from `up` and subsequent verification are caught by the
+rollback handler: their **final** code is `DEPLOY_FAILED_ROLLBACK_SUCCEEDED_DATABASE_UNCHANGED`
+or `DEPLOY_FAILED_ROLLBACK_FAILED_OR_BLOCKED_REVIEW_PRIVATE_STATE`. A lone original
+`COMMAND_FAILED_DOCKER` therefore points to the earlier preflight, pull or snapshot
+steps, rather than proving that application replacement failed. In manual rollback,
+errors within restoration are also wrapped in a rollback-specific final code.
+
+The new protocol reports phase, service/step, a fixed command template, exit code,
+and a normalized cause with an operator hint. Example:
+
+```text
+phase=pull step=image.frontend.pull result=failed exit=1 command="docker pull [frontend immutable CI image]" reason=registry_denied: Registry access denied; check VPS GHCR credentials and package read permissions (CI login is separate).
+```
+
+Causes cover daemon/socket permissions, registry authorization, missing images,
+disk space, platform, TLS/network errors, unsupported Compose flags/YAML tags,
+invalid configuration, missing external resources, unhealthy/exited containers and
+database query errors. Silent curl failures also use its exit code (7/22/28).
+Classification is a diagnostic hint based on known Docker messages, not a claim
+that the actual VPS cause has been observed locally. Unknown messages report
+`unknown` with the failed step and exit code and require private VPS investigation.
+
+No captured stderr/stdout, actual arguments, environment values, resolved Compose
+configuration, inspect data, health output or application logs are sent to Actions.
+Both ends validate an exact schema and a closed vocabulary; arbitrary uppercase
+lines and extra fields are rejected. This avoids relying on regex redaction of
+unknown or multiline secrets. The original failure and rollback diagnostics both
+survive; `ROLLBACK_STARTED`, `ROLLBACK_SUCCEEDED` and `ROLLBACK_FAILED` distinguish
+the recovery outcome while a failed deployment still exits nonzero.
+
+The CI artifact and manual rollback bundle now include `simple_diagnostics.py`.
+Before a later authorized deployment, CI must publish an artifact containing that
+file. An older artifact fails locally with `DEPLOY_BUNDLE_INCOMPLETE` before SSH;
+the workflow does not silently replace tested artifact tooling with checkout files.
+
 ## Rollback
 
 Before replacement, private VPS `simple-deploy/snapshot-*` directories retain immutable
@@ -210,6 +274,32 @@ VPS snapshot and cached images, requiring no historical CI artifact or registry 
 Schema change/unreadable history/failed rollback stops automation and writes
 `simple-deploy/blocked.json`. Review/recover with explicit operator authorization before
 removing that marker. Database restore remains a separate recovery operation.
+
+Failure is not an atomic undo of all VPS changes:
+
+- Before `up`, directory creation/transfers, image downloads and partial snapshot
+  files can remain, although application containers have not been replaced. No
+  application rollback runs in these phases.
+- `up` replaces backend and frontend sequentially. A failed backend update can
+  already have stopped/replaced that container; a failed frontend update can leave
+  the new backend alongside an old or failed frontend until rollback completes.
+- The recovery boundary now also covers the final atomic write of `current.json`.
+  Previously, its failure could leave new containers running with stale state and
+  no automatic rollback. A manual rollback state-write failure also marks recovery
+  as failed instead of claiming success.
+- Restoration itself is sequential and can fail midway. Schema drift/unreadable
+  history blocks restoration before its first `up`. A failed restoration writes
+  `blocked.json` and prevents subsequent automatic changes. If the filesystem is
+  unwritable, persisting that marker can also fail; the failure logs remain relevant
+  and the marker must not be assumed to exist.
+- SSH loss, the 1800-second SSH subprocess timeout, runner cancellation, remote
+  termination or a VPS outage do not prove that rollback ran. A detected transport
+  timeout or SSH exit 255 reports `SSH_REMOTE_OUTCOME_UNCONFIRMED`; inspect state
+  through a separately authorized operation before retrying. The runner timeout
+  does not implement remote transactional cancellation.
+- Image rollback leaves downloaded images/snapshots and database contents in place.
+  Schema equality is checked, but application/worker writes or external calls made
+  while a candidate was running are not undone.
 
 ## Local validation and legacy recovery
 
