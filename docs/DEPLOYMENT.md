@@ -40,10 +40,12 @@ The initializer uses the revision/hashes in [model provenance](provenance/embedd
 The 384 dimensions remain fixed. Cold model/native initialization needs public downloads;
 warm restarts reuse verified caches. Real Meta reasoning always needs outbound API access.
 
-Production merges backend compose.yaml, compose.production.yaml and the image-only
-overlay; the separate frontend base merges the backend's frontend production/image
-overlays. The pipeline supplies verified local image aliases, including the unchanged
-PostgreSQL image. Never use base-only Compose up against this production deployment.
+Routine CD merges backend compose.yaml, compose.production.yaml and
+deploy/simple/compose.images.yaml, and uses deploy/simple/compose.frontend.yaml for the
+frontend. It pulls only the CI-selected frontend/backend digests and updates those two
+services with --no-deps. PostgreSQL and model-init are left running/untouched. Existing
+model assets are required; the initializer is a separate bootstrap/recovery operation.
+Never use base-only Compose up against this production deployment.
 
 ## Nginx Proxy Manager
 

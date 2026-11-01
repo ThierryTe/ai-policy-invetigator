@@ -353,7 +353,7 @@ class PreparationTest(unittest.TestCase):
 
 class WorkflowTest(unittest.TestCase):
     def test_artifact_identity_inputs_have_no_stale_defaults(self):
-        text = (preparation.ROOT / '.github/workflows/prepare-backend-qualification.yml').read_text()
+        text = (preparation.ROOT / '.github/legacy-workflows/prepare-backend-qualification.yml').read_text()
         for key in ['backend_sha', 'approved_backend_digest', 'approved_config_digest']:
             block = re.search(r'^      ' + key + r':\n(.*?)(?=^      \w+:|^permissions:)', text, re.M | re.S)
             self.assertIsNotNone(block)
@@ -361,7 +361,7 @@ class WorkflowTest(unittest.TestCase):
             self.assertNotIn('default:', block[1])
 
     def test_manual_read_only_no_environment_secrets_or_production_operations(self):
-        text = (preparation.ROOT / '.github/workflows/prepare-backend-qualification.yml').read_text()
+        text = (preparation.ROOT / '.github/legacy-workflows/prepare-backend-qualification.yml').read_text()
         self.assertEqual(re.findall(r'^  (workflow_dispatch|push|pull_request|workflow_call|schedule):', text, re.M),
                          ['workflow_dispatch'])
         for value in ("github.event_name == 'workflow_dispatch'", "github.ref == 'refs/heads/main'",

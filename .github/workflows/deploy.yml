@@ -1,0 +1,75 @@
+name: Deploy production
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Deploy latest successful CI images, or restore the previous healthy application images
+        type: choice
+        options: [deploy, rollback]
+        default: deploy
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    environment: prod
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select latest successfully published main image pair
+        id: images
+        if: inputs.operation == 'deploy'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 -B scripts/ci_images.py select
+      - name: Download the tested CI artifact
+        if: inputs.operation == 'deploy'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ steps.images.outputs.run_id }}
+          ARTIFACT_NAME: ${{ steps.images.outputs.artifact_name }}
+        run: gh run download "$RUN_ID" --name "$ARTIFACT_NAME" --dir "$RUNNER_TEMP/deployment"
+      - name: Validate immutable image references and CI provenance
+        if: inputs.operation == 'deploy'
+        env:
+          SELECTED_RUN_ID: ${{ steps.images.outputs.run_id }}
+          SELECTED_SHA: ${{ steps.images.outputs.backend_sha }}
+        run: python3 -B scripts/ci_images.py validate --file "$RUNNER_TEMP/deployment/images.json"
+      - name: Prepare rollback tooling (no CI artifact required)
+        if: inputs.operation == 'rollback'
+        run: |
+          mkdir -p "$RUNNER_TEMP/deployment"
+          cp compose.yaml compose.production.yaml "$RUNNER_TEMP/deployment/"
+          cp deploy/simple/compose.images.yaml deploy/simple/compose.frontend.yaml "$RUNNER_TEMP/deployment/"
+          cp scripts/simple_deploy.py scripts/ci_images.py "$RUNNER_TEMP/deployment/"
+          printf '{}\n' > "$RUNNER_TEMP/deployment/images.json"
+      - name: Deploy over pinned SSH and verify; restore images on failure when schema is unchanged
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USERNAME: ${{ secrets.VPS_USERNAME }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+          VPS_HOST_KEY: ${{ vars.VPS_HOST_KEY }}
+          DEPLOY_OPERATION: ${{ inputs.operation }}
+          DEPLOY_BUNDLE: ${{ runner.temp }}/deployment
+        run: python3 -B scripts/simple_ssh.py 2>&1 | tee "$RUNNER_TEMP/deployment-result.txt"
+      - name: Deployment result
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          printf 'Operation: %s — %s\n' "$OPERATION" "$JOB_STATUS" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f "$RUNNER_TEMP/deployment-result.txt" ]; then
+            cat "$RUNNER_TEMP/deployment-result.txt" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          printf '\nImage rollback never reverses database migrations.\n' >> "$GITHUB_STEP_SUMMARY"

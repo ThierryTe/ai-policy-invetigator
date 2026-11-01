@@ -28,6 +28,7 @@ public class IngestionWorker {
     private final com.tewendelabs.investigator.security.DatabaseSafetyCheck safety;
     private final ExecutorService executor = Executors.newFixedThreadPool(2);
     private final AtomicInteger active = new AtomicInteger();
+    private volatile long lastSuccessfulPoll;
 
     public IngestionWorker(JdbcTemplate jdbc, ScopedAccess scope, PdfExtractor extractor, SourceChunker chunker, EmbeddingGateway embeddings, MeterRegistry metrics, @Value("${app.worker.enabled:true}") boolean enabled, com.tewendelabs.investigator.security.DatabaseSafetyCheck safety) {
         this.jdbc = jdbc;
@@ -44,6 +45,7 @@ public class IngestionWorker {
     public void dispatch() {
         if (!safety.ready() || !enabled || active.get() >= 2) return;
         Lease lease = claim();
+        lastSuccessfulPoll = System.nanoTime();
         if (lease == null) return;
         active.incrementAndGet();
         try {
@@ -62,6 +64,13 @@ public class IngestionWorker {
     public Lease claim() {
         return jdbc.query("select * from claim_ingestion()", (r, n) -> new Lease(r.getObject("id", UUID.class), r.getObject("version_id", UUID.class), r.getObject("requested_by", UUID.class), r.getObject("lease_token", UUID.class)))
                 .stream().findFirst().orElse(null);
+    }
+
+    public boolean operational() {
+        // Allow the bounded PDF/embedding work to finish when both slots are busy.
+        long grace = active.get() >= 2 ? 180L : 30L;
+        return enabled && safety.ready() && !executor.isShutdown() && lastSuccessfulPoll != 0
+                && System.nanoTime() - lastSuccessfulPoll < grace * 1_000_000_000L;
     }
 
     public void process(Lease lease) {

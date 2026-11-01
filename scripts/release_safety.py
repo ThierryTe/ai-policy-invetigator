@@ -15,6 +15,7 @@ COMMON = {'github_protection', 'write_freeze', 'image_qualification'}
 REQUIRED = {'migrate-v8': COMMON | {'v7_preflight', 'v7_backup', 'isolated_restore'},
             'activate-v8': COMMON | {'v8_acceptance', 'worker_reactivation'}}
 WORKERS = ('APP_WORKER_ENABLED', 'APP_INVESTIGATION_WORKER_ENABLED')
+ACTIVATION_IDENTITY_FIELDS = ('backendSha', 'frontendSha', 'configurationSha', 'configuration', 'runtime', 'migrations')
 
 
 def explicit_worker_inputs(path):
@@ -105,8 +106,8 @@ def validate_target(data, previous, applied, phase):
             'V8_PHASE_DATABASE_HISTORY_MISMATCH')
     if phase == 'activate-v8':
         require(previous.get('releaseSafety', {}).get('phase') == 'migrate-v8', 'VALIDATED_DISABLED_WORKER_PHASE_REQUIRED')
-        for key in ('backendSha', 'frontendSha', 'configurationSha', 'configuration', 'runtime', 'migrations'):
-            require(key in previous and data.get(key) == previous[key], 'ACTIVATION_MUST_REUSE_MIGRATION_RELEASE')
+        divergent = [key for key in ACTIVATION_IDENTITY_FIELDS if key not in previous or data.get(key) != previous[key]]
+        require(not divergent, 'ACTIVATION_MUST_REUSE_MIGRATION_RELEASE: divergent_fields=' + ','.join(divergent))
         require(set(previous.get('images', {})) == set(data['images']), 'ACTIVATION_IMAGE_SET_CHANGED')
         for key, image in data['images'].items():
             require(all(image.get(field) == previous['images'][key].get(field)

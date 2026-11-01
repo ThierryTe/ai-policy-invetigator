@@ -127,7 +127,7 @@ class PublicationTest(unittest.TestCase):
 
 class PublicationWorkflowTest(unittest.TestCase):
     def test_manual_publication_requires_successful_main_ci_for_exact_source(self):
-        text = (Path(__file__).resolve().parents[2] / '.github/workflows/publish-images.yml').read_text()
+        text = (Path(__file__).resolve().parents[2] / '.github/legacy-workflows/publish-images.yml').read_text()
         step = text.split('- name: Require successful backend CI for manual publication\n', 1)[1]
         match = re.search(r"python3 - <<'PY'\n(.*?)\n          PY", step, re.S)
         code = '\n'.join(line[10:] for line in match[1].splitlines())
@@ -160,7 +160,7 @@ class PublicationWorkflowTest(unittest.TestCase):
         self.assertLess(text.index('SUCCESSFUL_BACKEND_CI_FOR_EXACT_SHA_REQUIRED'), text.index('uses: actions/checkout'))
 
     def test_tooling_revision_guard_rejects_floating_or_injected_refs(self):
-        text = (Path(__file__).resolve().parents[2] / '.github/workflows/publish-images.yml').read_text()
+        text = (Path(__file__).resolve().parents[2] / '.github/legacy-workflows/publish-images.yml').read_text()
         match = re.search(r"python3 - <<'PY'\n(.*?)\n          PY", text, re.S)
         self.assertIsNotNone(match)
         code = '\n'.join(line[10:] for line in match[1].splitlines())

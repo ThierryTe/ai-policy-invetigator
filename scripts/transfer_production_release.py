@@ -14,7 +14,7 @@ import tempfile
 
 from deploy_local_images import DeploymentError, require
 from release_artifacts import RELEASE_ID, validate_manifest
-from release_safety import validate_release
+from release_safety import ACTIVATION_IDENTITY_FIELDS, validate_release
 
 BASE = '/opt/ai-policy-investigator'
 
@@ -39,11 +39,26 @@ def pinned_host_key(value):
     return 'ssh-ed25519 ' + base64.b64encode(blob).decode('ascii')
 
 
+def safe_remote_error(stderr):
+    for line in stderr.splitlines():
+        if re.fullmatch(r'[A-Z][A-Z0-9_]{5,120}', line):
+            return line
+        code, separator, fields = line.partition(': divergent_fields=')
+        if code == 'ACTIVATION_MUST_REUSE_MIGRATION_RELEASE' and separator:
+            names = fields.split(',')
+            # A fixed allowlist of metadata names, never remote values, paths or
+            # arbitrary stderr. Malformed detail retains only the known code.
+            if len(names) == len(set(names)) and set(names) <= set(ACTIVATION_IDENTITY_FIELDS):
+                return line
+            return code
+    return None
+
+
 def execute(command, code, timeout=1200):
     try:
         result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
         if result.returncode:
-            safe = next((line for line in result.stderr.splitlines() if re.fullmatch(r'[A-Z][A-Z0-9_]{5,120}', line)), None)
+            safe = safe_remote_error(result.stderr)
             raise DeploymentError(code + (': ' + safe if safe else ''))
         return result.stdout
     except (OSError, subprocess.TimeoutExpired):

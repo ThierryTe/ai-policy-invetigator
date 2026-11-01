@@ -14,7 +14,7 @@ Start with the [project overview](../README.md), then choose a guide:
 | [API: investigations](api/phase3.md) | Consent, asynchronous jobs, structured requirements and findings |
 | [API: dashboard and human review](api/phase4.md) | Status, graph, verified citations and append-only review actions |
 | [Evaluation and reproducibility](EVALUATION.md) | Golden datasets, recorded real inference, errors and limitations |
-| [Production CI/CD](PRODUCTION_PIPELINE.md) | Main-branch publication, SSH image delivery, GitHub configuration and rollback |
+| [Production CI/CD](PRODUCTION_PIPELINE.md) | Test/publish on main, one-click deployment, worker readiness, GitHub/VPS setup and image rollback |
 | [Production operations](DEPLOYMENT.md) | Network topology, initial account, backup and restore |
 | [Reuse and contributions](provenance/HACKATHON_CONTRIBUTIONS.md) | Pre-existing work, exact imports and Investigator-specific development |
 | [V8 preproduction qualification — English companion](V8_PREPRODUCTION.en.md) | Option A GO, recorded test results, deployment conditions and realistic rollback |

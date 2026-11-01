@@ -27,7 +27,7 @@ on:
         options: [prepare-reviewed, deploy-reviewed, deploy, rollback]
         default: prepare-reviewed
       prepared_release:
-        description: Retained release ID returned by prepare-reviewed; deploy-reviewed only
+        description: Retained release ID for deploy-reviewed; for activate-v8, the successful migration release ID, identical to expected_previous
         type: string
       backend_sha:
         description: Full backend source SHA for manual recovery
@@ -48,7 +48,7 @@ on:
         options: [migrate-v8, activate-v8]
         default: migrate-v8
       expected_previous:
-        description: Actual approved last-successful release ID
+        description: Actual approved last-successful release ID; for activate-v8, identical to prepared_release
         type: string
       approved_backend_digest:
         description: Reviewed linux/amd64 backend child manifest digest

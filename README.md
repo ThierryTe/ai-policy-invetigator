@@ -155,26 +155,23 @@ production database.
 
 ## Production deployment and CI/CD
 
-On main, CI and immutable image publication remain automatic; production deployment
-requires an explicit reviewed backend workflow dispatch. Develop and PR runs validate
-only. Follow the [two-phase V8 runbook](docs/V8_DEPLOYMENT_RUNBOOK.md) for attestations,
-mandatory worker flags, target preflights and remaining external approval duties.
-The backend **prod** environment must have required reviewers configured separately.
-Images are downloaded/verified on the
-runner and transferred through the configured SSH account, avoiding a GHCR pull
-dependency on the VPS. Local images deploy with no build/pull and preserve PostgreSQL/ONNX volumes.
+Push backend `main` → backend/frontend tests → build both Docker images → GHCR.
+Pushes never deploy. In backend GitHub Actions, choose **Deploy production → Run workflow**
+on `main` to deploy the latest successful CI image pair over pinned SSH. The VPS pulls
+immutable digests and updates the existing Compose services, preserving PostgreSQL/model
+volumes, the public domain and HTTPS. Workers run inside the backend and are enabled
+explicitly in the existing private production env file.
 
-The workflow keeps the existing VPS_HOST, VPS_USERNAME, VPS_SSH_KEY, VPS_PORT and
-VPS_DEPLOY_PATH secrets. Set the public backend prod variable VPS_HOST_KEY
-to the independently verified Ed25519 public host key of the VPS. The runner builds an
-isolated known_hosts file and enforces StrictHostKeyChecking=yes for SSH/SCP; no additional
-SSH secret or unverified key scan is needed. Missing or malformed pins fail before connecting.
-See [SSH host identity setup](docs/PRODUCTION_PIPELINE.md#current-ssh-configuration).
-The local startup commands above are separate from this production pipeline; no
-successful hosted run or public-site deployment is established here.
+Deployment checks public routing, container/database health and actual local worker
+readiness without paid inference probes. Flyway validates the existing schema and refuses
+pending migrations; schema changes require separately reviewed maintenance. Failed updates
+restore previous application images when Flyway history is unchanged. For manual rollback,
+select operation **rollback** in the same workflow.
 
-- [Production pipeline and one-time GitHub configuration](docs/PRODUCTION_PIPELINE.md).
-- [Network topology, initial administrator, backup and restore](docs/DEPLOYMENT.md).
+Follow [the practical CI/CD setup and deployment procedure](docs/PRODUCTION_PIPELINE.md)
+for secrets, VPS registry access, the separate frontend repository's notification workflow
+and first deployment. Preserve V8 release `r041243000818-11` and all recovery artifacts.
+See [production operations](docs/DEPLOYMENT.md) for initial accounts and backup/restore.
 
 Only the Angular/Nginx container joins the existing shared proxy network. Backend and
 PostgreSQL remain private, with no production host ports. Swagger and dotenv remain

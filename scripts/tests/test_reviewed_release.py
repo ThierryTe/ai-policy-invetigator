@@ -163,7 +163,7 @@ class CandidateTest(unittest.TestCase):
 
 class ReviewedWorkflowTest(unittest.TestCase):
     def test_prod_configuration_reaches_both_python_steps_after_environment_approval(self):
-        workflow = (Path(__file__).resolve().parents[2] / '.github/workflows/deploy-production.yml').read_text()
+        workflow = (Path(__file__).resolve().parents[2] / '.github/legacy-workflows/deploy-production.yml').read_text()
         job, steps = workflow.split('    steps:\n', 1)
         self.assertIn('    environment:\n      name: prod\n', job)
         for name in ['V7_DEMO_INVESTIGATION_ID', 'V7_BACKUP_DIR', 'V7_RESTORE_START_TIMEOUT_SECONDS']:

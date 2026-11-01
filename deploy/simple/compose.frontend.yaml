@@ -1,0 +1,24 @@
+services:
+  frontend:
+    image: ${FRONTEND_IMAGE_REF:?Immutable CI image required}
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      BACKEND_UPSTREAM: http://backend.ai-policy-investigator_application:8080
+    networks:
+      application:
+      proxy:
+        aliases: [ai-policy-investigator-web]
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/healthz]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 6
+networks:
+  application:
+    external: true
+    name: ai-policy-investigator_application
+  proxy:
+    external: true
+    name: nginx-proxy-manager_default

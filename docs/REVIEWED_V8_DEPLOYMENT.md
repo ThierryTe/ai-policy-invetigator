@@ -247,6 +247,24 @@ same fixed digests and published model-init and pins both worker flags true;
 no secret-file edit is needed. Worker activation can consume Meta attempts and
 is never implied by migration approval.
 
+Both IDs are read from the same dispatch event. `prepared_release` selects the
+approved image pair and must equal `expected_previous`; it does not restore the
+retained configuration/tooling checkout. `expected_previous` is stored in
+`release.json` as `expectedPrevious` and `releaseSafety.expected_previous`, then
+transferred by SCP. The SSH command selects the **new activation release ID**;
+the server reads the previous release identity from that manifest.
+
+`ACTIVATION_MUST_REUSE_MIGRATION_RELEASE: divergent_fields=...` names all changed
+source/configuration/runtime/migration metadata fields without printing their
+values. A newer checkout changes `configurationSha` even when both release IDs
+are correct. Diagnostic changes to packaged runtime scripts also change `runtime`.
+The exact identity checks remain required; do not relabel a new bundle with an
+older revision or rerun the migration to bypass them.
+
+See [the exact retained-bundle analysis](V8_RETAINED_BUNDLE_ANALYSIS.md) for the
+available evidence, offline byte-verification tool, proposed verified assembly
+path and options when the original immutable artifact cannot be recovered.
+
 ## Validation scope
 
 The Python regression suite, synthetic orchestration/failure tests and Compose
