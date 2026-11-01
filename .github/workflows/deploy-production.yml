@@ -61,15 +61,15 @@ on:
         type: boolean
         default: false
       confirm_v7_preflight:
-        description: I attest target-specific V7 preflight passed; reference held in change record
+        description: Migration only (false for activation) - I attest target-specific V7 preflight passed; reference held in change record
         type: boolean
         default: false
       confirm_v7_backup:
-        description: I attest a checksum-verified V7 backup is retained privately
+        description: Migration only (false for activation) - I attest a checksum-verified V7 backup is retained privately
         type: boolean
         default: false
       confirm_isolated_restore:
-        description: I attest this exact backup restored and verified on an isolated target
+        description: Migration only (false for activation) - I attest this exact backup restored and verified on an isolated target
         type: boolean
         default: false
       confirm_write_freeze:
@@ -136,7 +136,7 @@ jobs:
           python-version: '3.12'
       - name: Validate explicit inputs before registry or SSH access
         if: inputs.operation == 'deploy' || inputs.operation == 'rollback'
-        run: python3 -B scripts/validate_release_dispatch.py
+        run: python3 -B scripts/validate_release_dispatch.py --event-file "$GITHUB_EVENT_PATH"
       - name: Validate reviewed preparation or migration approval
         if: inputs.operation == 'prepare-reviewed' || inputs.operation == 'deploy-reviewed'
         # Resolve prod variables at step scope, after the runner declares the environment.
@@ -172,10 +172,8 @@ jobs:
           if [[ "$OPERATION" != rollback ]]; then
             printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           fi
-          args=(--operation "$OPERATION" --configuration-sha "$CONFIGURATION_SHA" --output "$RUNNER_TEMP/policy-releases"
-                --backend-sha "$BACKEND_SHA" --frontend-sha "$FRONTEND_SHA" --rollback-release "$ROLLBACK_RELEASE")
-          if [[ "$ALLOW_MIGRATIONS" == true ]]; then args+=(--allow-migrations); fi
-          python3 -B scripts/run_production_deploy.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
+          # Read exactly the same dispatch form as the preflight validator.
+          python3 -B scripts/run_production_deploy.py --event-file "$GITHUB_EVENT_PATH" --configuration-sha "$CONFIGURATION_SHA" --output "$RUNNER_TEMP/policy-releases" >> "$GITHUB_STEP_SUMMARY"
       - name: Prepare or deploy the retained approved image pair
         if: inputs.operation == 'prepare-reviewed' || inputs.operation == 'deploy-reviewed'
         env:

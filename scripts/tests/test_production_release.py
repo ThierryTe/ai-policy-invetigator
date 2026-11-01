@@ -271,7 +271,7 @@ class RunnerDockerDiagnosticsTest(unittest.TestCase):
         argv = ['run_production_deploy.py', '--output', '/unused']
         result = subprocess.CompletedProcess(command, 125, b'', b'unknown flag: --platform')
         with patch.object(sys, 'argv', argv), patch.object(pipeline, 'validate_manual'), \
-             patch.object(pipeline, 'deploy', side_effect=lambda args: prepare.run(command)), \
+             patch.object(pipeline, 'deploy', side_effect=lambda args, env: prepare.run(command)), \
              patch.object(prepare.subprocess, 'run', return_value=result), \
              contextlib.redirect_stderr(io.StringIO()) as stderr, contextlib.redirect_stdout(io.StringIO()) as stdout:
             self.assertEqual(pipeline.main(), 2)
