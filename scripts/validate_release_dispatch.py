@@ -8,7 +8,7 @@ import re
 import sys
 from deploy_local_images import DeploymentError, require
 from release_artifacts import SHA, RELEASE_ID
-from release_safety import CONFIRMATIONS, from_environment
+from release_safety import CONFIRMATIONS, REQUIRED, from_environment
 
 
 DISPATCH_INPUTS = {
@@ -43,6 +43,29 @@ def dispatch_environment(env, event_file):
 
 
 def validate(env):
+    try:
+        _validate(env)
+    except DeploymentError as error:
+        # Preserve the original gate and error code. Only fixed form field names
+        # and expected literals may appear in the diagnostic, never received data.
+        if str(error) in {'PHASE_OPERATOR_CONFIRMATIONS_REQUIRED', 'AMBIGUOUS_OPERATOR_CONFIRMATIONS',
+                          'PHASE_MIGRATION_PERMISSION_MISMATCH'}:
+            phase = env.get('RELEASE_PHASE')
+            if isinstance(phase, str) and phase in REQUIRED:
+                incorrect = []
+                for key in CONFIRMATIONS:
+                    expected = 'true' if key in REQUIRED[phase] else 'false'
+                    if env.get('CONFIRM_' + key.upper(), 'false') != expected:
+                        incorrect.append('confirm_' + key + ' (expected ' + expected + ')')
+                expected = 'true' if phase == 'migrate-v8' else 'false'
+                if env.get('ALLOW_MIGRATIONS') != expected:
+                    incorrect.append('allow_migrations (expected ' + expected + ')')
+                if incorrect:
+                    raise DeploymentError(str(error) + ': incorrect_fields=' + ', '.join(incorrect)) from None
+        raise
+
+
+def _validate(env):
     operation = env.get('OPERATION')
     if operation == 'deploy':
         require(all(re.fullmatch(SHA, env.get(k, '')) for k in ['BACKEND_SHA', 'FRONTEND_SHA']), 'TWO_FULL_SOURCE_SHAS_REQUIRED')
