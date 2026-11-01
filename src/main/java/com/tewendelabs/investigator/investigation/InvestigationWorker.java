@@ -98,11 +98,12 @@ public class InvestigationWorker {
                 JsonNode data;
                 if (!prior.isEmpty()) {
                     var row = prior.getFirst();
-                    if (!hash.equals(row.get("source_hash")) || !provider.modelId().equals(row.get("model")) || !InvestigationSchemas.PROMPT.equals(row.get("prompt_version")) || !InvestigationSchemas.EXTRACTION.equals(row.get("schema_version")))
+                    if (!hash.equals(row.get("source_hash")) || !provider.modelId().equals(row.get("model"))
+                            || !InvestigationSchemas.compatibleExtractionCheckpoint((String) row.get("prompt_version"), (String) row.get("schema_version")))
                         throw new ApiFailure(409, "EXTRACTION_CHECKPOINT_MISMATCH");
                     data = JsonContract.parse((String) row.get("payload"));
                 } else {
-                    String task = "Extract every explicit normative requirement in these sources. Fields not explicitly stated must be null and listed in unknownFields. Obligation uses MUST, MUST_NOT, SHOULD, or MAY. Preserve all exceptions and applicability. Copy each supplied sourceId into processedSourceIds after covering its entire excerpt. Analysis date: " + snapshot.date() + ". Document effective date: " + effectiveDate(lease, version) + ". The document date is metadata and may be used only if a requirement has no more specific effective date.";
+                    String task = "Extract every explicit normative requirement in these sources. Fields not explicitly stated must be null and listed in unknownFields. Obligation uses MUST, MUST_NOT, SHOULD, or MAY. Preserve all exceptions and applicability. Copy each supplied sourceId into processedSourceIds after covering its entire excerpt. Analysis date (applicability context only, never an effective-date fallback): " + snapshot.date() + ". effectiveDate must be a complete valid ISO YYYY-MM-DD date grounded in explicit source text, or null if unknown, ambiguous or invalid. Never substitute metadata or the analysis date. Keep deadlines separate from effective dates.";
                     Result result = provider.reason(request(lease, InvestigationSchemas.EXTRACTION, task, sources));
                     data = EvidenceValidator.extraction(result.content(), sources, lease.id(), version);
                     final JsonNode saved = data;
@@ -135,6 +136,10 @@ public class InvestigationWorker {
                 return null;
             });
         } catch (RuntimeException e) {
+            if (e instanceof EvidenceValidator.InvalidEffectiveDate rejection) {
+                LoggerFactory.getLogger(getClass()).warn("effective_date_validation_rejected reason={} stage={} investigation_id={} version_id={} requirement_index={}",
+                        rejection.reason(), diagnosticStage, lease.id(), rejection.version(), rejection.requirementIndex());
+            }
             if (e instanceof EvidenceValidator.UnverifiableReference rejection) {
                 // Fixed vocabulary and investigation UUID only; the lease token is not a logging identifier.
                 LoggerFactory.getLogger(getClass()).warn("citation_validation_rejected reason={} stage={} investigation_id={}",
@@ -145,10 +150,6 @@ public class InvestigationWorker {
             finish(lease, checkpointed ? "PARTIAL" : "FAILED", code);
         }
         LoggerFactory.getLogger(getClass()).info("investigation_event job_id={} event=attempt_finished", lease.id());
-    }
-
-    private java.sql.Date effectiveDate(Lease lease, UUID version) {
-        return access.as(lease.actor(), () -> jdbc.queryForObject("select effective_date from policy_versions where id=?", java.sql.Date.class, version));
     }
 
     private Request request(Lease lease, String schema, String task, List<Source> sources) {

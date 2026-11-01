@@ -8,6 +8,7 @@ import com.tewendelabs.investigator.investigation.InvestigationService.Create;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 
 import static org.assertj.core.api.Assertions.*;
@@ -434,7 +435,8 @@ class SecurityDatabaseTest {
         for (var src : input.path("sources"))
             refs.add(Map.of("sourceId", src.path("sourceId").asString(), "quote", src.path("excerpt").asString()));
         Object content;
-        if (envelope.path("response_format").path("json_schema").path("name").asString().equals("requirements_v1")) {
+        if (envelope.path("response_format").path("json_schema").path("name").asString().equals(
+                com.tewendelabs.investigator.investigation.InvestigationSchemas.EXTRACTION.replace('-', '_'))) {
             var ref = refs.getFirst();
             var req = com.tewendelabs.investigator.investigation.StructuredValidationTest.requirement(fabricated ? UUID.randomUUID().toString() : (String) ref.get("sourceId"), (String) ref.get("quote"));
             List<String> sourceIds = refs.stream().map(r -> (String) r.get("sourceId")).toList();
@@ -482,6 +484,80 @@ class SecurityDatabaseTest {
         assertThat(investigationService.progress(analyst, fixture.id()).get("error_code")).isEqualTo("UNVERIFIABLE_SOURCE_REFERENCE");
         assertThat(investigationService.extractions(analyst, fixture.id())).isEmpty();
         assertThat(investigationService.findings(analyst, fixture.id()).get("complete")).isEqualTo(false);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false, INVALID_FORMAT", "true, INVALID_FORMAT", "false, INVALID_CALENDAR_DATE", "true, INVALID_CALENDAR_DATE"})
+    void invalidDateIsMeteredWithoutRetryAndPreservesOnlyEarlierCheckpoints(boolean afterCheckpoint, String reason) throws Exception {
+        var fixture = investigationFixture();
+        var lease = investigationLease(fixture.id());
+        int rejectedCall = afterCheckpoint ? 2 : 1;
+        String invalidDate = reason.equals("INVALID_FORMAT") ? "synthetic-private-date\nforged=true" : "2025-02-29";
+        var sent = new java.util.concurrent.atomic.AtomicInteger();
+        var requests = new ArrayList<String>();
+        when(metaTransport.send(anyString(), anyString(), any())).thenAnswer(inv -> {
+            String request = inv.getArgument(1);
+            requests.add(request);
+            var reply = fixtureReply(request, fixture, true, false);
+            if (sent.incrementAndGet() != rejectedCall) return reply;
+            var envelope = com.tewendelabs.investigator.investigation.JsonContract.parse(reply.body());
+            var message = (tools.jackson.databind.node.ObjectNode) envelope.path("choices").get(0).path("message");
+            var content = com.tewendelabs.investigator.investigation.JsonContract.parse(message.path("content").asString());
+            var requirements = (tools.jackson.databind.node.ArrayNode) content.path("requirements");
+            var invalid = (tools.jackson.databind.node.ObjectNode) requirements.get(0).deepCopy();
+            invalid.put("effectiveDate", invalidDate);
+            invalid.set("unknownFields", com.tewendelabs.investigator.investigation.JsonContract.tree(List.of("condition", "exceptions")));
+            requirements.add(invalid); // Index 1: the first requirement remains valid and unknown.
+            message.put("content", com.tewendelabs.investigator.investigation.JsonContract.encode(content));
+            return new com.tewendelabs.investigator.provider.MetaTransport.Reply(200,
+                    com.tewendelabs.investigator.investigation.JsonContract.encode(envelope));
+        });
+        var logger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(
+                com.tewendelabs.investigator.investigation.InvestigationWorker.class);
+        var previousLevel = logger.getLevel();
+        var logs = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        logs.start();
+        logger.setLevel(ch.qos.logback.classic.Level.INFO);
+        logger.addAppender(logs);
+        try {
+            investigationWorker.process(lease);
+            assertThat(investigationService.progress(analyst, fixture.id()))
+                    .containsEntry("state", afterCheckpoint ? "PARTIAL" : "FAILED")
+                    .containsEntry("stage", "STOPPED").containsEntry("error_code", "INVALID_EFFECTIVE_DATE")
+                    .containsEntry("calls", rejectedCall).containsEntry("metered_calls", rejectedCall)
+                    .containsEntry("prompt_tokens", 5 * rejectedCall).containsEntry("completion_tokens", 5 * rejectedCall);
+            verify(metaTransport, times(rejectedCall)).send(anyString(), anyString(), any());
+            var extractions = investigationService.extractions(analyst, fixture.id());
+            assertThat(extractions).hasSize(afterCheckpoint ? 1 : 0);
+            if (afterCheckpoint) {
+                assertThat(extractions.getFirst().get("version_id")).isEqualTo(fixture.baseline());
+                var saved = (tools.jackson.databind.JsonNode) extractions.getFirst().get("payload");
+                assertThat(saved.path("requirements").get(0).path("effectiveDate").isNull()).isTrue();
+            }
+            assertThat(admin.queryForObject("select count(*) from investigation_assessments where investigation_id=?", Integer.class, fixture.id())).isZero();
+            assertThat(investigationService.findings(analyst, fixture.id()).get("complete")).isEqualTo(false);
+            var events = logs.list.stream().filter(event -> event.getFormattedMessage().startsWith("effective_date_validation_rejected ")).toList();
+            assertThat(events).hasSize(1);
+            assertThat(events.getFirst().getFormattedMessage()).isEqualTo("effective_date_validation_rejected reason=" + reason
+                    + " stage=" + (afterCheckpoint ? "EXTRACTING_REPLACEMENT" : "EXTRACTING_BASELINE")
+                    + " investigation_id=" + fixture.id()
+                    + " version_id=" + (afterCheckpoint ? fixture.replacement() : fixture.baseline()) + " requirement_index=1");
+            for (var event : logs.list) {
+                assertThat(event.getThrowableProxy()).isNull();
+                assertThat(event.getFormattedMessage()).doesNotContain(invalidDate, "synthetic-private-date", "forged=true",
+                        lease.token().toString(), lease.actor().toString(), "Report incidents", "Training is mandatory");
+            }
+            for (String request : requests) {
+                var payload = com.tewendelabs.investigator.investigation.JsonContract.parse(request);
+                var input = com.tewendelabs.investigator.investigation.JsonContract.parse(payload.path("messages").get(1).path("content").asString());
+                assertThat(input.path("task").asString()).contains("never an effective-date fallback", "Never substitute metadata or the analysis date")
+                        .doesNotContain("Document effective date:");
+            }
+        } finally {
+            logger.detachAppender(logs);
+            logs.stop();
+            logger.setLevel(previousLevel);
+        }
     }
 
     @ParameterizedTest
@@ -645,8 +721,9 @@ class SecurityDatabaseTest {
         assertThatThrownBy(() -> investigationService.progress(analyst, fixture.id())).hasMessage("NOT_FOUND");
     }
 
-    @Test
-    void restartRecoveryReusesExtractionCheckpointAndFencesStaleLease() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void restartRecoveryReusesExtractionCheckpointAndFencesStaleLease(boolean legacy) throws Exception {
         var fixture = investigationFixture();
         demoProfile(analyst, finance);
         java.util.concurrent.atomic.AtomicInteger sent = new java.util.concurrent.atomic.AtomicInteger();
@@ -657,6 +734,8 @@ class SecurityDatabaseTest {
         var stale = investigationLease(fixture.id());
         assertThatThrownBy(() -> investigationWorker.process(stale)).isInstanceOf(AssertionError.class);
         assertThat(investigationService.extractions(analyst, fixture.id())).hasSize(1);
+        if (legacy) admin.update("update requirement_extractions set prompt_version='policy-investigator-2026-10-27-v1',schema_version='requirements-v1' where investigation_id=?", fixture.id());
+        var checkpoint = admin.queryForMap("select payload::text,source_hash,model,prompt_version,schema_version from requirement_extractions where investigation_id=?", fixture.id());
         admin.update("update investigation_jobs set lease_until=now()-interval '1 second' where id=?", fixture.id());
         var recovered = investigationLease(fixture.id());
         successfulTransport(fixture);
@@ -666,6 +745,9 @@ class SecurityDatabaseTest {
         assertThat(investigationService.progress(analyst, fixture.id()).get("calls")).isEqualTo(5);
         assertThat(admin.queryForObject("select meta_attempts from demo_access where user_id=?", Long.class, analyst)).isEqualTo(5);
         assertThat(admin.queryForObject("select attempts from demo_meta_budget", Long.class)).isEqualTo(5);
+        assertThat(admin.queryForMap("select payload::text,source_hash,model,prompt_version,schema_version from requirement_extractions where investigation_id=? and version_id=?", fixture.id(), fixture.baseline())).isEqualTo(checkpoint);
+        var findings = (tools.jackson.databind.JsonNode) investigationService.findings(analyst, fixture.id()).get("payload");
+        assertThat(findings.path("complete").asBoolean()).isTrue();
     }
 
     private String token(UUID actor) {

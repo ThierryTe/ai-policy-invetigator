@@ -97,7 +97,7 @@ class V8MigrationDatabaseTest {
                         completed.replacement(), List.of(completed.procedure()), DATE),
                 extracted(completed), sources(completed));
         admin.update("insert into investigation_assessments values(?,?,?::jsonb,?,?,?)", UUID.randomUUID(),
-                completed.id(), JsonContract.encode(assessment), "muse-spark-1.3", InvestigationSchemas.PROMPT, InvestigationSchemas.ASSESSMENT);
+                completed.id(), JsonContract.encode(assessment), "muse-spark-1.3", "policy-investigator-2026-10-27-v1", InvestigationSchemas.ASSESSMENT);
         admin.update("update investigation_jobs set state='COMPLETED',stage='COMPLETED',calls=4,metered_calls=4 where id=?", completed.id());
         admin.update("insert into finding_reviews(id,investigation_id,finding_id,reviewer_id,action) values(?,?,?,?,'CONFIRM')",
                 UUID.randomUUID(), completed.id(), UUID.fromString(assessment.path("assessments").get(0).path("id").asString()), completed.actor());
@@ -212,7 +212,7 @@ class V8MigrationDatabaseTest {
         var src = sources(f).stream().filter(s -> s.versionId().equals(version)).toList();
         String hash = PolicyService.sha256(JsonContract.encode(src).getBytes(java.nio.charset.StandardCharsets.UTF_8));
         admin.update("insert into requirement_extractions values(?,?,?::jsonb,?,?,?,?)", f.id(), version,
-                JsonContract.encode(extraction(f, version)), hash, "muse-spark-1.3", InvestigationSchemas.PROMPT, InvestigationSchemas.EXTRACTION);
+                JsonContract.encode(extraction(f, version)), hash, "muse-spark-1.3", "policy-investigator-2026-10-27-v1", "requirements-v1");
     }
 
     static Map<String, Object> assessment(Fixture f) {
@@ -316,7 +316,7 @@ class V8MigrationDatabaseTest {
             var envelope = JsonContract.parse(payload);
             var input = JsonContract.parse(envelope.path("messages").get(1).path("content").asString());
             Object content;
-            if (envelope.path("response_format").path("json_schema").path("name").asString().equals("requirements_v1")) {
+            if (envelope.path("response_format").path("json_schema").path("name").asString().equals(InvestigationSchemas.EXTRACTION.replace('-', '_'))) {
                 var src = input.path("sources").get(0);
                 content = Map.of("requirements", List.of(StructuredValidationTest.requirement(src.path("sourceId").asString(), TEXT)),
                         "processedSourceIds", List.of(src.path("sourceId").asString()), "complete", true, "limitations", List.of());
@@ -357,7 +357,8 @@ class V8MigrationDatabaseTest {
             try (var r = p.executeQuery()) { while (r.next()) assertThat(r.getObject(1)).isNotEqualTo(running.id()); }
             c.rollback();
         }
-        String checkpoint = admin.queryForObject("select payload::text from requirement_extractions where investigation_id=?", String.class, running.id());
+        var checkpoint = admin.queryForMap("select payload::text,source_hash,model,prompt_version,schema_version from requirement_extractions where investigation_id=?", running.id());
+        assertThat(checkpoint).containsEntry("schema_version", "requirements-v1").containsEntry("prompt_version", "policy-investigator-2026-10-27-v1");
         var deadline = admin.queryForObject("select deadline_at from investigation_jobs where id=?", java.sql.Timestamp.class, running.id());
         admin.update("update investigation_jobs set lease_until=now()-interval '1 second' where id=?", running.id());
         var lease = claim(running);
@@ -366,7 +367,7 @@ class V8MigrationDatabaseTest {
         assertThat(jdbc.queryForObject("select finish_investigation(?,?,'COMPLETED',null)", Boolean.class, running.id(), oldLease)).isFalse();
         CompletableFuture.runAsync(() -> worker.process(lease)).get(30, TimeUnit.SECONDS);
         assertThat(service.progress(running.actor(), running.id())).containsEntry("state", "COMPLETED").containsEntry("calls", 4).containsEntry("attempts", 2);
-        assertThat(admin.queryForObject("select payload::text from requirement_extractions where investigation_id=? and version_id=?", String.class, running.id(), running.baseline())).isEqualTo(checkpoint);
+        assertThat(admin.queryForMap("select payload::text,source_hash,model,prompt_version,schema_version from requirement_extractions where investigation_id=? and version_id=?", running.id(), running.baseline())).isEqualTo(checkpoint);
         verify(transport, times(3)).send(anyString(), anyString(), any());
     }
 

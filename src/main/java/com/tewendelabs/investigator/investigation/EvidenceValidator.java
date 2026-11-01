@@ -2,6 +2,8 @@ package com.tewendelabs.investigator.investigation;
 
 import java.util.*;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.regex.Pattern;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -10,6 +12,27 @@ import com.tewendelabs.investigator.api.ApiFailure;
 
 public final class EvidenceValidator {
     private static final Set<String> FIELDS = Set.of("actor", "action", "obligation", "condition", "scope", "deadline", "exceptions", "effectiveDate");
+    private static final Pattern ISO_DATE = Pattern.compile("[0-9]{4}-[0-9]{2}-[0-9]{2}");
+
+    enum DateRejectionReason { INVALID_FORMAT, INVALID_CALENDAR_DATE }
+
+    /** No raw date or parser exception: both may contain private model/document content. Index is zero-based. */
+    static final class InvalidEffectiveDate extends ApiFailure {
+        private final DateRejectionReason reason;
+        private final UUID version;
+        private final int requirementIndex;
+
+        private InvalidEffectiveDate(DateRejectionReason reason, UUID version, int requirementIndex) {
+            super(502, "INVALID_EFFECTIVE_DATE");
+            this.reason = reason;
+            this.version = version;
+            this.requirementIndex = requirementIndex;
+        }
+
+        DateRejectionReason reason() { return reason; }
+        UUID version() { return version; }
+        int requirementIndex() { return requirementIndex; }
+    }
 
     enum ReferenceRejectionReason { UNKNOWN_SOURCE_ID, BLANK_QUOTE, NONLITERAL_QUOTE }
 
@@ -55,10 +78,16 @@ public final class EvidenceValidator {
             for (String field : FIELDS)
                 if (req.path(field).isNull() != unknown.contains(field))
                     throw new ApiFailure(502, "UNKNOWN_FIELD_INVALID");
-            if (!req.path("effectiveDate").isNull()) try {
-                LocalDate.parse(req.path("effectiveDate").asString());
-            } catch (RuntimeException e) {
-                throw new ApiFailure(502, "INVALID_EFFECTIVE_DATE");
+            if (!req.path("effectiveDate").isNull()) {
+                String date = req.path("effectiveDate").asString();
+                if (!ISO_DATE.matcher(date).matches())
+                    throw new InvalidEffectiveDate(DateRejectionReason.INVALID_FORMAT, version, index);
+                try {
+                    // ISO_LOCAL_DATE uses strict calendar resolution; never trim, normalize or supply a fallback.
+                    LocalDate.parse(date);
+                } catch (DateTimeParseException e) {
+                    throw new InvalidEffectiveDate(DateRejectionReason.INVALID_CALENDAR_DATE, version, index);
+                }
             }
             ((ObjectNode) req).put("id", UUID.nameUUIDFromBytes((investigation + ":" + version + ":" + (index++)).getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString());
         }

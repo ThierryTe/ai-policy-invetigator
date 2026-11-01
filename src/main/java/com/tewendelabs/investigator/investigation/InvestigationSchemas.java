@@ -7,14 +7,24 @@ import tools.jackson.databind.JsonNode;
 import static com.tewendelabs.investigator.investigation.JsonContract.*;
 
 public final class InvestigationSchemas {
-    public static final String EXTRACTION = "requirements-v1", ASSESSMENT = "impact-v1", PROMPT = "policy-investigator-2026-10-27-v1";
+    public static final String EXTRACTION = "requirements-v2", ASSESSMENT = "impact-v1", PROMPT = "policy-investigator-2026-11-02-v2";
+
+    /** Previously validated v1 checkpoints remain immutable and reusable under the same model and source hash. */
+    static boolean compatibleExtractionCheckpoint(String prompt, String schema) {
+        return PROMPT.equals(prompt) && EXTRACTION.equals(schema)
+                || "policy-investigator-2026-10-27-v1".equals(prompt) && "requirements-v1".equals(schema);
+    }
 
     public static JsonNode schema(String version) {
         var reference = object(Map.of("sourceId", text(), "quote", Map.of("type", "string", "minLength", 1, "maxLength", 2000)));
         var refs = array(reference, 1, 12);
         Map<String, Object> fields = new LinkedHashMap<>();
-        for (String name : List.of("actor", "action", "obligation", "condition", "scope", "deadline", "effectiveDate"))
+        for (String name : List.of("actor", "action", "obligation", "condition", "scope"))
             fields.put(name, nullable());
+        fields.put("deadline", Map.of("type", List.of("string", "null"), "maxLength", 2000,
+                "description", "The requirement's deadline or relative timing, not its effective date."));
+        fields.put("effectiveDate", Map.of("type", List.of("string", "null"), "maxLength", 2000,
+                "description", "A complete, valid calendar date in ISO YYYY-MM-DD (four-digit year, two-digit month and day), grounded in explicit source text. Convert an explicit textual date only when unambiguous. If unknown, ambiguous or invalid, return null, include effectiveDate in unknownFields and explain in limitations. Never substitute the analysis date or document metadata. Do not confuse a deadline with an effective date."));
         fields.put("exceptions", Map.of("type", List.of("array", "null"), "items", text(), "maxItems", 20));
         fields.put("unknownFields", strings());
         fields.put("sourceReferences", refs);
