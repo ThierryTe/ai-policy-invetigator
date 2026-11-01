@@ -13,13 +13,15 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import run_production_deploy as pipeline
 import run_reviewed_release as reviewed
+import release_safety as safety
+import transfer_production_release as transport
 import validate_release_dispatch as dispatch
 from deploy_local_images import DeploymentError
 from reviewed_v8_release import APPROVED
 from test_release_safety import release
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = ROOT / '.github/workflows/deploy-production.yml'
+WORKFLOW = ROOT / '.github/legacy-workflows/deploy-production.yml'
 SCRIPT = ROOT / 'scripts/validate_release_dispatch.py'
 REQUIRED = {'github_protection', 'write_freeze', 'image_qualification',
             'v8_acceptance', 'worker_reactivation'}
@@ -61,10 +63,10 @@ class ActivationDispatchTest(unittest.TestCase):
         return subprocess.run([sys.executable, '-B', str(SCRIPT), '--event-file', str(path)],
                               env=env, capture_output=True, text=True, timeout=10)
 
-    def execute_cli(self, path, output, env):
+    def execute_cli(self, path, output, env, configuration_sha='a' * 40):
         # Deliberately conflicting old CLI/env inputs cannot alter the event form.
         argv = ['run_production_deploy.py', '--event-file', str(path), '--output', str(output),
-                '--configuration-sha', 'a' * 40, '--operation', 'rollback',
+                '--configuration-sha', configuration_sha, '--operation', 'rollback',
                 '--backend-sha', 'd' * 40, '--frontend-sha', 'e' * 40,
                 '--rollback-release', 'r999-1', '--allow-migrations']
         out, err = io.StringIO(), io.StringIO()
@@ -201,6 +203,75 @@ class ActivationDispatchTest(unittest.TestCase):
         form['allow_migrations'] = True
         self.assert_rejected(form, 'PHASE_MIGRATION_PERMISSION_MISMATCH: '
                              'incorrect_fields=allow_migrations (expected false)\n')
+
+    def test_activation_requires_prepared_release_equal_to_expected_previous_before_ssh(self):
+        for value in [None, '', 'not-a-release', 'r999-1']:
+            form = self.form()
+            form['expected_previous'] = 'r041243000818-11'
+            if value is None:
+                form.pop('prepared_release')
+            else:
+                form['prepared_release'] = value
+            code = ('ACTIVATION_PREPARED_RELEASE_MISMATCH: divergent_fields=prepared_release,expected_previous'
+                    if value == 'r999-1' else 'ACTIVATION_PREPARED_RELEASE_REQUIRED: incorrect_fields=prepared_release')
+            with self.subTest(value=value):
+                self.assert_rejected(form, code)
+
+    def test_migration_ids_survive_event_payload_scp_ssh_and_server_configuration_comparison(self):
+        from test_production_release import TransportTest
+        retained = 'r041243000818-11'
+        original_sha = 'a5b867b79504a59292cd52190908b51ec8c22080'
+        newer_sha = '3d78daf745bc98f361ed8b5b0b28ba80044d9957'
+        real_execute = transport.execute
+        for configuration_sha in [original_sha, newer_sha]:
+            with self.subTest(configuration_sha=configuration_sha), tempfile.TemporaryDirectory() as temp:
+                form = self.form()
+                form.update(prepared_release=retained, expected_previous=retained)
+                path = Path(temp) / 'event.json'
+                path.write_text(json.dumps({'inputs': form}))
+                env = {**self.stale_environment(), **TransportTest.ENV}
+                previous = release('migrate-v8')
+                previous.update(id=retained, configurationSha=original_sha)
+                commands, payloads = [], []
+
+                def prepare(directory, backend, frontend, configuration, identity, **kwargs):
+                    directory.mkdir()
+                    data = release('activate-v8')
+                    data.update(id=identity, configurationSha=configuration)
+                    return data
+
+                def execute(command, code, **kwargs):
+                    commands.append(command)
+                    if '/scripts/production_release.py deploy ' not in command[-1]:
+                        return ''  # SSH mkdir and SCP are simulated; nothing leaves this host.
+                    data = json.loads((Path(temp) / 'r0123-21/release.json').read_text())
+                    payloads.append(data)
+                    self.assertEqual(data['expectedPrevious'], retained)
+                    self.assertEqual(data['releaseSafety']['expected_previous'], retained)
+                    self.assertNotIn('--allow-migrations', command[-1])
+                    try:
+                        safety.validate_target(data, previous, [{'version': str(n)} for n in range(1, 9)], 'activate-v8')
+                    except DeploymentError as error:
+                        reply = subprocess.CompletedProcess(command, 2, '', str(error) + '\nprivate-ssh-marker\n')
+                        with patch.object(transport.subprocess, 'run', return_value=reply):
+                            return real_execute(command, code)
+                    return json.dumps({'id': data['id'], 'result': 'VALIDATED'})
+
+                with patch.object(pipeline, 'current_release', return_value=retained), \
+                        patch.object(pipeline, 'prepare', side_effect=prepare), \
+                        patch.object(transport, 'execute', side_effect=execute):
+                    code, out, err = self.execute_cli(path, Path(temp), env, configuration_sha)
+                self.assertEqual(len(payloads), 1)
+                self.assertTrue(any(any(str(Path(temp) / 'r0123-21/release.json') == arg for arg in cmd)
+                                    for cmd in commands))
+                self.assertIn('production_release.py deploy r0123-21 --env-file ', commands[-1][-1])
+                self.assertNotIn('private-ssh-marker', out + err)
+                if configuration_sha == original_sha:
+                    self.assertEqual(code, 0, err)
+                else:
+                    self.assertEqual(code, 2)
+                    self.assertEqual(err, 'SSH_RELEASE_FAILED: ACTIVATION_MUST_REUSE_MIGRATION_RELEASE: '
+                                         'divergent_fields=configurationSha\n')
 
     def test_all_nine_incorrect_fields_are_reported_together_without_weakening_gates(self):
         form = self.form()

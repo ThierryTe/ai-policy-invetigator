@@ -313,6 +313,20 @@ class TransportTest(unittest.TestCase):
         with patch.object(transport.subprocess, 'run', side_effect=OSError('private-marker')):
             with self.assertRaisesRegex(DeploymentError, '^SSH_NETWORK_FAILED$'): transport.execute(['ssh'], 'SSH_NETWORK_FAILED')
 
+    def test_ssh_preserves_only_allowlisted_activation_field_names(self):
+        prefix = 'ACTIVATION_MUST_REUSE_MIGRATION_RELEASE'
+        for fields, expected in [
+                ('configurationSha,runtime', ': divergent_fields=configurationSha,runtime'),
+                ('backendSha,frontendSha,configurationSha,configuration,runtime,migrations',
+                 ': divergent_fields=backendSha,frontendSha,configurationSha,configuration,runtime,migrations'),
+                ('configurationSha,private-secret', ''), ('runtime=/private/path', ''),
+                ('runtime,runtime', ''), ('', ''), ('runtime;echo private', '')]:
+            reply = subprocess.CompletedProcess(['ssh'], 2, '', prefix + ': divergent_fields=' + fields + '\nprivate-stderr\n')
+            with self.subTest(fields=fields), patch.object(transport.subprocess, 'run', return_value=reply), \
+                    self.assertRaises(DeploymentError) as error:
+                transport.execute(['ssh'], 'SSH_RELEASE_FAILED')
+            self.assertEqual(str(error.exception), 'SSH_RELEASE_FAILED: ' + prefix + expected)
+
     def test_dispatch_validates_explicit_pair_and_exclusive_rollback(self):
         from test_release_safety import attestations
         dispatch.validate({**attestations(), 'OPERATION': 'deploy', 'BACKEND_SHA': BACK,

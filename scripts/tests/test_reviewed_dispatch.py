@@ -15,7 +15,7 @@ import run_reviewed_release as runner
 from deploy_local_images import DeploymentError
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = ROOT / '.github/workflows/deploy-production.yml'
+WORKFLOW = ROOT / '.github/legacy-workflows/deploy-production.yml'
 SCRIPT = ROOT / 'scripts/run_reviewed_release.py'
 
 

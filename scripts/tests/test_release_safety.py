@@ -70,9 +70,10 @@ class AttestationTest(unittest.TestCase):
     def test_dispatch_permissions_and_rollback_remain_exclusive(self):
         base = {'OPERATION': 'deploy', 'BACKEND_SHA': BACK, 'FRONTEND_SHA': FRONT, 'ROLLBACK_RELEASE': ''}
         for phase, allow in [('migrate-v8', 'true'), ('activate-v8', 'false')]:
-            dispatch.validate({**base, **attestations(phase), 'ALLOW_MIGRATIONS': allow})
+            phase_base = {**base, 'PREPARED_RELEASE': 'r122-1'} if phase == 'activate-v8' else base
+            dispatch.validate({**phase_base, **attestations(phase), 'ALLOW_MIGRATIONS': allow})
             with self.assertRaises(DeploymentError):
-                dispatch.validate({**base, **attestations(phase), 'ALLOW_MIGRATIONS': str(allow != 'true').lower()})
+                dispatch.validate({**phase_base, **attestations(phase), 'ALLOW_MIGRATIONS': str(allow != 'true').lower()})
         dispatch.validate({'OPERATION': 'rollback', 'ROLLBACK_RELEASE': 'r121-1', 'ALLOW_MIGRATIONS': 'false'})
         with self.assertRaises(DeploymentError):
             dispatch.validate({'OPERATION': 'rollback', 'ROLLBACK_RELEASE': 'r121-1', 'ALLOW_MIGRATIONS': 'true'})
@@ -123,6 +124,24 @@ class ArtifactBindingTest(unittest.TestCase):
             with self.assertRaises(DeploymentError): safety.validate_target(data, previous, bad, 'activate-v8')
         with self.assertRaises(DeploymentError):
             safety.validate_target(release(), {'id': 'r122-1'}, applied, 'migrate-v8')
+
+    def test_activation_names_every_changed_or_missing_identity_field_without_values(self):
+        data = release('activate-v8')
+        previous = copy.deepcopy(data)
+        previous.update(id='r122-1', releaseSafety=safety.from_environment(attestations()))
+        applied = [{'version': str(n)} for n in range(1, 9)]
+        for key in safety.ACTIVATION_IDENTITY_FIELDS:
+            changed = copy.deepcopy(previous)
+            changed[key] = 'private-value-do-not-print'
+            with self.subTest(field=key), self.assertRaises(DeploymentError) as error:
+                safety.validate_target(data, changed, applied, 'activate-v8')
+            self.assertEqual(str(error.exception), 'ACTIVATION_MUST_REUSE_MIGRATION_RELEASE: divergent_fields=' + key)
+        for key in safety.ACTIVATION_IDENTITY_FIELDS:
+            del previous[key]
+        with self.assertRaises(DeploymentError) as error:
+            safety.validate_target(data, previous, applied, 'activate-v8')
+        self.assertEqual(str(error.exception), 'ACTIVATION_MUST_REUSE_MIGRATION_RELEASE: divergent_fields='
+                         + ','.join(safety.ACTIVATION_IDENTITY_FIELDS))
 
 
 class WorkerTest(unittest.TestCase):
@@ -309,13 +328,13 @@ class ControllerGateTest(unittest.TestCase):
 
 class WorkflowSafetyTest(unittest.TestCase):
     def test_push_ci_keeps_publication_but_has_no_deploy_job(self):
-        text = (safety.ROOT / '.github/workflows/verify.yml').read_text()
+        text = (safety.ROOT / '.github/legacy-workflows/verify.yml').read_text()
         self.assertIn('uses: ./.github/workflows/publish-images.yml', text)
         self.assertNotIn('deploy-production.yml', text)
         self.assertIsNone(re.search(r'^  deploy:', text, re.M))
 
     def test_manual_main_backend_only_and_confirmations_precede_credentials(self):
-        text = (safety.ROOT / '.github/workflows/deploy-production.yml').read_text()
+        text = (safety.ROOT / '.github/legacy-workflows/deploy-production.yml').read_text()
         guard = next(line for line in text.splitlines() if line.strip().startswith('if:'))
         for required in ("github.event_name == 'workflow_dispatch'", "github.ref == 'refs/heads/main'",
                          "github.repository == 'ThierryTe/ai-policy-invetigator'"):

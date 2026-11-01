@@ -1,0 +1,102 @@
+name: CI — test and publish
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  repository_dispatch:
+    types: [frontend-main]
+permissions:
+  contents: read
+concurrency:
+  group: simple-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  test-and-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check out frontend main once; record its exact revision
+        id: frontend
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ThierryTe/ai-policy-invetigator-frontend
+          ref: main
+          path: .ci/frontend
+          token: ${{ secrets.FRONTEND_READ_TOKEN || github.token }}
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: .ci/frontend/package-lock.json
+      - name: Backend tests, including isolated PostgreSQL security and migration fixtures
+        env:
+          SPRINGDOTENV_ENABLED: 'false'
+        run: ./mvnw -B -Pneural-embeddings,database-tests verify
+      - name: Deployment unit tests (no SSH, registry, production database or inference)
+        run: python3 -B -m unittest discover -s scripts/tests -p 'test_simple_*.py' -v
+      - name: Frontend tests
+        working-directory: .ci/frontend
+        run: |
+          npm install --global npm@11.8.0 --no-audit --no-fund
+          npm ci --no-audit --no-fund
+          npm test
+      - name: Build images once; publish only main pushes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FRONTEND_SHA: ${{ steps.frontend.outputs.commit }}
+          PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+          BUILDX_GIT_INFO: 'false'
+          BUILDX_GIT_LABELS: 'false'
+        run: |
+          set -euo pipefail
+          if [ "$PUBLISH" = true ]; then
+            printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+            output=--push
+          else
+            output=--load
+          fi
+          docker buildx build --platform linux/amd64 "$output" \
+            --file deploy/backend/Dockerfile \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.source=https://github.com/ThierryTe/ai-policy-invetigator" \
+            --tag "ghcr.io/thierryte/ai-policy-invetigator:sha-$GITHUB_SHA" \
+            --metadata-file "$RUNNER_TEMP/backend.json" .
+          docker buildx build --platform linux/amd64 "$output" \
+            --label "org.opencontainers.image.revision=$FRONTEND_SHA" \
+            --label "org.opencontainers.image.source=https://github.com/ThierryTe/ai-policy-invetigator-frontend" \
+            --tag "ghcr.io/thierryte/ai-policy-invetigator-frontend:sha-$FRONTEND_SHA" \
+            --metadata-file "$RUNNER_TEMP/frontend.json" .ci/frontend
+      - name: Save the image pair and tested deployment files
+        if: github.event_name != 'pull_request'
+        env:
+          FRONTEND_SHA: ${{ steps.frontend.outputs.commit }}
+          BACKEND_METADATA: ${{ runner.temp }}/backend.json
+          FRONTEND_METADATA: ${{ runner.temp }}/frontend.json
+        run: |
+          mkdir -p .ci/deployment
+          cp compose.yaml compose.production.yaml .ci/deployment/
+          cp deploy/simple/compose.images.yaml deploy/simple/compose.frontend.yaml .ci/deployment/
+          cp scripts/simple_deploy.py scripts/ci_images.py .ci/deployment/
+          python3 -B scripts/ci_images.py record --file .ci/deployment/images.json
+          cat .ci/deployment/images.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: github.event_name != 'pull_request'
+        with:
+          name: deployment-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .ci/deployment/
+          if-no-files-found: error
+          retention-days: 90

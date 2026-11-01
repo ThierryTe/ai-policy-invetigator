@@ -1,0 +1,16 @@
+# Install in the frontend repository as .github/workflows/verify.yml, replacing
+# its old tests/publish/deploy chain. Backend CI tests and publishes both images.
+name: Request application CI
+on:
+  push:
+    branches: [main]
+permissions: {}
+jobs:
+  request-ci:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Trigger coordinated CI in the backend repository
+        env:
+          GH_TOKEN: ${{ secrets.BACKEND_CI_TOKEN }}
+        run: gh api --method POST repos/ThierryTe/ai-policy-invetigator/dispatches -f event_type=frontend-main

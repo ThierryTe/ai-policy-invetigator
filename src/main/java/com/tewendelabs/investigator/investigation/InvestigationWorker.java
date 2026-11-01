@@ -32,6 +32,7 @@ public class InvestigationWorker {
     private final int budgetSeconds;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean active = new AtomicBoolean();
+    private volatile long lastSuccessfulPoll;
 
     public InvestigationWorker(JdbcTemplate jdbc, ScopedAccess access, InvestigationService service, PolicyReasoningProvider provider, DatabaseSafetyCheck safety, @Value("${app.investigation.worker-enabled:true}") boolean enabled, @Value("${app.investigation.budget-seconds:240}") int budgetSeconds) {
         if(budgetSeconds<30 || budgetSeconds>600)throw new IllegalArgumentException("Invalid investigation deadline budget");
@@ -49,6 +50,7 @@ public class InvestigationWorker {
         if (!enabled || !safety.ready() || !active.compareAndSet(false, true)) return;
         try {
             Lease lease = claim();
+            lastSuccessfulPoll = System.nanoTime();
             if (lease == null) {
                 active.set(false);
                 return;
@@ -67,6 +69,12 @@ public class InvestigationWorker {
 
     public Lease claim() {
         return jdbc.query("select * from claim_investigation(?)", (r, n) -> new Lease(r.getObject("id", UUID.class), r.getObject("requested_by", UUID.class), r.getObject("lease_token", UUID.class), r.getTimestamp("deadline_at").toInstant()),budgetSeconds).stream().findFirst().orElse(null);
+    }
+
+    public boolean operational() {
+        long grace = active.get() ? budgetSeconds + 60L : 30L;
+        return enabled && safety.ready() && !executor.isShutdown() && lastSuccessfulPoll != 0
+                && System.nanoTime() - lastSuccessfulPoll < grace * 1_000_000_000L;
     }
 
     public void process(Lease lease) {
