@@ -3,7 +3,7 @@
 **Current status: CI/CD automation is prepared locally; no production workflow was
 dispatched, backup created, application stopped or migration applied. V8 remains HOLD.**
 The preferred path is now the existing
-[`deploy-production.yml`](../.github/workflows/deploy-production.yml) workflow's
+[`deploy-production.yml`](../.github/legacy-workflows/deploy-production.yml) workflow's
 `prepare-reviewed` and `deploy-reviewed` operations. See the exact inputs and
 approval boundary in [REVIEWED_V8_DEPLOYMENT.md](REVIEWED_V8_DEPLOYMENT.md).
 No image rebuild is involved. The SQL files below and the PostgreSQL initializer

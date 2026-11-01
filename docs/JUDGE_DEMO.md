@@ -1,6 +1,6 @@
 # Interactive judge access
 
-For the judge-facing walkthrough, use [Judge quickstart](JUDGE_QUICKSTART.md).
+For the judge-facing walkthrough, use [Judge quickstart](TESTING.md#judge-walkthrough).
 This guide describes operator provisioning, access boundaries and persistent limits.
 
 Judge access uses the existing roles and RLS boundary. There is no `DEMO_TESTER` role,

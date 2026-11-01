@@ -1,202 +1,97 @@
 # AI Policy Investigator
 
-Built for the Meta Global AI Developer Hackathon 2026.
+Built for the **Meta Global AI Developer Hackathon 2026**.
 
-**Judges: [start with the two-minute walkthrough](docs/JUDGE_QUICKSTART.md).**
-A policy now requires training **before access**, but an HR procedure still grants
-access on day one. See the potential conflict, the exact PDF evidence and the action
-an analyst can review. The walkthrough starts with an existing result and needs no
-new AI request.
+**A policy changes. Which procedures need attention, and what is the evidence?**
+AI Policy Investigator helps compliance analysts compare a policy with its replacement
+and selected procedures, inspect potential conflicts against original PDF evidence,
+and record a human decision.
 
-AI Policy Investigator helps compliance analysts assess a policy change against
-related enterprise procedures. It extracts requirements, compares the old and new
-policy, detects potential conflicts and presents exact source evidence for human
-review. It is an investigation workflow rather than a generic RAG chatbot.
-
-The Angular application lives in the separate
-[ai-policy-invetigator-frontend repository](https://github.com/ThierryTe/ai-policy-invetigator-frontend).
-The backend repository is [ThierryTe/ai-policy-invetigator](https://github.com/ThierryTe/ai-policy-invetigator).
-Use the published repository/package names as shown; local checkout directories may differ.
-
-## What the application does
-
-1. Upload a baseline policy, an immutable replacement version and procedure PDFs.
-2. Index page-aware source text using local ONNX embeddings and PostgreSQL/pgvector.
-3. Explicitly authorize external processing for the selected documents.
-4. Run a durable asynchronous investigation and poll its persisted progress.
-5. Inspect changed requirements, potential conflicts, source quotations and an impact graph.
-6. Confirm, dismiss or annotate a finding while preserving its original AI result.
-
-Findings are CONTRADICTION, MISSING_REQUIREMENT, AMBIGUITY or NO_CONFLICT. The system
-preserves unknown fields and distinguishes incomplete processing from a non-conflict.
-Actionable findings require human review; suggested actions do not modify policies
-or grant access automatically.
-
-The MVP compares one to four explicitly selected procedure versions. It does not
-claim automatic discovery of every affected procedure across an enterprise. Original
-PDFs, versions, page provenance, jobs, findings and review history remain persisted.
-
-## Real demonstration
-
-The recorded synthetic scenario contrasts **training before sensitive-system access**
-with **day-one access and training within 30 days**, plus a compatible access-gated
-procedure. It used real Meta `muse-spark-1.3` inference and persisted, verified citations.
-Human review is separate from the AI result: Confirm, Dismiss and Add Note preserve
-original classification/evidence and append reviewer decisions rather than replacing them.
-
-View the existing frontend captures:
-[desktop investigation](https://github.com/ThierryTe/ai-policy-invetigator-frontend/blob/main/docs/screenshots/desktop-fitted-investigation.png),
-[mobile investigation](https://github.com/ThierryTe/ai-policy-invetigator-frontend/blob/main/docs/screenshots/mobile-fitted-investigation.png),
-and [source PDF viewer](https://github.com/ThierryTe/ai-policy-invetigator-frontend/blob/main/docs/screenshots/pdf-real-source.png).
-These show synthetic documents and actual model/review data; they do not establish
-public-site availability or general model accuracy. See [the reproducible demo](docs/DEMO.md).
-
-## Architecture
-
-| Component | Implementation |
+| Start here | Purpose |
 |---|---|
-| Backend | Java 21, Spring Boot 4.1.1, Spring AI 2.0.1, Maven wrapper 3.9.16 |
-| Storage | PostgreSQL 16, pgvector 0.8.0, parameterized JDBC and Spring Data JPA |
-| Security | Spring Security/JWT, current memberships/grants, forced SQL row-level security |
-| PDF ingestion | PDFBox, immutable bytes/versions, page-aware chunks and durable workers |
-| Embeddings | Local all-MiniLM-L6-v2 ONNX, pinned artifacts, 384 dimensions |
-| Reasoning | Meta Muse (`muse-spark-1.3`) behind PolicyReasoningProvider; independent of embeddings |
-| Frontend | Angular 21 standalone components, signals, OnPush and HttpClient |
-| Deployment | Docker/Compose, Nginx frontend, existing Nginx Proxy Manager, GitHub Actions |
+| [Architecture](docs/ARCHITECTURE.md) | Components, AI pipeline, security and infrastructure |
+| [Testing](docs/TESTING.md) | Judge walkthrough, local setup, scenarios and recorded evaluation |
+| [Frontend source](https://github.com/ThierryTe/ai-policy-invetigator-frontend) | Angular application; backend source is this repository |
 
-Access is checked at database retrieval and before every provider request, including
-retries. Findings and evidence require current access to every contributing source.
-Only explicitly consented documents can be sent to Meta. Schema and citation validation
-are enforced by the server; citation correctness is not proof that AI reasoning is
-correct. JWTs stay in frontend memory rather than localStorage.
+## Problem and solution
 
-Read the [technical architecture](docs/ARCHITECTURE.md) for the data model, authorization,
-provider boundary, durability and processing limits.
+A new policy can make an existing procedure incompatible without changing that
+procedure's wording. Reviewing the policy alone misses the operational consequence.
 
-## Run the local demonstration
+The application compares an immutable baseline, its direct replacement and **one to
+four explicitly selected procedure versions**. It connects changed requirements,
+potential issues, source quotations and suggested actions in one investigation.
+An analyst can confirm, dismiss or annotate a finding while preserving the AI output.
 
-Use Docker/Compose with Linux/amd64 images for the verified native embedding runtime.
-Python 3.11+ supports operator tools; Java 21 is needed for host builds and Node 22/npm 11.8.0
-for frontend development.
+## Implemented workflow
 
-For a fresh backend checkout:
+1. Upload policy and procedure PDFs; retain original bytes and immutable versions.
+2. Index page-aware text with local ONNX embeddings and PostgreSQL/pgvector.
+3. Explicitly authorize external processing for the selected documents.
+4. Start an asynchronous investigation and follow its persisted progress.
+5. Inspect requirements, findings, exact quotations, original PDFs and the impact graph.
+6. Record human review decisions separately from the original classification and evidence.
 
-```sh
-cp .env.example .env
-chmod 600 .env
-# Populate private values in your editor; preserve any existing .env instead.
-docker compose --env-file .env --profile app up --build -d --wait
-```
+Classifications are `CONTRADICTION`, `MISSING_REQUIREMENT`, `AMBIGUITY` and `NO_CONFLICT`.
+Incomplete processing and provider failures remain explicit; they are never successful
+no-conflict assessments. Suggested actions require review and do not modify policies.
 
-The local backend is http://127.0.0.1:18080. The first start downloads the exact pinned
-ONNX model/tokenizer into a persistent volume and verifies their sizes/hashes; Spring
-Boot mounts them read-only. Subsequent starts reuse the verified cache. No host model
-installation is required. See [installation and configuration](docs/SETUP.md).
+## What Meta Muse Spark does
 
-There is no default password or public registration. The [demo guide](docs/DEMO.md)
-provisions the explicitly enabled local account demo@policy-investigator.local using
-a private DEMO_PASSWORD, exports synthetic PDFs, and walks through login, upload,
-investigation, graph, source PDFs and human review. It never bypasses JWT or authorization.
-From the separate frontend checkout, npm ci/npm start serves http://127.0.0.1:4200;
-its Docker option serves http://127.0.0.1:18081.
+The backend calls the Meta Model API with **`muse-spark-1.3`** to extract structured
+requirements, align baseline/replacement requirements and assess selected procedures.
+Muse supplies the interpretation behind the findings. The server validates response
+schemas, model identity, source IDs and exact quotations before publishing results.
 
-The principal scenario contrasts **training before sensitive-system access** with
-**day-one access and training within 30 days**. A compatible access-gated procedure is
-included as a negative control. The demo uses real Meta inference and persisted citations;
-account access and a valid private MODEL_API_KEY are required.
+Local `all-MiniLM-L6-v2` embeddings support retrieval independently of Meta reasoning.
+Source access and external-processing consent are checked before each provider attempt.
+Historical [real inference](docs/verification/phase3-demo.json) and the
+[API preflight](docs/verification/meta-api-preflight.json) establish prior use of Meta;
+they do not guarantee current account entitlement or production availability.
 
-## API and local OpenAPI
+## Demo and video
 
-The main API flow is login → authorized upload/version history → ingestion polling →
-external-processing consent → investigation polling → requirements/findings/evidence →
-graph and append-only reviews. Exact fields, status transitions and errors are documented:
+- **Configured demo address:** [ai-policy.tewendelabs.com](https://ai-policy.tewendelabs.com).
+  Availability and judge access have not been reverified in this documentation pass.
+  Individual credentials and a completed-investigation link must be supplied privately.
+- **Two-minute walkthrough:** [open an existing result](docs/TESTING.md#judge-walkthrough).
+  Reading its findings, graph and evidence makes no new reasoning request.
+- **Video:** no published video URL is available. The frontend's
+  [recording status](https://github.com/ThierryTe/ai-policy-invetigator-frontend/blob/main/demo-artifacts/recording-status.json)
+  records that no video was created. See the [recording instructions](docs/TESTING.md#recording-an-existing-investigation).
+- **Visual fallback:** historical local captures of the
+  [desktop investigation](https://github.com/ThierryTe/ai-policy-invetigator-frontend/blob/main/docs/screenshots/desktop-fitted-investigation.png),
+  [mobile investigation](https://github.com/ThierryTe/ai-policy-invetigator-frontend/blob/main/docs/screenshots/mobile-fitted-investigation.png)
+  and [PDF viewer](https://github.com/ThierryTe/ai-policy-invetigator-frontend/blob/main/docs/screenshots/pdf-real-source.png).
 
-- [Authentication, documents, versions and evidence](docs/api/phase2.md).
-- [Consent and investigations](docs/api/phase3.md).
-- [Dashboard graph and human review](docs/api/phase4.md).
+The recorded synthetic scenario contrasts training **before sensitive-system access**
+with day-one access and training within 30 days, plus a compatible control procedure.
+**Remote Work is not validated:** its three input documents were not found in the
+inspected repositories, and no completed Remote Work investigation is established.
+The [test procedure](docs/TESTING.md#remote-work-scenario) defines what remains to verify.
 
-Those filenames remain stable for existing links; the contents describe current APIs.
+## Evidence and limits
 
-OpenAPI/Swagger is disabled by default and denied in production. For an explicit local
-opt-in, add compose.local.yaml as described in [setup](docs/SETUP.md), then open
-http://127.0.0.1:18080/swagger-ui.html. Documentation uses Springdoc 3.2.0 and JWT bearer
-metadata; API calls still enforce authentication and current permissions. Loading the
-specification does not call Meta. API DTOs use Java records; targeted Lombok 1.18.46
-constructor injection does not change domain/security behavior or add @Data to entities.
+The initial ten-case synthetic evaluation matched **6/10** expected outcomes, with
+four processing errors. A separate four-case retry matched **3/4**, including one
+false positive. Its results do not replace the initial failures. See
+[recorded evaluation](docs/TESTING.md#recorded-evaluation) for evidence and reproduction.
 
-## Evaluation and limitations
+Verified citations establish source correspondence, not correct interpretation or
+general AI accuracy. The MVP does not provide automatic enterprise-wide procedure
+discovery, autonomous remediation, report export, a server investigation-history list,
+notifications or a live accuracy score. No compliance certification is claimed.
 
-A recorded real Muse investigation identified the training/access contradiction and
-the compatible control with verified citations. The ten-case synthetic evaluation
-matched 6/10 expected outcomes with four processing errors. A separate four-case exception
-retry matched 3/4 and included one false positive; it does not replace the initial errors.
-Across those two runs: 31 calls, 38,359 prompt / 68,141 completion tokens, 296,572 ms
-summed metered provider latency and 119/119 verified source/quote instances. Citation
-matching does not establish semantic correctness. These small runs do not establish
-general accuracy, and errors must not be presented as NO_CONFLICT.
+## Operations and attribution
 
-[Evaluation and reproducibility](docs/EVALUATION.md) documents datasets, exact metrics,
-provider usage/latency, separate retries and retained sanitized evidence. It includes
-both unsuccessful outcomes and successful findings. Golden datasets are under evaluation/.
+Local installation and test commands are in [Testing](docs/TESTING.md). Operators retain
+the separate [production pipeline](docs/PRODUCTION_PIPELINE.md),
+[deployment and recovery guide](docs/DEPLOYMENT.md) and
+[judge provisioning guide](docs/JUDGE_DEMO.md). These guides do not establish live health.
 
-Deterministic regression checks:
-
-```sh
-python3 -B -m unittest discover -s scripts/tests -v
-./mvnw -B -Pdatabase-tests verify
-# Include native embedding dependencies for a runnable JAR:
-./mvnw -B -Pneural-embeddings,database-tests verify
-```
-
-Database tests require Docker and exercise isolated synthetic PostgreSQL fixtures.
-Normal CI does not call real Meta or download ONNX weights. Real evaluation scripts
-create local fixture data and can incur provider costs; do not run them on a shared
-production database.
-
-## Production deployment and CI/CD
-
-Push backend `main` → backend/frontend tests → build both Docker images → GHCR.
-Pushes never deploy. In backend GitHub Actions, choose **Deploy production → Run workflow**
-on `main` to deploy the latest successful CI image pair over pinned SSH. The VPS pulls
-immutable digests and updates the existing Compose services, preserving PostgreSQL/model
-volumes, the public domain and HTTPS. Workers run inside the backend and are enabled
-explicitly in the existing private production env file.
-
-Deployment checks public routing, container/database health and actual local worker
-readiness without paid inference probes. Flyway validates the existing schema and refuses
-pending migrations; schema changes require separately reviewed maintenance. Failed updates
-restore previous application images when Flyway history is unchanged. For manual rollback,
-select operation **rollback** in the same workflow.
-
-Follow [the practical CI/CD setup and deployment procedure](docs/PRODUCTION_PIPELINE.md)
-for secrets, VPS registry access, the separate frontend repository's notification workflow
-and first deployment. Preserve V8 release `r041243000818-11` and all recovery artifacts.
-See [production operations](docs/DEPLOYMENT.md) for initial accounts and backup/restore.
-
-Only the Angular/Nginx container joins the existing shared proxy network. Backend and
-PostgreSQL remain private, with no production host ports. Swagger and dotenv remain
-disabled in production. Live token/package access, VPS capacity, NPM/TLS routing and
-health must be verified during actual deployment; local checks do not certify them.
-
-## Reuse and contributions
-
-Selected infrastructure derives from
-[AI Compliance Copilot](https://github.com/ThierryTe/spring-ai-rag). The four exact
-imports, source commits/hashes and adaptations remain in the
-[reuse allowlist](docs/provenance/allowlist.json) and
-[design adaptations](docs/provenance/adaptations.json).
-[Pre-existing capabilities](docs/provenance/PRE_EXISTING.md) and
-[Investigator contributions](docs/provenance/HACKATHON_CONTRIBUTIONS.md) distinguish
-prior work from this project's policy domain, secure processing, investigations,
-evidence verification, review, evaluation and deployment additions. See also
-[third-party notices](THIRD_PARTY_NOTICES.md) and
-[model provenance](docs/provenance/embedding-model.json).
-
-Keep .env/.local files, credentials, SSH keys, model weights, database dumps and runtime
-logs outside commits/build contexts. Public examples use variable names and placeholders,
-not credentials. The [documentation index](docs/README.md) links the maintained guides;
-development plans and intermediate audit trails are not part of the public manual.
-
-For submission preparation, use the [English submission draft and demo script](docs/HACKATHON_SUBMISSION.md).
-The [English-language and judge-readiness audit](docs/audits/ENGLISH_JUDGE_READINESS.md)
-separates verified capabilities from recommendations and remaining release checks.
+Selected infrastructure derives from [AI Compliance Copilot](https://github.com/ThierryTe/spring-ai-rag).
+The [pre-existing capabilities](docs/provenance/PRE_EXISTING.md),
+[project contributions](docs/provenance/HACKATHON_CONTRIBUTIONS.md),
+[exact reuse records](docs/provenance/allowlist.json) and
+[third-party notices](THIRD_PARTY_NOTICES.md) preserve attribution.
+Credentials, private documents, model weights and database backups stay outside public artifacts.

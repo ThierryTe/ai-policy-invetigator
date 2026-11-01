@@ -238,7 +238,7 @@ The new protocol reports phase, service/step, a fixed command template, exit cod
 and a normalized cause with an operator hint. Example:
 
 ```text
-phase=pull step=image.frontend.pull result=failed exit=1 command="docker pull [frontend immutable CI image]" reason=registry_denied: Registry access denied; check VPS GHCR credentials and package read permissions (CI login is separate).
+phase=pull step=image.frontend.pull result=failed exit=1 rollback=not_started command="docker pull [frontend immutable CI image]" reason=registry_denied: Registry access denied; check VPS GHCR credentials and package read permissions (CI login is separate).
 ```
 
 Causes cover daemon/socket permissions, registry authorization, missing images,
@@ -252,14 +252,30 @@ that the actual VPS cause has been observed locally. Unknown messages report
 No captured stderr/stdout, actual arguments, environment values, resolved Compose
 configuration, inspect data, health output or application logs are sent to Actions.
 Both ends validate an exact schema and a closed vocabulary; arbitrary uppercase
-lines and extra fields are rejected. This avoids relying on regex redaction of
+lines and extra fields are rejected. Invalid protocol events now produce an explicit
+`diagnostic_invalid` transport diagnostic. A bare error code or a started event is
+not a detailed failure: missing details produce `diagnostic_missing`, with rollback
+unconfirmed. Neither case is allowed to degrade silently into `remote_failed`.
+This avoids relying on regex redaction of
 unknown or multiline secrets. The original failure and rollback diagnostics both
 survive; `ROLLBACK_STARTED`, `ROLLBACK_SUCCEEDED` and `ROLLBACK_FAILED` distinguish
-the recovery outcome while a failed deployment still exits nonzero.
+the recovery outcome while a failed deployment still exits nonzero. The transport
+failure also renders the final `rollback=not_started|succeeded|failed|unconfirmed`.
+It distinguishes the remote process exit from the earlier Docker command exit.
+If no process exit exists (timeout or failure to start), it prints `exit=unavailable`.
+Unexpected exceptions are caught inside their phase and at the remote entry point;
+only the last validated step and a fixed category are emitted, never a traceback.
+An invalid locally produced event fails before a command starts instead of being
+silently discarded. Both stdout and stderr are inspected, and final operation
+failure codes take precedence over intermediate codes across those two streams.
 
 The CI artifact and manual rollback bundle now include `simple_diagnostics.py`.
-Before a later authorized deployment, CI must publish an artifact containing that
-file. An older artifact fails locally with `DEPLOY_BUNDLE_INCOMPLETE` before SSH;
+Before a later authorized deployment, CI must publish a fresh artifact containing
+protocol version 2 in both `simple_deploy.py` and `simple_diagnostics.py`.
+The workflow checks those literal constants without executing artifact code before
+the transport step, and the SSH entry point repeats that check before any connection.
+A missing file fails with `DEPLOY_BUNDLE_INCOMPLETE`; a complete but incompatible
+artifact fails with `DEPLOY_DIAGNOSTIC_PROTOCOL_INCOMPATIBLE_RERUN_CI` before SSH;
 the workflow does not silently replace tested artifact tooling with checkout files.
 
 ## Rollback

@@ -111,7 +111,7 @@ Historical Meta evidence:
 - Frontend `docs/focused-demo-verification.json`: recorded browser workflow, five calls,
   eight verified published citation instances and 40,605 ms summed metered provider
   latency. It is not a current latency or availability promise.
-- [Evaluation](../EVALUATION.md): initial 6/10 expected outcomes with four processing
+- [Evaluation](../TESTING.md#recorded-evaluation): initial 6/10 expected outcomes with four processing
   errors; separate retry 3/4 with one false positive. 119/119 verified quote instances
   across those evaluation runs are not 100% reasoning accuracy.
 
@@ -143,10 +143,10 @@ All changes are in backend documentation. The frontend was audited read-only.
 | File | Change |
 | --- | --- |
 | [README.md](../../README.md) | Add concrete result-first judge entry and links to submission/audit materials. |
-| [docs/README.md](../README.md) | Index the quickstart, submission draft, English qualification companion and audit. |
+| [docs/README.md](../../README.md) | Index the quickstart, submission draft, English qualification companion and audit. |
 | [docs/JUDGE_DEMO.md](../JUDGE_DEMO.md) | Separate judge walkthrough from operator instructions with an opening link. |
-| [docs/JUDGE_QUICKSTART.md](../JUDGE_QUICKSTART.md) | New English two-minute walkthrough, permission boundaries, optional live path and labeled fallback. |
-| [docs/HACKATHON_SUBMISSION.md](../HACKATHON_SUBMISSION.md) | New English draft, 30-second pitch, timed demonstration and honest claims checklist. |
+| [docs/JUDGE_QUICKSTART.md](../TESTING.md#judge-walkthrough) | New English two-minute walkthrough, permission boundaries, optional live path and labeled fallback. |
+| [docs/HACKATHON_SUBMISSION.md](../../README.md) | New English draft, 30-second pitch, timed demonstration and honest claims checklist. |
 | [docs/V8_PREPRODUCTION.en.md](../V8_PREPRODUCTION.en.md) | English companion translating the historical French report without modifying it. |
 | This report | Findings, audit scope, remaining gaps and five prioritized improvements. |
 | [Check summary](ENGLISH_JUDGE_READINESS_CHECKS.json) | Machine-readable local results, preservation checks and scope limits. |

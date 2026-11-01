@@ -30,7 +30,7 @@ and HTTPS routing, and refuses incompatible application rollback.
 
 ## Prepare the published backend without deployment
 
-Use [Prepare backend qualification only](../.github/workflows/prepare-backend-qualification.yml)
+Use [Prepare backend qualification only](../.github/legacy-workflows/prepare-backend-qualification.yml)
 to prepare a single backend image before seeking production approval. After this workflow
 has been reviewed and is present on the default branch, an authorized repository writer
 chooses **Actions → Prepare backend qualification only → Run workflow → main**.

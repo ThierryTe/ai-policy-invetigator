@@ -39,7 +39,7 @@ The frontend remains a separate repository with its own source history and notic
 - Separate Angular investigation workflow, production image delivery and reproducible model cache.
 
 These are project contributions, not claims that every underlying architectural idea
-is novel. The [evaluation guide](../EVALUATION.md) separates real inference evidence
+is novel. The [evaluation guide](../TESTING.md#recorded-evaluation) separates real inference evidence
 from deterministic/mocked tests and reports unsuccessful outcomes as well as successes.
 
 ## Dependencies and limits
