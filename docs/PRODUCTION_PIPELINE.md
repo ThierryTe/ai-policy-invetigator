@@ -163,7 +163,15 @@ No VPS actions are performed while implementing this pipeline. Review these prer
 
 Verification checks healthy frontend/backend/PostgreSQL containers, the backend health
 endpoint, public Angular HTML and `/healthz`, plus `/api/auth/me` returning 401 through
-public API routing. Public checks allow a short DNS/proxy settling period and validate TLS.
+public API routing. Preflight, post-update verification and rollback each allow up to
+12 public probe attempts with 5 seconds between failures (55 seconds of pauses),
+using a 10-second socket timeout and the identified
+`AI-Policy-Investigator-Deployment/1.0` user agent. Each attempt rechecks the three
+routes in order and stops at the first failure. TLS verification, rejection of
+redirects, exact status codes and response-body checks remain required.
+Public diagnostics report phase, route, expected/actual HTTP status and attempt
+without response bodies or headers. See [the public HTTP failure analysis](PUBLIC_HTTP_CHECK_ANALYSIS.md)
+for the previous behavior and how to distinguish preflight failure from rollback.
 
 The existing private `/actuator/health` gains a status-only worker contributor. It
 requires successful real queue-function polls, live executors, enabled flags, the database

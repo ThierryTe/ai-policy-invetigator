@@ -307,15 +307,18 @@ class PublicHealthTest(unittest.TestCase):
 
     def test_public_readiness_retries_temporary_proxy_errors(self):
         with patch.object(deploy, 'public_check', side_effect=[deploy.DeployError('PUBLIC_HTTP_CHECK_FAILED'), None]) as probe, \
-                patch.object(deploy.time, 'sleep'):
+                patch.object(deploy.time, 'sleep') as sleep:
             deploy.wait_for_public()
         self.assertEqual(probe.call_count, 2)
+        sleep.assert_called_once_with(5)
 
     def test_public_readiness_fails_after_bounded_retries(self):
         with patch.object(deploy, 'public_check', side_effect=deploy.DeployError('PUBLIC_HTTP_CHECK_FAILED')) as probe, \
-                patch.object(deploy.time, 'sleep'), self.assertRaises(deploy.DeployError):
+                patch.object(deploy.time, 'sleep') as sleep, self.assertRaises(deploy.DeployError):
             deploy.wait_for_public()
-        self.assertEqual(probe.call_count, 6)
+        self.assertEqual(probe.call_count, 12)
+        self.assertEqual(sleep.call_count, 11)
+        self.assertTrue(all(call.args == (5,) for call in sleep.call_args_list))
 
 
 @unittest.skipUnless(shutil.which('docker'), 'Docker Compose CLI required; daemon is never used')

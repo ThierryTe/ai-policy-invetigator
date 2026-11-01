@@ -12,7 +12,13 @@ import sys
 PREFIX = 'DEPLOY_DIAGNOSTIC '
 PHASE = ContextVar('deployment_phase', default='preflight')
 PHASES = {'preflight', 'pull', 'snapshot', 'update', 'verify', 'commit', 'rollback', 'transport'}
+PUBLIC_STEPS = {
+    'public.root': 'GET https://ai-policy.tewendelabs.com/ [expected HTTP 200, Angular HTML]',
+    'public.healthz': 'GET https://ai-policy.tewendelabs.com/healthz [expected HTTP 200, body ok]',
+    'public.auth_me': 'GET https://ai-policy.tewendelabs.com/api/auth/me [expected HTTP 401, anonymous]',
+}
 STEPS = {
+    **PUBLIC_STEPS,
     'compose.backend.config': 'docker compose [backend files] config --format json',
     'compose.frontend.config': 'docker compose [frontend files] config --format json',
     'compose.backend.up': 'docker compose [backend files] up -d --no-deps --no-build --pull never --wait --wait-timeout 240 backend',
@@ -77,6 +83,10 @@ REASONS.update({
     'health_http': 'Backend health endpoint returned an HTTP error; review backend and worker readiness privately on the VPS.',
     'health_connection': 'Backend health endpoint could not be reached inside its container; check application startup and listen port.',
     'health_timeout': 'Backend health request timed out; check application and worker readiness.',
+    'public_http': 'Unexpected public HTTP status; check the indicated route and public proxy rules.',
+    'public_connection': 'Public connection or TLS check failed; check DNS, proxy readiness and certificate trust.',
+    'public_application': 'Public root did not serve Angular HTML.',
+    'public_health_body': 'Public frontend health did not return ok.',
 })
 CODES = frozenset('''
 COMMAND_FAILED_DOCKER COMMAND_FAILED_COMMAND COMMAND_UNAVAILABLE_OR_TIMED_OUT
@@ -111,7 +121,17 @@ def classify(stdout, stderr, *, step='command', exit_code=None):
 
 
 def validated_event(value):
-    if not isinstance(value, dict) or set(value) != {'phase', 'step', 'result', 'reason', 'exit_code'}:
+    if not isinstance(value, dict):
+        return False
+    public = isinstance(value.get('step'), str) and value['step'] in PUBLIC_STEPS
+    fields = {'phase', 'step', 'result', 'reason', 'exit_code'}
+    if public:
+        fields |= {'http_status', 'attempt'}
+    if set(value) != fields:
+        return False
+    if public and not (
+            (value['http_status'] is None or (type(value['http_status']) is int and 100 <= value['http_status'] <= 599))
+            and type(value['attempt']) is int and 1 <= value['attempt'] <= 100):
         return False
     if any(not isinstance(value[k], str) for k in ('phase', 'step', 'result', 'reason')):
         return False
@@ -122,12 +142,16 @@ def validated_event(value):
 
 
 def render_event(value):
+    detail = (' attempt={attempt} http_status={http_status}'.format(**value)
+              if value['step'] in PUBLIC_STEPS else '')
     print('phase={phase} step={step} result={result} exit={exit_code} command="{command}" reason={reason}: {hint}'.format(
-        **value, command=STEPS[value['step']], hint=REASONS[value['reason']]), file=sys.stderr, flush=True)
+        **value, command=STEPS[value['step']], hint=REASONS[value['reason']]) + detail, file=sys.stderr, flush=True)
 
 
-def emit(step, result, reason='none', exit_code=None, *, render=False):
+def emit(step, result, reason='none', exit_code=None, *, render=False, http_status=None, attempt=None):
     value = dict(phase=PHASE.get(), step=step, result=result, reason=reason, exit_code=exit_code)
+    if step in PUBLIC_STEPS:
+        value.update(http_status=http_status, attempt=attempt)
     if validated_event(value):
         if render:
             render_event(value)

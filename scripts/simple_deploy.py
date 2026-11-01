@@ -19,6 +19,10 @@ from simple_diagnostics import classify, emit, phase, public_code, status
 
 BASE = Path('/opt/ai-policy-investigator')
 PUBLIC = 'https://ai-policy.tewendelabs.com'
+PUBLIC_USER_AGENT = 'AI-Policy-Investigator-Deployment/1.0'
+PUBLIC_TIMEOUT = 10
+PUBLIC_ATTEMPTS = 12
+PUBLIC_RETRY_DELAY = 5
 PROJECT = 'ai-policy-investigator'
 UI_PROJECT = 'ai-policy-investigator-ui'
 FILES = ('compose.yaml', 'compose.production.yaml', 'compose.images.yaml', 'compose.frontend.yaml')
@@ -87,38 +91,52 @@ def history():
     return rows
 
 
-def public_check():
+def public_check(*, attempt=1):
     # Standard TLS certificate validation, no redirects to another host or login page.
     class NoRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self, request, fp, code, msg, headers, newurl):
             return None
     opener = urllib.request.build_opener(NoRedirect)
-    for path, expected in [('/', 200), ('/healthz', 200), ('/api/auth/me', 401)]:
+    for path, expected, step in [('/', 200, 'public.root'), ('/healthz', 200, 'public.healthz'),
+                                ('/api/auth/me', 401, 'public.auth_me')]:
+        emit(step, 'started', attempt=attempt)
+        # Match the identified probe in production_release.py: public edges may
+        # reject Python's generic agent even while browser requests succeed.
+        request = urllib.request.Request(PUBLIC + path, method='GET', headers={
+            'User-Agent': PUBLIC_USER_AGENT})
         try:
-            with opener.open(PUBLIC + path, timeout=5) as response:
+            with opener.open(request, timeout=PUBLIC_TIMEOUT) as response:
                 code = response.status
                 body = response.read(1_000_000)
         except urllib.error.HTTPError as error:
-            code, body = error.code, b''
+            with error:
+                code, body = error.code, b''
         except (OSError, urllib.error.URLError):
+            emit(step, 'failed', 'public_connection', attempt=attempt)
             raise DeployError('PUBLIC_TLS_OR_CONNECTION_FAILED') from None
-        require(code == expected, 'PUBLIC_HTTP_CHECK_FAILED')
-        if path == '/':
-            require(b'<app-root' in body, 'ANGULAR_APPLICATION_MISSING')
-        if path == '/healthz':
-            require(body.strip() == b'ok', 'FRONTEND_HEALTH_BODY_INVALID')
+        failure = None
+        if code != expected:
+            failure = ('PUBLIC_HTTP_CHECK_FAILED', 'public_http')
+        elif path == '/' and b'<app-root' not in body:
+            failure = ('ANGULAR_APPLICATION_MISSING', 'public_application')
+        elif path == '/healthz' and body.strip() != b'ok':
+            failure = ('FRONTEND_HEALTH_BODY_INVALID', 'public_health_body')
+        if failure:
+            emit(step, 'failed', failure[1], http_status=code, attempt=attempt)
+            raise DeployError(failure[0])
+        emit(step, 'succeeded', http_status=code, attempt=attempt)
 
 
 def wait_for_public():
-    # Nginx caches Docker DNS briefly while containers are replaced.
-    for attempt in range(6):
+    # Allow public proxy routes and Docker DNS to settle after container replacement.
+    for attempt in range(1, PUBLIC_ATTEMPTS + 1):
         try:
-            public_check()
+            public_check(attempt=attempt)
             return
         except DeployError:
-            if attempt == 5:
+            if attempt == PUBLIC_ATTEMPTS:
                 raise
-            time.sleep(5)
+            time.sleep(PUBLIC_RETRY_DELAY)
 
 
 def verify(images):
@@ -227,12 +245,14 @@ def restore(previous):
 
 
 def deploy(bundle, env_file, state):
-    # Imported only for deployment; rollback needs no CI artifact or network access.
+    # Imported only for deployment; rollback uses cached images and snapshot metadata.
     from ci_images import validate
     data = validate(json.loads((bundle / 'images.json').read_text()))
     images = {**data['images'], 'postgres': container(PROJECT, 'postgres')['Image']}
     back, front, env = check_topology(bundle, env_file, images)
-    public_check()
+    # Preflight checks the existing release too; a transient public edge failure
+    # must get the same settling period before any pull or application update.
+    wait_for_public()
     # Pull both images before touching either running service. Never pull PostgreSQL or models.
     with phase('pull'):
         for component in ('backend', 'frontend'):
