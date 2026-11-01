@@ -52,7 +52,82 @@ restricted to backend Contents write access, required by GitHub's repository-dis
 A frontend main push then requests coordinated backend CI; rapid pushes may coalesce to
 frontend main at checkout time. Until installed, only backend pushes publish coordinated
 pairs. The old frontend reusable-workflow calls must be removed during this switch.
-No files in the sibling frontend checkout were edited by this implementation.
+The frontend may retain its existing verification job and make the notification job
+depend on it. Replace the old reusable `publish`/`deploy` jobs: their workflow files
+have been archived and are no longer active in the backend repository.
+
+## Diagnosing GHCR `permission_denied: write_package`
+
+The coordinated publisher is backend `.github/workflows/ci.yml`, job
+`test-and-publish`, in **`ThierryTe/ai-policy-invetigator`**, even for the frontend image
+and even when a frontend push requests the run. Checking out frontend sources does
+not change the job's repository or token identity. A `repository_dispatch` starts a
+backend workflow with its own `GITHUB_TOKEN`; it does not transfer the dispatch token.
+
+The workflow uses shell `docker login`, not `docker/login-action`. Its password is
+`GHCR_TOKEN: ${{ github.token }}`, equivalent to `${{ secrets.GITHUB_TOKEN }}` in
+the inspected failing revision. There is no PAT fallback. The workflow and the job
+both request `contents: read` and `packages: write`; checkout credentials are not
+persisted. The publisher identity is recorded in the job log and run summary without
+printing any credential.
+
+Keep these credentials separate:
+
+| Credential | Repository / use | Required access |
+|---|---|---|
+| `GITHUB_TOKEN` | Backend job: login and push both GHCR images | Job `packages: write` AND package Actions Write for the backend repository |
+| `FRONTEND_READ_TOKEN` | Backend: optional private frontend checkout only | Frontend Contents read |
+| `BACKEND_CI_TOKEN` | Frontend: existing credential to notify backend only | Backend Contents write for `repository_dispatch`; no GHCR use |
+
+Do not create another PAT or give the notification token package scopes to fix a
+GHCR denial. The automatic backend `GITHUB_TOKEN` is sufficient with the package ACL.
+At the time of the public audit below, the frontend workflow had no notification.
+The corrected local frontend workflow replaces its old publish/deploy calls with a
+notification after verification, using the existing `BACKEND_CI_TOKEN` secret. Its
+push/develop and PR verification jobs are preserved. The example above also provides
+a minimal notification-only configuration.
+If that secret is absent, notifications require configuring an existing suitable
+credential; this is independent of publishing images from backend pushes.
+
+Manual GitHub checks:
+
+1. Open the **frontend container package**
+   [`ai-policy-invetigator-frontend`](https://github.com/users/ThierryTe/packages/container/ai-policy-invetigator-frontend/settings).
+   Under **Package settings → Manage Actions access**, verify the exact repository
+   **`ThierryTe/ai-policy-invetigator`** has **Write**. A Write grant for the frontend
+   repository, a user/collaborator role, or merely linking the frontend source repository
+   does not grant this backend workflow access. Repeat for the backend package.
+   Keep the frontend source association; add backend Actions access independently.
+2. In the failed backend run, open **test-and-publish → Set up job → GITHUB_TOKEN
+   Permissions** and confirm **Packages: write**. The YAML requests it, but only this
+   log confirms the effective permission. PR/fork/Dependabot restrictions or a reusable
+   workflow caller can reduce permissions in other execution paths. This publisher is
+   a normal backend job and never pushes images on `pull_request`.
+3. In backend **Settings → Actions → General → Workflow permissions**, inspect the
+   defaults and any organization/enterprise policy if the effective permission is
+   read-only. A read-only *default* alone is not a reason to enable all write permissions:
+   explicit workflow/job permissions adjust that default. No need to enable permission
+   to create/approve pull requests. Package Actions access remains a separate requirement.
+4. Match the failing run's workflow revision and registry/package spelling. The image
+   source label points to the frontend repository but does not switch the publishing
+   identity or grant backend Actions access. A successful login alone does not prove
+   permission to push this existing package.
+5. After an operator applies the missing package permission, rerunning CI only tests
+   and publishes images; deployment remains a separate manual workflow. This investigation
+   does not rerun CI, push images, change GitHub settings, or deploy.
+
+Public GitHub inspection on 2026-11-01 confirmed
+[run 41301619487, attempt 2](https://github.com/ThierryTe/ai-policy-invetigator/actions/runs/41301619487),
+backend commit `013182abcda835c6b10f4fe916c51a940db18184`, failed at the combined image
+build/publish step. That revision matches the inspected local workflow before this fix.
+The public frontend `main` still called the archived reusable workflows and did not
+use `BACKEND_CI_TOKEN`. Detailed logs and private package settings were unavailable
+without authentication (HTTP 403 and 401); the effective permissions and package ACL
+must therefore be confirmed manually, not inferred as observed facts.
+
+References: [package workflow access](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility#ensuring-workflow-access-to-your-package),
+[workflow permission calculation](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#how-permissions-are-calculated-for-a-workflow-job),
+[GitHub token context](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#github-context).
 
 ## One-time VPS configuration — operator only
 

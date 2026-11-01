@@ -12,5 +12,11 @@ jobs:
     steps:
       - name: Trigger coordinated CI in the backend repository
         env:
+          # Dispatch only: backend Contents write. Never use this token for GHCR.
           GH_TOKEN: ${{ secrets.BACKEND_CI_TOKEN }}
-        run: gh api --method POST repos/ThierryTe/ai-policy-invetigator/dispatches -f event_type=frontend-main
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo '::error::Configure BACKEND_CI_TOKEN with Contents write access to ThierryTe/ai-policy-invetigator for repository_dispatch.'
+            exit 1
+          fi
+          gh api --method POST repos/ThierryTe/ai-policy-invetigator/dispatches -f event_type=frontend-main
