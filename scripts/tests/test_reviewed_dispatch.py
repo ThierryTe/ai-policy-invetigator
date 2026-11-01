@@ -1,5 +1,5 @@
 """Actual dispatch form -> Python CLI -> approval payload, with no registry/SSH access."""
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 import io
 import json
 from pathlib import Path
@@ -224,6 +224,51 @@ class ReviewedDispatchTest(unittest.TestCase):
             for key in runner.CONFIRMATIONS:
                 expected = 'true' if key in {'github_protection', 'write_freeze', 'image_qualification'} else 'false'
                 self.assertEqual(env['CONFIRM_' + key.upper()], expected)
+
+    def test_ci_revision_change_does_not_change_the_approved_production_base(self):
+        # Synthetic dispatch using the reported IDs; no claim about remote state.
+        form = self.form()
+        form.update(prepared_release='r041243000818-11', expected_previous='r141093671636-11')
+        for revision in ['a' * 40, 'b' * 40]:
+            env = {**self.metadata(), 'CONFIGURATION_SHA': revision, 'GITHUB_SHA': revision,
+                   'GITHUB_WORKFLOW_SHA': revision, 'GITHUB_RUN_ID': '999'}
+            with self.subTest(revision=revision), \
+                    patch.object(runner, 'current_release', return_value=form['expected_previous']) as current, \
+                    patch.object(runner, 'ghcr_manifest', return_value={'manifestDigest': 'sha256:' + 'c' * 64}), \
+                    patch.object(runner, 'prepare') as prepare, \
+                    patch.object(runner, 'transfer', return_value={'result': 'synthetic'}) as transfer:
+                runner.run(self.resolve(form, env), Path('/unused'))
+                current.assert_called_once_with()
+                prepare.assert_not_called()
+                self.assertEqual(transfer.call_args.args, ('deploy-reviewed', form['prepared_release']))
+                approval = transfer.call_args.kwargs['approval']
+                self.assertEqual(approval['expected_previous'], form['expected_previous'])
+                self.assertEqual(approval['environment']['EXPECTED_PREVIOUS'], form['expected_previous'])
+
+    def test_cli_base_mismatch_blocks_before_registry_and_approval_transfer(self):
+        # Distinguish a changed marker from selecting the prepared ID as the base.
+        # Both are deliberately synthetic reproductions of the same error code.
+        previous, prepared = 'r141093671636-11', 'r041243000818-11'
+        for actual, expected in [('r999-1', previous), (None, previous), (previous, prepared)]:
+            form = self.form()
+            form.update(prepared_release=prepared, expected_previous=expected)
+            with self.subTest(actual=actual, expected=expected), tempfile.TemporaryDirectory() as temp:
+                path = Path(temp) / 'event.json'
+                path.write_text(json.dumps({'inputs': form}))
+                out, err = io.StringIO(), io.StringIO()
+                with patch.dict(runner.os.environ, self.metadata(), clear=True), \
+                        patch.object(sys, 'argv', [str(SCRIPT), '--event-file', str(path)]), \
+                        patch.object(runner, 'current_release', return_value=actual) as current, \
+                        patch.object(runner, 'ghcr_manifest') as registry, \
+                        patch.object(runner, 'prepare') as prepare, patch.object(runner, 'transfer') as transfer, \
+                        redirect_stdout(out), redirect_stderr(err):
+                    self.assertEqual(runner.main(), 2)
+                current.assert_called_once_with()
+                registry.assert_not_called()
+                prepare.assert_not_called()
+                transfer.assert_not_called()
+                self.assertEqual(out.getvalue(), '')
+                self.assertEqual(err.getvalue(), 'APPROVED_RELEASE_BASE_CHANGED\n')
 
     def test_event_failure_never_falls_back_to_inherited_approval(self):
         for content in ['{bad json', 'null', '{}', '{"inputs": []}']:
