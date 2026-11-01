@@ -10,7 +10,12 @@ import re
 import sys
 
 PREFIX = 'DEPLOY_DIAGNOSTIC '
+DIAGNOSTIC_PROTOCOL = 2
 PHASE = ContextVar('deployment_phase', default='preflight')
+STEP = ContextVar('deployment_step', default='deployment')
+STEP_INFO = ContextVar('deployment_step_info', default={})
+ROLLBACK = ContextVar('deployment_rollback', default='not_started')
+ROLLBACK_STATES = {'not_started', 'started', 'succeeded', 'failed', 'unconfirmed'}
 PHASES = {'preflight', 'pull', 'snapshot', 'update', 'verify', 'commit', 'rollback', 'transport'}
 PUBLIC_STEPS = {
     'public.root': 'GET https://ai-policy.tewendelabs.com/ [expected HTTP 200, Angular HTML]',
@@ -30,6 +35,8 @@ STEPS = {
     'ssh.transfer': 'scp [deployment bundle] [pinned host]',
     'ssh.deploy': 'ssh [pinned host] python3 simple_deploy.py [operation]',
     'command': '[unlabelled command]',
+    'deployment': 'deployment controller',
+    'ssh.diagnostics': 'validate remote diagnostic protocol',
 }
 for service in ('backend', 'frontend', 'postgres'):
     STEPS['container.' + service + '.list'] = 'docker ps -aq [project and ' + service + ' service labels]'
@@ -80,6 +87,11 @@ REASONS.update({
     'transport_failed': 'SSH transport failed; remote outcome and rollback are unconfirmed. Review VPS state before retrying.',
     'state_write': 'Could not persist deployment state; check filesystem permissions and free space.',
     'remote_failed': 'Remote deployment failed; see the preceding step diagnostics and rollback outcome.',
+    'diagnostic_missing': 'Remote failure has no valid detailed diagnostic; rerun CI to publish compatible deployment tooling. Remote exit is not the Docker exit; rollback is unconfirmed.',
+    'diagnostic_invalid': 'Remote diagnostic protocol is incompatible or invalid; rerun CI to publish compatible deployment tooling. Raw output remains private.',
+    'invalid_state': 'Deployment input or command response is invalid; review private state on the VPS.',
+    'internal_error': 'Unexpected deployment exception; exception text and traceback withheld because they may contain secrets.',
+    'deployment_check': 'Deployment safety or readiness check failed; see the fixed error code and preceding diagnostics.',
     'health_http': 'Backend health endpoint returned an HTTP error; review backend and worker readiness privately on the VPS.',
     'health_connection': 'Backend health endpoint could not be reached inside its container; check application startup and listen port.',
     'health_timeout': 'Backend health request timed out; check application and worker readiness.',
@@ -101,6 +113,7 @@ ANOTHER_DEPLOYMENT_IS_RUNNING PRIVATE_PRODUCTION_ENV_REQUIRED BUNDLE_PATH_INVALI
 ROLLBACK_FAILED_OR_SCHEMA_CHANGED_REVIEW_PRIVATE_STATE DEPLOYMENT_INPUT_OR_STATE_INVALID
 DEPLOY_SUCCEEDED ROLLBACK_STARTED ROLLBACK_SUCCEEDED ROLLBACK_FAILED
 SSH_TRANSFER_OR_REMOTE_DEPLOYMENT_FAILED SSH_REMOTE_OUTCOME_UNCONFIRMED
+SSH_REMOTE_DIAGNOSTIC_MISSING SSH_REMOTE_DIAGNOSTIC_INVALID
 '''.split())
 
 
@@ -124,7 +137,7 @@ def validated_event(value):
     if not isinstance(value, dict):
         return False
     public = isinstance(value.get('step'), str) and value['step'] in PUBLIC_STEPS
-    fields = {'phase', 'step', 'result', 'reason', 'exit_code'}
+    fields = {'phase', 'step', 'result', 'reason', 'exit_code', 'rollback'}
     if public:
         fields |= {'http_status', 'attempt'}
     if set(value) != fields:
@@ -133,30 +146,48 @@ def validated_event(value):
             (value['http_status'] is None or (type(value['http_status']) is int and 100 <= value['http_status'] <= 599))
             and type(value['attempt']) is int and 1 <= value['attempt'] <= 100):
         return False
-    if any(not isinstance(value[k], str) for k in ('phase', 'step', 'result', 'reason')):
+    if any(not isinstance(value[k], str) for k in ('phase', 'step', 'result', 'reason', 'rollback')):
         return False
     code = value['exit_code']
     return (value['phase'] in PHASES and value['step'] in STEPS
             and value['result'] in {'started', 'failed', 'succeeded'} and value['reason'] in REASONS
+            and value['rollback'] in ROLLBACK_STATES
             and (code is None or (type(code) is int and -255 <= code <= 255)))
 
 
 def render_event(value):
     detail = (' attempt={attempt} http_status={http_status}'.format(**value)
               if value['step'] in PUBLIC_STEPS else '')
-    print('phase={phase} step={step} result={result} exit={exit_code} command="{command}" reason={reason}: {hint}'.format(
-        **value, command=STEPS[value['step']], hint=REASONS[value['reason']]) + detail, file=sys.stderr, flush=True)
+    rendered = {**value, 'exit_code': value['exit_code'] if value['exit_code'] is not None else 'unavailable'}
+    print('phase={phase} step={step} result={result} exit={exit_code} rollback={rollback} command="{command}" reason={reason}: {hint}'.format(
+        **rendered, command=STEPS[value['step']], hint=REASONS[value['reason']]) + detail, file=sys.stderr, flush=True)
 
 
-def emit(step, result, reason='none', exit_code=None, *, render=False, http_status=None, attempt=None):
-    value = dict(phase=PHASE.get(), step=step, result=result, reason=reason, exit_code=exit_code)
+def emit(step, result, reason='none', exit_code=None, *, render=False, http_status=None, attempt=None, rollback=None):
+    value = dict(phase=PHASE.get(), step=step, result=result, reason=reason, exit_code=exit_code,
+                 rollback=ROLLBACK.get() if rollback is None else rollback)
     if step in PUBLIC_STEPS:
         value.update(http_status=http_status, attempt=attempt)
-    if validated_event(value):
-        if render:
-            render_event(value)
-        else:
-            print(PREFIX + json.dumps(value, sort_keys=True), file=sys.stderr, flush=True)
+    if not validated_event(value):
+        # A producer bug must fail before a command runs, never silently erase its diagnostic.
+        raise ValueError('DIAGNOSTIC_EVENT_INVALID')
+    if result == 'started':
+        STEP.set(step)
+        STEP_INFO.set({'http_status': http_status, 'attempt': attempt} if step in PUBLIC_STEPS else {})
+    if render:
+        render_event(value)
+    else:
+        print(PREFIX + json.dumps(value, sort_keys=True), file=sys.stderr, flush=True)
+
+
+def failure(error, reason=None, exit_code=None):
+    """Report once, inside the failing phase, without exception text or traceback."""
+    if getattr(error, '_deployment_reported', False):
+        return
+    reason = reason or ('deployment_check' if str(error) in CODES else
+                        ('invalid_state' if isinstance(error, (ValueError, OSError, KeyError, TypeError)) else 'internal_error'))
+    emit(STEP.get(), 'failed', reason, exit_code, **STEP_INFO.get())
+    error._deployment_reported = True
 
 
 def public_code(error):
@@ -165,10 +196,12 @@ def public_code(error):
 
 
 def status(code):
+    if code in {'ROLLBACK_STARTED', 'ROLLBACK_SUCCEEDED', 'ROLLBACK_FAILED'}:
+        ROLLBACK.set({'ROLLBACK_STARTED': 'started', 'ROLLBACK_SUCCEEDED': 'succeeded', 'ROLLBACK_FAILED': 'failed'}[code])
     print(public_code(code), file=sys.stderr, flush=True)
 
 
-def forward(output):
+def forward(output, *, report=None):
     """Decode untrusted SSH output, then render only values from the closed vocabulary."""
     if isinstance(output, bytes):
         output = output.decode('utf-8', errors='replace')
@@ -181,17 +214,31 @@ def forward(output):
             try:
                 value = json.loads(line[len(PREFIX):])
             except (ValueError, RecursionError):
+                if report is not None:
+                    report['invalid'] = True
                 continue
             if validated_event(value):
                 # Never echo the original line, extra fields, raw command or free text.
                 render_event(value)
+                if report is not None:
+                    report['events'].append(value)
+            elif report is not None:
+                report['invalid'] = True
     return codes
 
 
 @contextmanager
 def phase(name):
     token = PHASE.set(name)
+    step_token = STEP.set('deployment')
+    info_token = STEP_INFO.set({})
     try:
         yield
+    except Exception as error:
+        if name != 'transport':
+            failure(error)
+        raise
     finally:
+        STEP.reset(step_token)
+        STEP_INFO.reset(info_token)
         PHASE.reset(token)

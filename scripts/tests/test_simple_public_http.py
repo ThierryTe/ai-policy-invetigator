@@ -300,7 +300,7 @@ class PublicDiagnosticTest(unittest.TestCase):
 
     def test_public_metadata_is_strictly_validated_before_forwarding(self):
         event = dict(phase='preflight', step='public.root', result='failed', reason='public_http',
-                     exit_code=None, http_status=503, attempt=1)
+                     exit_code=None, http_status=503, attempt=1, rollback='not_started')
         self.assertTrue(diagnostics.validated_event(event))
         invalid = [{**event, 'http_status': value} for value in ('secret', True, [], 99, 600)]
         invalid += [{**event, 'attempt': value} for value in ('secret', True, None, 0, 101)]

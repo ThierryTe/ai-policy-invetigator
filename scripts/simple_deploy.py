@@ -15,7 +15,10 @@ import time
 import urllib.error
 import urllib.request
 
-from simple_diagnostics import classify, emit, phase, public_code, status
+from simple_diagnostics import ROLLBACK, classify, emit, failure, phase, public_code, status
+
+# Checked locally against the tested artifact before any SSH operation.
+DIAGNOSTIC_PROTOCOL = 2
 
 BASE = Path('/opt/ai-policy-investigator')
 PUBLIC = 'https://ai-policy.tewendelabs.com'
@@ -42,14 +45,17 @@ def run(command, env=None, timeout=360, *, step='command'):
     try:
         result = subprocess.run(command, env=env, text=True, errors='replace', capture_output=True, timeout=timeout)
     except subprocess.TimeoutExpired:
-        emit(step, 'failed', 'timeout')
-        raise DeployError('COMMAND_UNAVAILABLE_OR_TIMED_OUT') from None
+        error = DeployError('COMMAND_UNAVAILABLE_OR_TIMED_OUT')
+        failure(error, 'timeout')
+        raise error from None
     except OSError:
-        emit(step, 'failed', 'unavailable')
-        raise DeployError('COMMAND_UNAVAILABLE_OR_TIMED_OUT') from None
+        error = DeployError('COMMAND_UNAVAILABLE_OR_TIMED_OUT')
+        failure(error, 'unavailable')
+        raise error from None
     if result.returncode:
-        emit(step, 'failed', classify(result.stdout, result.stderr, step=step, exit_code=result.returncode), result.returncode)
-        raise DeployError('COMMAND_FAILED_DOCKER' if command[0] == 'docker' else 'COMMAND_FAILED_COMMAND')
+        error = DeployError('COMMAND_FAILED_DOCKER' if command[0] == 'docker' else 'COMMAND_FAILED_COMMAND')
+        failure(error, classify(result.stdout, result.stderr, step=step, exit_code=result.returncode), result.returncode)
+        raise error
     return result.stdout
 
 
@@ -65,7 +71,7 @@ def record_current(state, value):
     try:
         save(state / 'current.json', value)
     except OSError:
-        emit('state.current', 'failed', 'state_write')
+        failure(sys.exc_info()[1], 'state_write')
         raise
 
 
@@ -245,6 +251,7 @@ def restore(previous):
 
 
 def deploy(bundle, env_file, state):
+    ROLLBACK.set('not_started')
     # Imported only for deployment; rollback uses cached images and snapshot metadata.
     from ci_images import validate
     data = validate(json.loads((bundle / 'images.json').read_text()))
@@ -272,12 +279,14 @@ def deploy(bundle, env_file, state):
             record_current(state, {'bundle': str(bundle), 'images': images, 'ci_run': data['run_id'],
                                    'backend_sha': data['backend_sha'], 'frontend_sha': data['frontend_sha']})
     except Exception as error:
+        failure(error)
         status(public_code(error))
         with phase('rollback'):
             status('ROLLBACK_STARTED')
             try:
                 restore(previous)
             except Exception as rollback_error:
+                failure(rollback_error)
                 status(public_code(rollback_error))
                 status('ROLLBACK_FAILED')
                 save(state / 'blocked.json', {'reason': 'ROLLBACK_FAILED_OR_SCHEMA_CHANGED', 'snapshot': previous['bundle']})
@@ -297,11 +306,13 @@ def deployment_lock(state):
         yield
 
 
+@phase('preflight')
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('operation', choices=['deploy', 'rollback'])
     parser.add_argument('--bundle', type=Path, required=True)
     args = parser.parse_args()
+    rollback_token = ROLLBACK.set('not_started')
     os.umask(0o077)
     state = BASE / 'simple-deploy'
     env_file = BASE / '.env.production'
@@ -322,6 +333,7 @@ def main():
                         restore(previous)
                         record_current(state, {'bundle': previous['bundle'], 'images': previous['images'], 'rollback': True})
                     except Exception as error:
+                        failure(error)
                         status(public_code(error))
                         status('ROLLBACK_FAILED')
                         save(state / 'blocked.json', {'reason': 'ROLLBACK_FAILED_OR_SCHEMA_CHANGED', 'snapshot': previous['bundle']})
@@ -329,10 +341,12 @@ def main():
                     status('ROLLBACK_SUCCEEDED')
             else:
                 deploy(bundle, env_file, state)
-    except (DeployError, ValueError, OSError, KeyError, TypeError):
-        error = sys.exc_info()[1]
+    except Exception as error:
+        failure(error)
         status(public_code(error) if isinstance(error, DeployError) else 'DEPLOYMENT_INPUT_OR_STATE_INVALID')
         return 1
+    finally:
+        ROLLBACK.reset(rollback_token)
     return 0
 
 

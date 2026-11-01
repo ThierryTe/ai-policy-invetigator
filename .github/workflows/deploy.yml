@@ -50,6 +50,8 @@ jobs:
           cp deploy/simple/compose.images.yaml deploy/simple/compose.frontend.yaml "$RUNNER_TEMP/deployment/"
           cp scripts/simple_deploy.py scripts/simple_diagnostics.py scripts/ci_images.py "$RUNNER_TEMP/deployment/"
           printf '{}\n' > "$RUNNER_TEMP/deployment/images.json"
+      - name: Check tested artifact diagnostic compatibility before transport
+        run: python3 -B scripts/simple_ssh.py --check-bundle "$RUNNER_TEMP/deployment"
       - name: Deploy over pinned SSH and verify; restore images on failure when schema is unchanged
         shell: bash
         env:
@@ -63,7 +65,7 @@ jobs:
           DEPLOY_BUNDLE: ${{ runner.temp }}/deployment
         run: |
           set -euo pipefail
-          python3 -B scripts/simple_ssh.py 2>&1 | tee "$RUNNER_TEMP/deployment-result.txt"
+          python3 -u -B scripts/simple_ssh.py 2>&1 | tee "$RUNNER_TEMP/deployment-result.txt"
       - name: Deployment result
         if: always()
         env:

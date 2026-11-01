@@ -1,5 +1,7 @@
 """Synthetic contracts and failure injection. Never connects to a server or starts containers."""
 import json
+import io
+from contextlib import redirect_stderr
 import os
 from pathlib import Path
 import shutil
@@ -96,8 +98,12 @@ class SshValidationTest(unittest.TestCase):
 
     def test_remote_error_does_not_expose_stderr_or_secret_values(self):
         result = MagicMock(returncode=1, stderr='synthetic-secret-value\nDEPLOY_FAILED_ROLLBACK_SUCCEEDED_DATABASE_UNCHANGED\n')
-        with patch.object(ssh.subprocess, 'run', return_value=result), self.assertRaisesRegex(ValueError, '^DEPLOY_FAILED_ROLLBACK_SUCCEEDED_DATABASE_UNCHANGED$'):
+        captured = io.StringIO()
+        with patch.object(ssh.subprocess, 'run', return_value=result), redirect_stderr(captured), \
+                self.assertRaisesRegex(ValueError, '^SSH_REMOTE_DIAGNOSTIC_MISSING$'):
             ssh.execute(['ssh'])
+        self.assertIn('DEPLOY_FAILED_ROLLBACK_SUCCEEDED_DATABASE_UNCHANGED', captured.getvalue())
+        self.assertNotIn('synthetic-secret-value', captured.getvalue())
 
 
 class DeploymentTest(unittest.TestCase):

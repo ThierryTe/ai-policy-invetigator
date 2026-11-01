@@ -2,6 +2,7 @@
 from contextlib import redirect_stderr, redirect_stdout
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -86,13 +87,36 @@ class DockerDiagnosticsTest(unittest.TestCase):
             with self.subTest(code=code):
                 self.assertEqual(diagnostics.classify('', '', step='workers.health', exit_code=code), reason)
 
+    def test_invalid_local_step_fails_before_docker_instead_of_silently_dropping_diagnostics(self):
+        with patch.object(deploy.subprocess, 'run') as command, redirect_stderr(io.StringIO()), \
+                self.assertRaisesRegex(ValueError, '^DIAGNOSTIC_EVENT_INVALID$'):
+            deploy.run(['docker'], step='unrecognised-private-step')
+        command.assert_not_called()
+
     def test_database_permission_failure_is_not_misreported_as_registry_access(self):
         self.assertEqual(diagnostics.classify('', 'ERROR: permission denied for table private-history', step='history'), 'database')
 
 
 class DiagnosticTransportTest(unittest.TestCase):
     def event(self, **changes):
-        return {**dict(phase='update', step='compose.backend.up', result='failed', reason='unhealthy', exit_code=1), **changes}
+        return {**dict(phase='update', step='compose.backend.up', result='failed', reason='unhealthy', exit_code=1,
+                       rollback='not_started'), **changes}
+
+    def test_incompatible_remote_docker_diagnostic_is_never_silently_lost(self):
+        # A tested artifact may use a different schema than the checkout's reader.
+        # Previously the event disappeared, while its generic code caused remote_failed.
+        old_event = self.event()
+        old_event.pop('rollback')
+        output = diagnostics.PREFIX + json.dumps(old_event) + '\nCOMMAND_FAILED_DOCKER\nprivate-secret\n'
+        captured = io.StringIO()
+        with patch.object(ssh.subprocess, 'run', return_value=subprocess.CompletedProcess(['ssh'], 1, '', output)), \
+                redirect_stderr(captured), self.assertRaisesRegex(ValueError, '^SSH_REMOTE_DIAGNOSTIC_INVALID$'):
+            ssh.execute(['synthetic-transport'])
+        self.assertIn('step=ssh.diagnostics', captured.getvalue())
+        self.assertIn('reason=diagnostic_invalid', captured.getvalue())
+        self.assertIn('exit=1', captured.getvalue())
+        self.assertIn('rollback=unconfirmed', captured.getvalue())
+        self.assertNotIn('private-secret', captured.getvalue())
 
     def test_docker_failure_crosses_both_layers_and_preserves_command_reason_and_exit(self):
         remote = io.StringIO()
@@ -151,13 +175,44 @@ class DiagnosticTransportTest(unittest.TestCase):
         self.assertIn('remote outcome and rollback are unconfirmed', captured.getvalue())
         self.assertNotIn('ROLLBACK_SUCCEEDED', captured.getvalue())
 
+    def test_stdout_and_stderr_do_not_reorder_final_failure_or_rollback_outcome(self):
+        final = 'DEPLOY_FAILED_ROLLBACK_SUCCEEDED_DATABASE_UNCHANGED'
+        stdout = diagnostics.PREFIX + json.dumps(self.event(exit_code=42)) + '\n' + final + '\nROLLBACK_SUCCEEDED\n'
+        stderr = 'COMMAND_FAILED_DOCKER\nprivate-secret\n'
+        captured = io.StringIO()
+        with patch.object(ssh.subprocess, 'run', return_value=subprocess.CompletedProcess([], 1, stdout, stderr)), \
+                redirect_stderr(captured), self.assertRaisesRegex(ValueError, '^' + final + '$'):
+            ssh.execute(['synthetic'])
+        self.assertIn('step=compose.backend.up result=failed exit=42', captured.getvalue())
+        self.assertIn('step=ssh.deploy result=failed exit=1 rollback=succeeded', captured.getvalue())
+        self.assertNotIn('private-secret', captured.getvalue())
+
+    def test_rollback_started_without_terminal_status_is_unconfirmed(self):
+        remote = diagnostics.PREFIX + json.dumps(self.event()) + '\nROLLBACK_STARTED\nCOMMAND_FAILED_DOCKER\n'
+        captured = io.StringIO()
+        with patch.object(ssh.subprocess, 'run', return_value=subprocess.CompletedProcess([], 1, '', remote)), \
+                redirect_stderr(captured), self.assertRaises(ValueError):
+            ssh.execute(['synthetic'])
+        self.assertIn('step=ssh.deploy result=failed exit=1 rollback=unconfirmed', captured.getvalue())
+
+    def test_unexpected_transport_exception_is_sanitized_with_context(self):
+        captured = io.StringIO()
+        with patch.object(ssh.subprocess, 'run', side_effect=RuntimeError('transport-private-secret')), \
+                redirect_stderr(captured), self.assertRaisesRegex(ValueError, '^SSH_REMOTE_OUTCOME_UNCONFIRMED$'):
+            ssh.execute(['synthetic'])
+        self.assertIn('phase=transport step=ssh.deploy result=failed exit=unavailable rollback=unconfirmed', captured.getvalue())
+        self.assertIn('reason=internal_error', captured.getvalue())
+        self.assertNotIn('private-secret', captured.getvalue())
+
     def test_bundle_contract_includes_diagnostics_for_deploy_and_manual_rollback(self):
         root = Path(__file__).resolve().parents[2]
         self.assertIn('simple_diagnostics.py', ssh.FILES)
         for name in ('ci.yml', 'deploy.yml'):
             text = (root / '.github/workflows' / name).read_text()
             self.assertIn('cp scripts/simple_deploy.py scripts/simple_diagnostics.py scripts/ci_images.py', text)
-        self.assertIn('set -euo pipefail\n          python3 -B scripts/simple_ssh.py', (root / '.github/workflows/deploy.yml').read_text())
+        workflow = (root / '.github/workflows/deploy.yml').read_text()
+        self.assertIn('set -euo pipefail\n          python3 -u -B scripts/simple_ssh.py', workflow)
+        self.assertIn('scripts/simple_ssh.py --check-bundle', workflow)
 
     def test_ssh_main_does_not_echo_arbitrary_uppercase_exception_values(self):
         with patch.object(ssh, 'settings', side_effect=OSError('PRIVATE_UPPERCASE_SECRET')), self.assertRaises(SystemExit) as error:
@@ -175,6 +230,31 @@ class DiagnosticTransportTest(unittest.TestCase):
                 ssh.main()
             self.assertEqual(str(error.exception), 'DEPLOY_BUNDLE_INCOMPLETE')
             execute.assert_not_called()
+
+    def test_complete_but_incompatible_artifact_is_rejected_before_any_transport(self):
+        for name in ('simple_deploy.py', 'simple_diagnostics.py'):
+            for version in ('', 'DIAGNOSTIC_PROTOCOL = 1', 'DIAGNOSTIC_PROTOCOL = True'):
+                with self.subTest(name=name, version=version), tempfile.TemporaryDirectory() as directory:
+                    bundle = Path(directory)
+                    for filename in ssh.FILES:
+                        (bundle / filename).write_text('DIAGNOSTIC_PROTOCOL = 2\n')
+                    (bundle / name).write_text(version)
+                    env = {'GITHUB_RUN_ID': '1', 'GITHUB_RUN_ATTEMPT': '1', 'DEPLOY_OPERATION': 'deploy', 'DEPLOY_BUNDLE': directory}
+                    with patch.dict(ssh.os.environ, env), patch.object(ssh, 'settings', return_value=('host', 'user', '22', 'pin')), \
+                            patch.object(ssh, 'execute') as execute, self.assertRaises(SystemExit) as error:
+                        ssh.main()
+                    self.assertEqual(str(error.exception), 'DEPLOY_DIAGNOSTIC_PROTOCOL_INCOMPATIBLE_RERUN_CI')
+                    execute.assert_not_called()
+
+    def test_bare_docker_code_and_started_event_do_not_count_as_a_failure_diagnostic(self):
+        output = diagnostics.PREFIX + json.dumps(self.event(result='started', reason='none', exit_code=None))
+        output += '\nCOMMAND_FAILED_DOCKER\n'
+        captured = io.StringIO()
+        with patch.object(ssh.subprocess, 'run', return_value=subprocess.CompletedProcess(['synthetic'], 1, output, '')), \
+                redirect_stderr(captured), self.assertRaisesRegex(ValueError, '^SSH_REMOTE_DIAGNOSTIC_MISSING$'):
+            ssh.execute(['synthetic'])
+        self.assertIn('reason=diagnostic_missing', captured.getvalue())
+        self.assertIn('rollback=unconfirmed', captured.getvalue())
 
 
 class PartialDeploymentTest(unittest.TestCase):
@@ -199,7 +279,7 @@ class PartialDeploymentTest(unittest.TestCase):
         self.real_run = deploy.run
         self.captured = io.StringIO()
         with patch.object(deploy, 'container', return_value={'Image': self.images['postgres']}), \
-                patch.object(deploy, 'check_topology', return_value=(['backend-compose'], ['frontend-compose'], {})), \
+                patch.object(deploy, 'check_topology', return_value=(['docker', 'compose', 'backend'], ['docker', 'compose', 'frontend'], {})), \
                 patch.object(deploy, 'public_check'), patch.object(deploy, 'snapshot', return_value=self.previous), \
                 patch.object(deploy, 'run', side_effect=run), patch.object(deploy, 'verify'), \
                 patch.object(deploy, 'history', return_value=self.previous['history']), patch.object(deploy, 'save', side_effect=save), \
@@ -263,6 +343,49 @@ class PartialDeploymentTest(unittest.TestCase):
             self.assertIn('--wait', command)
         verify.assert_called_once_with(self.previous['images'])
 
+    def test_remote_docker_failure_and_rollback_reach_actual_workflow_tee_and_keep_failure_exit(self):
+        root = Path(__file__).resolve().parents[2]
+        workflow = (root / '.github/workflows/deploy.yml').read_text()
+        body = workflow.split('          set -euo pipefail\n', 1)[1].split('\n      - name:', 1)[0]
+        body = 'set -euo pipefail\n' + '\n'.join(line[10:] for line in body.splitlines())
+        for rollback_error, outcome in [(None, 'succeeded'), (RuntimeError('rollback-private-secret'), 'failed')]:
+            with self.subTest(rollback=outcome), tempfile.TemporaryDirectory() as directory:
+                code, count = self.execute(failed_step='compose.frontend.up', rollback_failure=rollback_error)
+                self.assertEqual(count, 1)
+                remote = self.captured.getvalue() + code + '\n'
+                temporary = Path(directory)
+                (temporary / 'scripts').mkdir()
+                bundle = temporary / 'bundle'
+                bundle.mkdir()
+                for name in ssh.FILES:
+                    source = root / 'scripts' / name
+                    (bundle / name).write_text(source.read_text() if name in ('simple_deploy.py', 'simple_diagnostics.py') else 'synthetic')
+                # Execute the real SSH entry point with every subprocess mocked in
+                # a child Python process. The only real subprocess here is bash/Python/tee.
+                harness = f'''import sys
+sys.path.insert(0, {str(root / 'scripts')!r})
+import subprocess
+from unittest.mock import patch
+import simple_ssh as ssh
+results = [subprocess.CompletedProcess([], 0, '', ''), subprocess.CompletedProcess([], 0, '', ''),
+           subprocess.CompletedProcess([], 1, 'stdout-private-secret', {remote!r})]
+with patch.object(ssh, 'settings', return_value=('host', 'user', '22', 'pin')), patch.object(ssh.subprocess, 'run', side_effect=results):
+    ssh.main()
+'''
+                (temporary / 'scripts/simple_ssh.py').write_text(harness)
+                env = {**os.environ, 'RUNNER_TEMP': directory, 'GITHUB_RUN_ID': '1', 'GITHUB_RUN_ATTEMPT': '1',
+                       'DEPLOY_OPERATION': 'deploy', 'DEPLOY_BUNDLE': str(bundle), 'VPS_SSH_KEY': 'synthetic'}
+                result = subprocess.run(['bash', '--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', body],
+                                        cwd=temporary, env=env, capture_output=True, text=True, timeout=15)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                logged = (temporary / 'deployment-result.txt').read_text()
+                self.assertEqual(logged, result.stdout)
+                for expected in ('phase=update step=compose.frontend.up result=failed exit=1',
+                                 'reason=unhealthy', 'rollback=' + outcome, code):
+                    self.assertIn(expected, logged)
+                for private in ('private-secret', 'TOKEN=', 'private-name', 'Traceback'):
+                    self.assertNotIn(private, logged + result.stderr)
+
     def main_fixture(self, operation):
         state = self.root / 'simple-deploy'
         incoming = state / 'incoming' / '1-1'
@@ -300,6 +423,39 @@ class PartialDeploymentTest(unittest.TestCase):
         self.assertIn('"reason": "state_write"', captured.getvalue())
         self.assertNotIn('ROLLBACK_SUCCEEDED', captured.getvalue())
         self.assertNotIn('private-error', captured.getvalue())
+
+    def test_unexpected_exception_after_docker_response_keeps_step_and_is_sanitized(self):
+        _, argv = self.main_fixture('deploy')
+        def action(*unused):
+            with diagnostics.phase('snapshot'):
+                with patch.object(deploy.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '[]', '')):
+                    deploy.run(['docker', 'inspect'], step='container.backend.inspect')
+                raise IndexError('response-private-secret')
+        remote = io.StringIO()
+        with patch.object(deploy, 'BASE', self.root), patch.object(sys, 'argv', argv), \
+                patch.object(deploy, 'deploy', side_effect=action), redirect_stderr(remote):
+            self.assertEqual(deploy.main(), 1)
+        captured = io.StringIO()
+        with patch.object(ssh.subprocess, 'run', return_value=subprocess.CompletedProcess([], 1, '', remote.getvalue())), \
+                redirect_stderr(captured), self.assertRaises(ValueError):
+            ssh.execute(['synthetic'])
+        self.assertIn('phase=snapshot step=container.backend.inspect result=failed', captured.getvalue())
+        self.assertIn('reason=internal_error', captured.getvalue())
+        self.assertNotIn('private-secret', captured.getvalue())
+        self.assertNotIn('Traceback', captured.getvalue())
+
+    def test_unexpected_public_probe_exception_keeps_attempt_without_breaking_error_reporter(self):
+        captured = io.StringIO()
+        with redirect_stderr(captured), self.assertRaises(IndexError):
+            with diagnostics.phase('verify'):
+                diagnostics.emit('public.root', 'started', attempt=4)
+                raise IndexError('public-private-secret')
+        events = [json.loads(line.removeprefix(diagnostics.PREFIX)) for line in captured.getvalue().splitlines()]
+        self.assertEqual(events[-1]['step'], 'public.root')
+        self.assertEqual(events[-1]['phase'], 'verify')
+        self.assertEqual(events[-1]['attempt'], 4)
+        self.assertEqual(events[-1]['reason'], 'internal_error')
+        self.assertNotIn('public-private-secret', captured.getvalue())
 
 
 if __name__ == '__main__':
