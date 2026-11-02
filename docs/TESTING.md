@@ -2,7 +2,8 @@
 
 Use this guide for the judge walkthrough and a dedicated local reproduction. Historical
 evidence is linked below; these instructions are not a report of a new execution.
-**Remote Work remains unvalidated until a complete investigation succeeds.**
+The project owner confirms a recorded Remote Work investigation previously marked
+Completed; its inputs and results have not been independently validated in this pass.
 
 ## Judge walkthrough
 
@@ -12,8 +13,11 @@ not start new Meta reasoning. The configured site is
 [ai-policy.tewendelabs.com](https://ai-policy.tewendelabs.com); current availability
 and the actual judge account must be checked separately.
 
-1. Sign in and open the supplied investigation link. The recorded training/access
-   scenario changes training from within 30 days after access to **before access**.
+The steps below describe the historical training/access result, separately from the
+recorded Remote Work demonstration.
+
+1. Sign in and open the supplied training/access investigation link. This scenario
+   changes training from within 30 days after access to **before access**.
 2. Select the contradiction. Read the explanation and suggested action; compare the
    policy and procedure quotations in Evidence, then open the original PDF pages.
 3. Inspect the compatible procedure, which blocks access until training is complete.
@@ -29,7 +33,8 @@ unauthorized writes. Operator setup remains in [Judge access](JUDGE_DEMO.md).
 
 If live inference is slow, return to a separate completed result and identify it as an
 earlier run. If the site is unavailable, use the historical screenshots linked from the
-[README](../README.md#demo-and-video). A video is not yet available. Evidence coverage
+[README](../README.md#demo-and-video). An English video has been recorded (2 min 54 s);
+its public URL has not yet been supplied. Evidence coverage
 means source coverage, not AI accuracy. Preserve the investigation URL: the recent list
 contains only known session IDs, not server history. Reload can restore an unexpired
 tab session after identity verification; 401 requires sign-in, while 403/404 requires
@@ -145,12 +150,17 @@ This retains documents and review history. Production accounts use the separate
 
 ## Remote Work scenario
 
-**Status: not validated.** Neither the three input PDFs nor evidence of a successful
-complete Remote Work investigation was found in the inspected repositories. The fixture
-exporter and existing browser workflow use the training/access scenario above; renaming
-their files would not test Remote Work. No expected classifications or metrics are asserted.
+**Status: recorded demonstration confirmed by the project owner; independent validation
+pending.** The English video (2 min 54 s) shows an existing investigation previously
+marked Completed, using three fictional PDFs: a 2025 policy, its 2026 replacement and a
+management procedure. The video URL is not yet public. The PDFs, result correctness,
+current site health and judge access were not independently verified in this pass.
+The fixture exporter and existing browser workflow still use the training/access
+scenario above; renaming their files would not test Remote Work. No expected
+classifications or metrics are asserted.
 
-Once the exact synthetic inputs are supplied, follow this manual procedure:
+For independent validation once the exact synthetic inputs are supplied, follow this
+manual procedure in a separate authorized test run; it was not executed in this pass:
 
 1. Record filenames, effective dates and SHA-256 hashes for **Remote Work Policy V1**,
    **Remote Work Policy V2** and **Remote Work Management Procedure**. Verify each PDF
@@ -171,7 +181,7 @@ Once the exact synthetic inputs are supplied, follow this manual procedure:
    Check graph consistency and review history using the authorized private account.
 6. Retain a sanitized report from that real run with input hashes, version IDs,
    investigation ID, timestamp, actual classifications, usage and checks performed.
-   Only then update the scenario status. A completed run establishes this workflow's
+   Only then claim independent validation. A completed run establishes this workflow's
    completion; correct interpretation still needs human assessment.
 
 Do not replace historical training/access reports with Remote Work output. Keep each
@@ -307,11 +317,11 @@ Deterministic regression commands are in [Regression and browser checks](#regres
 
 ## Recording an existing investigation
 
-**No video has been created.** The retained frontend
-[recording status](https://github.com/ThierryTe/ai-policy-invetigator-frontend/blob/main/demo-artifacts/recording-status.json)
-records a blocked attempt because its production investigation URL and authorized
-credentials/session were missing. That attempt stopped at the configuration guard;
-it does not establish production access, recording duration or a successful video.
+**An English Remote Work video has been recorded (2 min 54 s), as confirmed by the
+project owner. Public video URL: `[TO BE ADDED — not yet published]`.** This confirmation
+does not establish current site health, judge access or independent input/result validation.
+The frontend [recording status](https://github.com/ThierryTe/ai-policy-invetigator-frontend/blob/main/demo-artifacts/recording-status.json)
+was not rechecked during this documentation pass.
 
 The optional frontend [recording script](https://github.com/ThierryTe/ai-policy-invetigator-frontend/blob/main/e2e/demo-recording.spec.ts)
 uses an existing completed investigation. It does not create an account, start inference,
@@ -347,7 +357,7 @@ Only a successful run generates `ai-policy-investigator-demo.webm`,
 and updates `recording-status.json`. The timeline/narration are generated outputs, not
 required inputs; the removed provisional drafts are not evidence of a recording.
 The target is one continuous 180-second 1920×1080 silent video, with separate English
-narration. Actual duration and dimensions must be confirmed from successful metadata.
+narration. For a new recording, confirm its actual duration and dimensions from successful metadata.
 
 The recorder hides account details, omits reviewer History/settings, uses populated
 features and records omissions. It trims only setup footage at the ends, without internal
