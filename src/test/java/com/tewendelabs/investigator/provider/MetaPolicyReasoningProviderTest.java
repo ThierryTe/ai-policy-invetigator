@@ -120,11 +120,11 @@ class MetaPolicyReasoningProviderTest {
         var result = provider(4096).reason(request);
         var payload = JsonContract.parse(transport.payload);
         var contract = payload.path("response_format").path("json_schema");
-        assertThat(contract.path("name").asString()).isEqualTo("requirements_v3");
+        assertThat(contract.path("name").asString()).isEqualTo("requirements_v4");
         var fields = contract.path("schema").path("properties").path("requirements").path("items").path("properties");
         assertThat(fields.path("effectiveDate").path("description").asString())
                 .contains("ISO YYYY-MM-DD", "unknown, ambiguous or invalid", "return null", "unknownFields", "limitations",
-                        "Never substitute the analysis date or document metadata");
+                        "Never substitute the analysis date or document metadata", "If non-null, effectiveDate must be absent from unknownFields");
         assertThat(fields.path("deadline").path("description").asString()).contains("not its effective date");
         assertThat(payload.path("messages").get(0).path("content").asString())
                 .contains("January 1, 2025 becomes 2025-01-01", "Never substitute the analysis date or document metadata",
@@ -140,8 +140,8 @@ class MetaPolicyReasoningProviderTest {
         assertThat(payload.path("messages").get(0).path("content").asString()).contains(InvestigationSchemas.EXTRACTION_CONTRACT);
         assertThat(fields.path("obligation").path("enum"))
                 .isEqualTo(JsonContract.tree(Arrays.asList("MUST", "MUST_NOT", "SHOULD", "MAY", null)));
-        assertThat(result.promptVersion()).isEqualTo("policy-investigator-2026-11-02-v3");
-        assertThat(result.schemaVersion()).isEqualTo("requirements-v3");
+        assertThat(result.promptVersion()).isEqualTo("policy-investigator-2026-11-02-v4");
+        assertThat(result.schemaVersion()).isEqualTo("requirements-v4");
         onlyLog();
     }
 
