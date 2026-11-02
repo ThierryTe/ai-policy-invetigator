@@ -59,8 +59,23 @@ public final class JsonContract {
                 fail();
             for (var item : value) validate(item, schema.get("items"));
         }
-        if (value.isString() && (value.asString().length() > schema.path("maxLength").asInt(12000) || value.asString().length() < schema.path("minLength").asInt(0)))
-            fail();
+        if (value.isString()) {
+            String text = value.asString();
+            // Preserve the existing UTF-16 budgets; do not silently double them for supplementary characters.
+            if (text.length() > schema.path("maxLength").asInt(12000) || text.length() < schema.path("minLength").asInt(0))
+                fail();
+            // JSON strings can encode these values, but our jsonb checkpoints cannot store them.
+            // Reject before persistence, without removing/replacing text or exposing provider content.
+            for (int i = 0; i < text.length(); i++) {
+                char unit = text.charAt(i);
+                if (unit == 0 || Character.isLowSurrogate(unit)) throw new ApiFailure(502, "UNPERSISTABLE_MODEL_TEXT");
+                if (Character.isHighSurrogate(unit)) {
+                    if (i + 1 >= text.length() || !Character.isLowSurrogate(text.charAt(i + 1)))
+                        throw new ApiFailure(502, "UNPERSISTABLE_MODEL_TEXT");
+                    i++;
+                }
+            }
+        }
     }
 
     public static void fail() {

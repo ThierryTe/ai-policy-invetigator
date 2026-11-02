@@ -104,6 +104,7 @@ public class InvestigationWorker {
                     data = JsonContract.parse((String) row.get("payload"));
                 } else {
                     String task = "Extract every explicit normative requirement in these sources. Fields not explicitly stated must be null and listed in unknownFields. Obligation uses MUST, MUST_NOT, SHOULD, or MAY. Preserve all exceptions and applicability. Copy each supplied sourceId into processedSourceIds after covering its entire excerpt. Analysis date (applicability context only, never an effective-date fallback): " + snapshot.date() + ". effectiveDate must be a complete valid ISO YYYY-MM-DD date grounded in explicit source text, or null if unknown, ambiguous or invalid. Never substitute metadata or the analysis date. Keep deadlines separate from effective dates.";
+                    task += " " + InvestigationSchemas.UNKNOWN_FIELDS_CONTRACT + " " + InvestigationSchemas.EXTRACTION_CONTRACT;
                     Result result = provider.reason(request(lease, InvestigationSchemas.EXTRACTION, task, sources));
                     data = EvidenceValidator.extraction(result.content(), sources, lease.id(), version);
                     final JsonNode saved = data;
@@ -136,6 +137,10 @@ public class InvestigationWorker {
                 return null;
             });
         } catch (RuntimeException e) {
+            if (e instanceof EvidenceValidator.InvalidUnknownFields rejection) {
+                LoggerFactory.getLogger(getClass()).warn("unknown_fields_validation_rejected reason={} field={} stage={} investigation_id={} version_id={} requirement_index={}",
+                        rejection.reason(), rejection.field(), diagnosticStage, lease.id(), rejection.version(), rejection.requirementIndex());
+            }
             if (e instanceof EvidenceValidator.InvalidEffectiveDate rejection) {
                 LoggerFactory.getLogger(getClass()).warn("effective_date_validation_rejected reason={} stage={} investigation_id={} version_id={} requirement_index={}",
                         rejection.reason(), diagnosticStage, lease.id(), rejection.version(), rejection.requirementIndex());

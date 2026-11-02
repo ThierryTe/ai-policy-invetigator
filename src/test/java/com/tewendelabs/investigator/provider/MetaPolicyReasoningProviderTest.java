@@ -120,7 +120,7 @@ class MetaPolicyReasoningProviderTest {
         var result = provider(4096).reason(request);
         var payload = JsonContract.parse(transport.payload);
         var contract = payload.path("response_format").path("json_schema");
-        assertThat(contract.path("name").asString()).isEqualTo("requirements_v2");
+        assertThat(contract.path("name").asString()).isEqualTo("requirements_v3");
         var fields = contract.path("schema").path("properties").path("requirements").path("items").path("properties");
         assertThat(fields.path("effectiveDate").path("description").asString())
                 .contains("ISO YYYY-MM-DD", "unknown, ambiguous or invalid", "return null", "unknownFields", "limitations",
@@ -129,8 +129,19 @@ class MetaPolicyReasoningProviderTest {
         assertThat(payload.path("messages").get(0).path("content").asString())
                 .contains("January 1, 2025 becomes 2025-01-01", "Never substitute the analysis date or document metadata",
                         "Never fill missing date components or infer a locale", "Keep deadlines in deadline");
-        assertThat(result.promptVersion()).isEqualTo("policy-investigator-2026-11-02-v2");
-        assertThat(result.schemaVersion()).isEqualTo("requirements-v2");
+        assertThat(fields.path("unknownFields").path("items").path("enum"))
+                .isEqualTo(JsonContract.tree(List.of("actor", "action", "obligation", "condition", "scope", "deadline", "exceptions", "effectiveDate")));
+        assertThat(fields.path("unknownFields").path("maxItems").asInt()).isEqualTo(8);
+        assertThat(fields.path("unknownFields").path("description").asString())
+                .isEqualTo(InvestigationSchemas.UNKNOWN_FIELDS_CONTRACT);
+        assertThat(payload.path("messages").get(0).path("content").asString())
+                .contains(InvestigationSchemas.UNKNOWN_FIELDS_CONTRACT);
+        assertThat(contract.path("schema").path("description").asString()).isEqualTo(InvestigationSchemas.EXTRACTION_CONTRACT);
+        assertThat(payload.path("messages").get(0).path("content").asString()).contains(InvestigationSchemas.EXTRACTION_CONTRACT);
+        assertThat(fields.path("obligation").path("enum"))
+                .isEqualTo(JsonContract.tree(Arrays.asList("MUST", "MUST_NOT", "SHOULD", "MAY", null)));
+        assertThat(result.promptVersion()).isEqualTo("policy-investigator-2026-11-02-v3");
+        assertThat(result.schemaVersion()).isEqualTo("requirements-v3");
         onlyLog();
     }
 

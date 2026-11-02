@@ -11,10 +11,33 @@ import com.tewendelabs.investigator.provider.PolicyReasoningProvider.Source;
 import com.tewendelabs.investigator.api.ApiFailure;
 
 public final class EvidenceValidator {
-    private static final Set<String> FIELDS = Set.of("actor", "action", "obligation", "condition", "scope", "deadline", "exceptions", "effectiveDate");
+    private static final Set<String> FIELDS = Set.copyOf(InvestigationSchemas.REQUIREMENT_FIELDS);
     private static final Pattern ISO_DATE = Pattern.compile("[0-9]{4}-[0-9]{2}-[0-9]{2}");
 
     enum DateRejectionReason { INVALID_FORMAT, INVALID_CALENDAR_DATE }
+
+    enum UnknownFieldRejectionReason { UNKNOWN_NAME, NULL_FIELD_NOT_LISTED, NON_NULL_FIELD_LISTED }
+
+    /** Only fixed vocabulary and server identifiers; never retain the model-supplied name or value. */
+    static final class InvalidUnknownFields extends ApiFailure {
+        private final UnknownFieldRejectionReason reason;
+        private final String field;
+        private final UUID version;
+        private final int requirementIndex;
+
+        private InvalidUnknownFields(UnknownFieldRejectionReason reason, String field, UUID version, int requirementIndex) {
+            super(502, "UNKNOWN_FIELD_INVALID");
+            this.reason = reason;
+            this.field = field;
+            this.version = version;
+            this.requirementIndex = requirementIndex;
+        }
+
+        UnknownFieldRejectionReason reason() { return reason; }
+        String field() { return field; }
+        UUID version() { return version; }
+        int requirementIndex() { return requirementIndex; }
+    }
 
     /** No raw date or parser exception: both may contain private model/document content. Index is zero-based. */
     static final class InvalidEffectiveDate extends ApiFailure {
@@ -74,10 +97,12 @@ public final class EvidenceValidator {
         for (var req : output.path("requirements")) {
             references(req.path("sourceReferences"), sources, Set.of(version));
             Set<String> unknown = values(req.path("unknownFields"));
-            if (!FIELDS.containsAll(unknown)) throw new ApiFailure(502, "UNKNOWN_FIELD_INVALID");
-            for (String field : FIELDS)
+            if (!FIELDS.containsAll(unknown))
+                throw new InvalidUnknownFields(UnknownFieldRejectionReason.UNKNOWN_NAME, "UNRECOGNIZED", version, index);
+            for (String field : InvestigationSchemas.REQUIREMENT_FIELDS)
                 if (req.path(field).isNull() != unknown.contains(field))
-                    throw new ApiFailure(502, "UNKNOWN_FIELD_INVALID");
+                    throw new InvalidUnknownFields(req.path(field).isNull() ? UnknownFieldRejectionReason.NULL_FIELD_NOT_LISTED
+                            : UnknownFieldRejectionReason.NON_NULL_FIELD_LISTED, field, version, index);
             if (!req.path("effectiveDate").isNull()) {
                 String date = req.path("effectiveDate").asString();
                 if (!ISO_DATE.matcher(date).matches())
